@@ -1,5 +1,6 @@
 import 'dart:convert';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
 
 class ApiClient {
@@ -7,31 +8,63 @@ class ApiClient {
   static String? _token;
   static String? get token => _token;
 
-  /// macOS: usesDataProtectionKeychain 设为 false，否则在没有开发者证书的
-  /// ad-hoc 签名环境下会抛出 -34018 (errSecMissingEntitlement)。
-  static const _macOptions = MacOsOptions(
-    accessibility: KeychainAccessibility.unlocked,
-    usesDataProtectionKeychain: false,
-    synchronizable: false,
-  );
+  static File? _credsFile;
+  static Future<File> _getCredsFile() async {
+    if (_credsFile != null) return _credsFile!;
+    final dir = await getApplicationSupportDirectory();
+    final credsDir = Directory('${dir.path}/credentials');
+    if (!await credsDir.exists()) {
+      await credsDir.create(recursive: true);
+    }
+    _credsFile = File('${credsDir.path}/apiclient.json');
+    return _credsFile!;
+  }
 
-  static final FlutterSecureStorage _storage = FlutterSecureStorage(mOptions: _macOptions);
+  static Future<Map<String, dynamic>> _readAll() async {
+    try {
+      final file = await _getCredsFile();
+      if (!await file.exists()) return {};
+      final content = await file.readAsString();
+      if (content.isEmpty) return {};
+      return jsonDecode(content) as Map<String, dynamic>;
+    } catch (_) {
+      return {};
+    }
+  }
 
-  static Future<void> storageWrite(String key, String value) => _storage.write(key: key, value: value, mOptions: _macOptions);
-  static Future<String?> storageRead(String key) => _storage.read(key: key, mOptions: _macOptions);
-  static Future<void> storageDelete(String key) => _storage.delete(key: key, mOptions: _macOptions);
+  static Future<void> _writeAll(Map<String, dynamic> data) async {
+    final file = await _getCredsFile();
+    await file.writeAsString(jsonEncode(data));
+  }
+
+  static Future<void> storageWrite(String key, String value) async {
+    final data = await _readAll();
+    data[key] = value;
+    await _writeAll(data);
+  }
+
+  static Future<String?> storageRead(String key) async {
+    final data = await _readAll();
+    return data[key] as String?;
+  }
+
+  static Future<void> storageDelete(String key) async {
+    final data = await _readAll();
+    data.remove(key);
+    await _writeAll(data);
+  }
 
   static void setToken(String? t) {
     _token = t;
     if (t != null) {
-      _storage.write(key: 'jwt_token', value: t, mOptions: _macOptions);
+      storageWrite('jwt_token', t);
     } else {
-      _storage.delete(key: 'jwt_token', mOptions: _macOptions);
+      storageDelete('jwt_token');
     }
   }
 
   static Future<String?> loadSavedToken() async {
-    _token = await _storage.read(key: 'jwt_token', mOptions: _macOptions);
+    _token = await storageRead('jwt_token');
     return _token;
   }
 

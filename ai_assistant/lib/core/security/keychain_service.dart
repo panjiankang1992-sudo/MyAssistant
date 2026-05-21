@@ -1,38 +1,64 @@
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'dart:convert';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
 
 class KeychainService {
-  /// macOS: usesDataProtectionKeychain 设为 false，否则在没有开发者证书的
-  /// ad-hoc 签名环境下会抛出 -34018 (errSecMissingEntitlement)。
-  static const _macOptions = MacOsOptions(
-    accessibility: KeychainAccessibility.unlocked,
-    usesDataProtectionKeychain: false,
-    synchronizable: false,
-  );
+  static Future<File> _getCredsFile() async {
+    final dir = await getApplicationSupportDirectory();
+    final credsDir = Directory('${dir.path}/credentials');
+    if (!await credsDir.exists()) {
+      await credsDir.create(recursive: true);
+    }
+    return File('${credsDir.path}/keychain.json');
+  }
 
-  final FlutterSecureStorage _storage = const FlutterSecureStorage(mOptions: _macOptions);
+  Future<Map<String, dynamic>> _readAll() async {
+    try {
+      final file = await _getCredsFile();
+      if (!await file.exists()) return {};
+      final content = await file.readAsString();
+      if (content.isEmpty) return {};
+      return jsonDecode(content) as Map<String, dynamic>;
+    } catch (_) {
+      return {};
+    }
+  }
+
+  Future<void> _writeAll(Map<String, dynamic> data) async {
+    final file = await _getCredsFile();
+    await file.writeAsString(jsonEncode(data));
+  }
 
   Future<void> saveCredentials(String serverUrl, String username, String password) async {
-    await _storage.write(key: 'webdav:$serverUrl:username', value: username, mOptions: _macOptions);
-    await _storage.write(key: 'webdav:$serverUrl:password', value: password, mOptions: _macOptions);
+    final data = await _readAll();
+    data['webdav:$serverUrl:username'] = username;
+    data['webdav:$serverUrl:password'] = password;
+    await _writeAll(data);
   }
 
   Future<Map<String, String>?> getCredentials(String serverUrl) async {
-    final username = await _storage.read(key: 'webdav:$serverUrl:username', mOptions: _macOptions);
-    final password = await _storage.read(key: 'webdav:$serverUrl:password', mOptions: _macOptions);
+    final data = await _readAll();
+    final username = data['webdav:$serverUrl:username'] as String?;
+    final password = data['webdav:$serverUrl:password'] as String?;
     if (username == null || password == null) return null;
     return {'username': username, 'password': password};
   }
 
   Future<void> deleteCredentials(String serverUrl) async {
-    await _storage.delete(key: 'webdav:$serverUrl:username', mOptions: _macOptions);
-    await _storage.delete(key: 'webdav:$serverUrl:password', mOptions: _macOptions);
+    final data = await _readAll();
+    data.remove('webdav:$serverUrl:username');
+    data.remove('webdav:$serverUrl:password');
+    await _writeAll(data);
   }
 
   Future<String?> getLastServerUrl() async {
-    return await _storage.read(key: 'webdav_last_server', mOptions: _macOptions);
+    final data = await _readAll();
+    return data['webdav_last_server'] as String?;
   }
 
   Future<void> setLastServerUrl(String url) async {
-    await _storage.write(key: 'webdav_last_server', value: url, mOptions: _macOptions);
+    final data = await _readAll();
+    data['webdav_last_server'] = url;
+    await _writeAll(data);
   }
 }

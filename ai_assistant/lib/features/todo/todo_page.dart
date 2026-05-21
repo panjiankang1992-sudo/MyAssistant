@@ -3,9 +3,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../main.dart';
+import '../../core/providers/core_providers.dart';
 import 'providers/todo_provider.dart';
-import 'services/seed_data.dart';
 import 'widgets/add_todo_modal.dart';
 import 'widgets/todo_detail_modal.dart';
 import 'widgets/todo_list.dart';
@@ -65,7 +64,6 @@ class _TodoPageState extends ConsumerState<TodoPage> with TickerProviderStateMix
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final repo = ref.read(todoRepoProvider);
-      await SeedData.seedIfEmpty(repo);
       ref.read(todoNotifierProvider.notifier).loadTodayTodos();
     });
   }

@@ -8,6 +8,8 @@ class SyncResult {
   final int errorCount;
   final DateTime timestamp;
   final String? error;
+  final int todosIndexCount;
+  final int routinesIndexCount;
 
   SyncResult({
     required this.module,
@@ -16,6 +18,8 @@ class SyncResult {
     this.errorCount = 0,
     String? error,
     DateTime? timestamp,
+    this.todosIndexCount = 0,
+    this.routinesIndexCount = 0,
   })  : error = error,
         timestamp = timestamp ?? DateTime.now();
 

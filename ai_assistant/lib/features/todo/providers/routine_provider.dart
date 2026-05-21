@@ -1,5 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../main.dart';
+import '../../../core/providers/core_providers.dart';
 import '../../../domain/models/routine.dart';
 import 'todo_provider.dart';
 

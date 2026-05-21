@@ -1,15 +1,9 @@
-import 'dart:convert';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:webdav_plus/webdav_plus.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/security/keychain_service.dart';
-import '../../data/datasources/webdav_datasource.dart';
-import '../../domain/models/todo.dart';
-import '../todo/providers/todo_provider.dart';
-import '../sync/cloud_path_builder.dart';
 import '../sync/providers/sync_provider.dart';
+import '../../core/providers/core_providers.dart';
 
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
@@ -46,38 +40,24 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 
   /// 找最近 N 天的待办目录并拉取
-  static const _pullDays = 7; // 拉取最近一周 + 未来一周
+  /// 找最近 N 天的待办目录并拉取
+  static const _pullDays = 7;
 
   Future<void> _syncWebdav() async {
     setState(() { _syncing = true; _syncMessage = ''; });
     try {
-      final keychain = KeychainService();
-      final lastUrl = await keychain.getLastServerUrl();
-
-      if (lastUrl == null || lastUrl.isEmpty) {
+      final engine = await ref.read(syncEngineProvider.future);
+      if (engine == null) {
         setState(() => _syncMessage = '未配置 WebDAV，请确保服务器已配置 WebDAV 账号并重新登录');
         return;
       }
 
-      final creds = await keychain.getCredentials(lastUrl);
-      if (creds == null) {
-        setState(() => _syncMessage = 'WebDAV 凭据丢失，请重新登录');
-        return;
-      }
+      final notifier = ref.read(syncNotifierProvider.notifier);
+      notifier.setSyncing(true);
+      final result = await engine.sync('todos');
+      notifier.onSyncComplete(result);
 
-      final webdav = WebDavDatasource();
-      await webdav.initialize(baseUrl: lastUrl, username: creds['username']!, password: creds['password']!);
-
-      // 1. 拉取：从云端下载待办并合并到本地
-      int pulled = await _pullTodosFromWebdav(webdav);
-
-      // 2. 推送：将本地待办上传到云端
-      int pushed = await _pushTodosToWebdav(webdav);
-
-      webdav.dispose();
-
-      setState(() => _syncMessage = '同步完成：拉取 $pulled 条，推送 $pushed 条');
-      await _loadWebdavInfo(); // 刷新信息
+      setState(() => _syncMessage = '同步完成：拉取 ${result.pullCount} 条，推送 ${result.pushCount} 条');
     } catch (e) {
       setState(() => _syncMessage = '同步异常: $e');
     } finally {
@@ -85,90 +65,32 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     }
   }
 
-  /// 从 WebDAV 拉取最近 N 天的待办数据，以 id 去重合并到本地
-  Future<int> _pullTodosFromWebdav(WebDavDatasource webdav) async {
-    final now = DateTime.now();
-    final existingTodos = ref.read(todoNotifierProvider);
-    final existingIds = existingTodos.map((t) => t.id).toSet();
-    final pathBuilder = CloudPathBuilder(_webdavUser);
-    int pulled = 0;
-
-    for (int offset = -_pullDays; offset <= _pullDays; offset++) {
-      final date = now.add(Duration(days: offset));
-      final y = date.year.toString();
-      final ym = '${date.year}${date.month.toString().padLeft(2, '0')}';
-      final ymd = '$ym${date.day.toString().padLeft(2, '0')}';
-      final dirPath = 'MyAssistant/${pathBuilder.username}/todos/$y/$ym/$ymd';
-
-      List<DavResource> files;
-      try {
-        files = await webdav.listDirectory(dirPath);
-      } catch (_) {
-        continue;
+  Future<void> _fullSync() async {
+    setState(() { _syncing = true; _syncMessage = ''; });
+    try {
+      final engine = await ref.read(syncEngineProvider.future);
+      if (engine == null) {
+        setState(() => _syncMessage = '未配置 WebDAV');
+        return;
       }
-
-      for (final file in files) {
-        if (!file.name.endsWith('.json')) continue;
-        try {
-          final bytes = await webdav.getFile('$dirPath/${file.name}');
-          final json = jsonDecode(utf8.decode(bytes)) as Map<String, dynamic>;
-          final id = json['id'] as String;
-          if (existingIds.contains(id)) continue;
-
-          final todo = Todo(
-            id: id,
-            title: json['title'] as String,
-            description: json['description'] as String?,
-            source: json['source'] as String? ?? 'cloud',
-            type: json['type'] as String? ?? 'personal',
-            time: json['time'] as String? ?? '09:00',
-            date: DateTime.parse(json['date'] as String),
-            completed: json['completed'] as bool? ?? false,
-            createdAt: json['createdAt'] != null ? DateTime.parse(json['createdAt'] as String) : now,
-            updatedAt: json['updatedAt'] != null ? DateTime.parse(json['updatedAt'] as String) : now,
-          );
-
-          await ref.read(todoNotifierProvider.notifier).addTodo(todo);
-          existingIds.add(id);
-          pulled++;
-        } catch (_) {}
+      final notifier = ref.read(syncNotifierProvider.notifier);
+      notifier.setSyncing(true);
+      final result = await engine.fullSync('todos');
+      notifier.onSyncComplete(result);
+      final msg = StringBuffer();
+      msg.writeln('全量同步完成');
+      msg.writeln('拉取 ${result.pullCount} 条 | 推送 ${result.pushCount} 条');
+      msg.writeln('todos索引=${result.todosIndexCount}条 routines=${result.routinesIndexCount}条');
+      if (result.error != null && result.error!.isNotEmpty) {
+        msg.writeln('---');
+        msg.write(result.error);
       }
+      setState(() => _syncMessage = msg.toString());
+    } catch (e) {
+      setState(() => _syncMessage = '同步异常: $e');
+    } finally {
+      setState(() => _syncing = false);
     }
-    return pulled;
-  }
-
-  /// 将本地所有待办推送到 WebDAV
-  Future<int> _pushTodosToWebdav(WebDavDatasource webdav) async {
-    final pathBuilder = CloudPathBuilder(_webdavUser);
-    for (final dir in pathBuilder.requiredDirectories) {
-      try { await webdav.createDirectory(dir); } catch (_) {}
-    }
-
-    final todos = ref.read(todoNotifierProvider);
-    int pushed = 0;
-    for (final todo in todos) {
-      final path = pathBuilder.buildFilePath('todo', todo.date.toIso8601String().split('T').first, todo.id);
-      final parentDir = path.substring(0, path.lastIndexOf('/'));
-      try { await webdav.createDirectory(parentDir); } catch (_) {}
-
-      try {
-        final data = jsonEncode({
-          'id': todo.id,
-          'title': todo.title,
-          'description': todo.description,
-          'source': todo.source,
-          'type': todo.type,
-          'time': todo.time,
-          'date': todo.date.toIso8601String(),
-          'completed': todo.completed,
-          'createdAt': todo.createdAt.toIso8601String(),
-          'updatedAt': todo.updatedAt.toIso8601String(),
-        });
-        await webdav.putFile(path, Uint8List.fromList(utf8.encode(data)));
-        pushed++;
-      } catch (_) {}
-    }
-    return pushed;
   }
 
   Widget _infoRow(String label, String value) {
@@ -292,7 +214,24 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               ),
               child: _syncing
                 ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : const Text('同步'),
+                : const Text('增量同步'),
+            ),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(
+              onPressed: _syncing ? null : _fullSync,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primary,
+                side: const BorderSide(color: AppColors.primary),
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              child: _syncing
+                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary))
+                : const Text('全量同步'),
             ),
           ),
           if (_syncMessage.isNotEmpty) ...[
