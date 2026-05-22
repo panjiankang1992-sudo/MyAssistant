@@ -2,24 +2,28 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/providers/core_providers.dart';
 import '../../../domain/models/todo.dart';
+import 'selected_date_provider.dart';
 
 class TodoNotifier extends Notifier<List<Todo>> {
   @override
   List<Todo> build() {
-    loadTodayTodos();
+    final selectedDate = ref.watch(selectedDateProvider);
+    _loadTodosForDate(selectedDate);
     return [];
   }
 
-  Future<void> loadTodayTodos() async {
+  Future<void> _loadTodosForDate(DateTime date) async {
     final repo = ref.read(todoRepoProvider);
-    final todos = await repo.getTodayTodos();
+    final todos = await repo.getTodosByDate(date);
     state = todos;
 
-    // 加载例行数据，为今天生成待办
-    await _generateRoutineTodos();
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    if (date == today) {
+      await _generateRoutineTodos();
+    }
   }
 
-  /// 根据例行规则为今天生成待办（去重）
   Future<void> _generateRoutineTodos() async {
     final routineRepo = ref.read(routineRepoProvider);
     final todoRepo = ref.read(todoRepoProvider);
@@ -33,7 +37,6 @@ class TodoNotifier extends Notifier<List<Todo>> {
     for (final routine in routines) {
       if (!routine.shouldGenerateOn(todayDate)) continue;
 
-      // 去重：检查今天是否已存在标题相同且来源为例行的待办
       final alreadyExists = existingTodos.any(
         (t) => t.title == routine.title && t.source == 'routine' && t.date == todayDate,
       );
@@ -53,26 +56,34 @@ class TodoNotifier extends Notifier<List<Todo>> {
       await todoRepo.addTodo(todo);
     }
 
-    // 重新加载刷新列表
     state = await todoRepo.getTodayTodos();
+  }
+
+  Future<void> loadTodayTodos() async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    ref.read(selectedDateProvider.notifier).state = today;
   }
 
   Future<void> addTodo(Todo todo) async {
     final repo = ref.read(todoRepoProvider);
     await repo.addTodo(todo);
-    await loadTodayTodos();
+    final selectedDate = ref.read(selectedDateProvider);
+    await _loadTodosForDate(selectedDate);
   }
 
   Future<void> toggleComplete(String id) async {
     final repo = ref.read(todoRepoProvider);
     await repo.toggleTodo(id);
-    await loadTodayTodos();
+    final selectedDate = ref.read(selectedDateProvider);
+    await _loadTodosForDate(selectedDate);
   }
 
   Future<void> deleteTodo(String id) async {
     final repo = ref.read(todoRepoProvider);
     await repo.deleteTodo(id);
-    await loadTodayTodos();
+    final selectedDate = ref.read(selectedDateProvider);
+    await _loadTodosForDate(selectedDate);
   }
 }
 
