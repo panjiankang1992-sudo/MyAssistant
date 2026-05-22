@@ -20,12 +20,28 @@ class _WeekCalendarStripState extends State<WeekCalendarStrip> {
   late DateTime _initialWeekStart;
 
   static const _weekdays = ['一', '二', '三', '四', '五', '六', '日'];
+  static const _initialPage = 520; // middle of 1040 pages (~20 year range)
 
   @override
   void initState() {
     super.initState();
     _initialWeekStart = _mondayOfWeek(widget.selectedDate);
-    _pageController = PageController(initialPage: 52); // middle of 104 pages
+    _pageController = PageController(initialPage: _initialPage);
+  }
+
+  @override
+  void didUpdateWidget(covariant WeekCalendarStrip oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!_isSameDay(widget.selectedDate, oldWidget.selectedDate)) {
+      final targetPage = _pageForDate(widget.selectedDate);
+      if (_pageController.hasClients && (_pageController.page?.round() ?? _initialPage) != targetPage) {
+        _pageController.animateToPage(
+          targetPage,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    }
   }
 
   @override
@@ -39,8 +55,14 @@ class _WeekCalendarStripState extends State<WeekCalendarStrip> {
     return DateTime(date.year, date.month, date.day).subtract(Duration(days: d - 1));
   }
 
+  int _pageForDate(DateTime date) {
+    final monday = _mondayOfWeek(date);
+    final diff = monday.difference(_initialWeekStart).inDays;
+    return _initialPage + diff ~/ 7;
+  }
+
   DateTime _weekStartForPage(int page) {
-    return _initialWeekStart.add(Duration(days: (page - 52) * 7));
+    return _initialWeekStart.add(Duration(days: (page - _initialPage) * 7));
   }
 
   bool _isSameDay(DateTime a, DateTime b) {
@@ -56,7 +78,7 @@ class _WeekCalendarStripState extends State<WeekCalendarStrip> {
       height: 64,
       child: PageView.builder(
         controller: _pageController,
-        itemCount: 104,
+        itemCount: 1040,
         itemBuilder: (context, page) {
           final weekStart = _weekStartForPage(page);
           return Row(
