@@ -62,7 +62,7 @@ class TodoNotifier extends Notifier<List<Todo>> {
   Future<void> loadTodayTodos() async {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    ref.read(selectedDateProvider.notifier).state = today;
+    ref.read(selectedDateProvider.notifier).date = today;
   }
 
   Future<void> addTodo(Todo todo) async {

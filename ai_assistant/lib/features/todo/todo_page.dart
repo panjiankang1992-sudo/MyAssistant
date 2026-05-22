@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/providers/core_providers.dart';
 import 'providers/todo_provider.dart';
 import 'providers/selected_date_provider.dart';
 import 'widgets/add_todo_modal.dart';
@@ -12,7 +11,6 @@ import 'widgets/todo_list.dart';
 import 'widgets/week_calendar_strip.dart';
 import '../../core/theme/app_theme.dart';
 import '../profile/profile_provider.dart';
-import 'package:intl/intl.dart';
 
 class TodoPage extends ConsumerStatefulWidget {
   final VoidCallback? onAvatarTap;
@@ -153,7 +151,7 @@ class _TodoPageState extends ConsumerState<TodoPage> with TickerProviderStateMix
             WeekCalendarStrip(
               selectedDate: selectedDate,
               onDateSelected: (date) {
-                ref.read(selectedDateProvider.notifier).state = date;
+                ref.read(selectedDateProvider.notifier).date = date;
               },
             ),
             Expanded(
