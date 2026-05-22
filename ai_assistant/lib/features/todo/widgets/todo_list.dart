@@ -7,6 +7,7 @@ import 'todo_item.dart';
 class TodoList extends StatelessWidget {
   final List<Todo> todos;
   final bool isLoading;
+  final bool readOnly;
   final void Function(Todo) onToggle;
   final void Function(Todo) onDelete;
   final void Function(Todo) onTap;
@@ -15,6 +16,7 @@ class TodoList extends StatelessWidget {
     super.key,
     required this.todos,
     this.isLoading = false,
+    this.readOnly = false,
     required this.onToggle,
     required this.onDelete,
     required this.onTap,
@@ -43,9 +45,10 @@ class TodoList extends StatelessWidget {
           index: index,
           child: TodoItem(
             todo: todo,
+            readOnly: readOnly,
             onTap: () => onTap(todo),
             onToggle: () => onToggle(todo),
-            onLongPress: () => _showDeleteActionSheet(context, todo),
+            onLongPress: readOnly ? null : () => _showDeleteActionSheet(context, todo),
           ),
         );
       },

@@ -5,6 +5,7 @@ import '../../../core/theme/app_theme.dart';
 
 class TodoItem extends StatefulWidget {
   final Todo todo;
+  final bool readOnly;
   final VoidCallback? onTap;
   final VoidCallback? onToggle;
   final VoidCallback? onLongPress;
@@ -12,6 +13,7 @@ class TodoItem extends StatefulWidget {
   const TodoItem({
     super.key,
     required this.todo,
+    this.readOnly = false,
     this.onTap,
     this.onToggle,
     this.onLongPress,
@@ -96,11 +98,11 @@ class _TodoItemState extends State<TodoItem> with SingleTickerProviderStateMixin
     final actionStyle = _getActionStyle(widget.todo.type);
 
     return GestureDetector(
-      onTapDown: (_) => setState(() => _itemPressed = true),
-      onTapUp: (_) => setState(() => _itemPressed = false),
-      onTapCancel: () => setState(() => _itemPressed = false),
+      onTapDown: widget.readOnly ? null : (_) => setState(() => _itemPressed = true),
+      onTapUp: widget.readOnly ? null : (_) => setState(() => _itemPressed = false),
+      onTapCancel: widget.readOnly ? null : () => setState(() => _itemPressed = false),
       onTap: widget.onTap,
-      onLongPress: widget.onLongPress,
+      onLongPress: widget.readOnly ? null : widget.onLongPress,
       child: AnimatedScale(
         scale: _itemPressed ? 0.985 : 1.0,
         duration: const Duration(milliseconds: 100),
@@ -120,7 +122,7 @@ class _TodoItemState extends State<TodoItem> with SingleTickerProviderStateMixin
             child: Row(
               children: [
                 GestureDetector(
-                  onTap: widget.onToggle,
+                  onTap: widget.readOnly ? null : widget.onToggle,
                   child: AnimatedBuilder(
                     animation: _checkController,
                     builder: (context, _) {
