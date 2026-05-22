@@ -14,6 +14,10 @@ class TodoRepository {
     return _datasource.getTodosByDate(DateTime.now());
   }
 
+  Future<List<Todo>> getTodosByDate(DateTime date) async {
+    return _datasource.getTodosByDate(date);
+  }
+
   Future<void> addTodo(Todo todo) async {
     await _datasource.insertTodo(todo);
     _trySync();
