@@ -5,11 +5,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/providers/core_providers.dart';
 import 'providers/todo_provider.dart';
+import 'providers/selected_date_provider.dart';
 import 'widgets/add_todo_modal.dart';
 import 'widgets/todo_detail_modal.dart';
 import 'widgets/todo_list.dart';
+import 'widgets/week_calendar_strip.dart';
 import '../../core/theme/app_theme.dart';
 import '../profile/profile_provider.dart';
+import 'package:intl/intl.dart';
 
 class TodoPage extends ConsumerStatefulWidget {
   final VoidCallback? onAvatarTap;
@@ -41,8 +44,7 @@ class _TodoPageState extends ConsumerState<TodoPage> with TickerProviderStateMix
   Timer? _poetryTimer;
   bool _poetryVisible = true;
 
-  // FAB 拖动状态
-  Offset _fabOffset = Offset.zero; // 相对于默认右下角的偏移
+  Offset _fabOffset = Offset.zero;
 
   @override
   void initState() {
@@ -61,11 +63,6 @@ class _TodoPageState extends ConsumerState<TodoPage> with TickerProviderStateMix
         });
       },
     );
-
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final repo = ref.read(todoRepoProvider);
-      ref.read(todoNotifierProvider.notifier).loadTodayTodos();
-    });
   }
 
   @override
@@ -74,9 +71,21 @@ class _TodoPageState extends ConsumerState<TodoPage> with TickerProviderStateMix
     super.dispose();
   }
 
+  bool _isToday(DateTime date) {
+    final now = DateTime.now();
+    return date.year == now.year && date.month == now.month && date.day == now.day;
+  }
+
+  String _titleForDate(DateTime date) {
+    if (_isToday(date)) return '今日待办';
+    return '${date.month}月${date.day}日 待办';
+  }
+
   @override
   Widget build(BuildContext context) {
+    final selectedDate = ref.watch(selectedDateProvider);
     final todos = ref.watch(todoNotifierProvider);
+    final isToday = _isToday(selectedDate);
 
     return Scaffold(
       backgroundColor: AppColors.scaffoldBg,
@@ -92,15 +101,19 @@ class _TodoPageState extends ConsumerState<TodoPage> with TickerProviderStateMix
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          '今日待办',
-                          style: TextStyle(
-                            fontFamily: 'PingFang SC',
-                            fontFamilyFallback: ['.SF Pro Text', 'system-ui', 'sans-serif'],
-                            fontSize: 30,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: -0.3,
-                            color: AppColors.text,
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 200),
+                          child: Text(
+                            _titleForDate(selectedDate),
+                            key: ValueKey(selectedDate),
+                            style: const TextStyle(
+                              fontFamily: 'PingFang SC',
+                              fontFamilyFallback: ['.SF Pro Text', 'system-ui', 'sans-serif'],
+                              fontSize: 30,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.3,
+                              color: AppColors.text,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 2),
@@ -137,9 +150,16 @@ class _TodoPageState extends ConsumerState<TodoPage> with TickerProviderStateMix
                 ],
               ),
             ),
+            WeekCalendarStrip(
+              selectedDate: selectedDate,
+              onDateSelected: (date) {
+                ref.read(selectedDateProvider.notifier).state = date;
+              },
+            ),
             Expanded(
               child: TodoList(
                 todos: todos,
+                readOnly: !isToday,
                 onToggle: (todo) {
                   ref.read(todoNotifierProvider.notifier).toggleComplete(todo.id);
                 },
@@ -154,16 +174,17 @@ class _TodoPageState extends ConsumerState<TodoPage> with TickerProviderStateMix
           ],
         ),
       ),
-      floatingActionButton: _DraggableFAB(
-        offset: _fabOffset,
-        onOffsetChanged: (o) => setState(() => _fabOffset = o),
-        onPressed: () => showAddTodoModal(context),
-      ),
+      floatingActionButton: isToday
+          ? _DraggableFAB(
+              offset: _fabOffset,
+              onOffsetChanged: (o) => setState(() => _fabOffset = o),
+              onPressed: () => showAddTodoModal(context),
+            )
+          : null,
     );
   }
 }
 
-/// 支持长按拖动的 FAB，默认右下角
 class _DraggableFAB extends StatefulWidget {
   final Offset offset;
   final ValueChanged<Offset> onOffsetChanged;
@@ -208,7 +229,6 @@ class _DraggableFABState extends State<_DraggableFAB> {
           widget.onOffsetChanged(_offset);
         },
         onPanEnd: (_) {
-          // 短暂延迟后重置拖动状态，避免 tap 误触
           Future.microtask(() => setState(() => _isDragging = false));
         },
         onTap: _isDragging ? null : widget.onPressed,
@@ -245,7 +265,6 @@ class _AvatarButtonState extends State<_AvatarButton> {
     Widget avatarChild;
     if (widget.serverAvatarUrl != null && widget.serverAvatarUrl!.isNotEmpty) {
       final url = widget.serverAvatarUrl!;
-      // 后端返回 data:image/...;base64,... 格式的数据URI
       if (url.startsWith('data:')) {
         final base64Str = url.split(',').last;
         try {
