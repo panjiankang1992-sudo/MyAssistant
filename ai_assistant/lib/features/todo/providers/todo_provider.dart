@@ -104,28 +104,18 @@ class TodoNotifier extends Notifier<List<Todo>> {
   Future<void> updateRoutineTodos(Routine oldRoutine, Routine newRoutine) async {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
+    final tomorrow = today.add(const Duration(days: 1));
+    final datasource = ref.read(datasourceProvider);
+
+    // Single bulk soft-delete of all future todos for the old routine title
+    await datasource.softDeleteFutureRoutineTodos(oldRoutine.title, tomorrow);
 
     for (int offset = 1; offset <= 30; offset++) {
       final date = today.add(Duration(days: offset));
-
-      // 不再符合新规则 → 软删除旧的
-      if (!newRoutine.shouldGenerateOn(date)) {
-        await _softDeleteRoutineTodo(newRoutine.title, date);
-        continue;
-      }
-
-      // 原本就不符合旧规则 → 跳过
+      if (!newRoutine.shouldGenerateOn(date)) continue;
       if (!oldRoutine.shouldGenerateOn(date)) continue;
-
-      // 符合新规则 → 软删除旧的，重新生成
-      await _softDeleteRoutineTodo(newRoutine.title, date);
       await _generateSingleRoutineTodo(newRoutine, date);
     }
-  }
-
-  Future<void> _softDeleteRoutineTodo(String routineTitle, DateTime date) async {
-    final datasource = ref.read(datasourceProvider);
-    await datasource.softDeleteFutureRoutineTodos(routineTitle, date);
   }
 
   Future<void> _generateSingleRoutineTodo(Routine routine, DateTime date) async {
@@ -136,7 +126,6 @@ class TodoNotifier extends Notifier<List<Todo>> {
     );
     if (alreadyExists) return;
 
-    final now = DateTime.now();
     final todo = Todo(
       id: const Uuid().v4(),
       title: routine.title,
@@ -146,8 +135,8 @@ class TodoNotifier extends Notifier<List<Todo>> {
       tags: routine.tags,
       time: routine.time,
       date: date,
-      createdAt: now,
-      updatedAt: now,
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
     );
     final repo = ref.read(todoRepoProvider);
     await repo.addTodo(todo);
