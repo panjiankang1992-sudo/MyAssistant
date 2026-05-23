@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/providers/core_providers.dart';
+import '../../../domain/models/routine.dart';
 import '../../../domain/models/todo.dart';
 import 'selected_date_provider.dart';
 
@@ -98,6 +99,58 @@ class TodoNotifier extends Notifier<List<Todo>> {
     await repo.updateTodo(todo);
     final selectedDate = ref.read(selectedDateProvider);
     await _loadTodosForDate(selectedDate);
+  }
+
+  Future<void> updateRoutineTodos(Routine oldRoutine, Routine newRoutine) async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    for (int offset = 1; offset <= 30; offset++) {
+      final date = today.add(Duration(days: offset));
+
+      // 不再符合新规则 → 软删除旧的
+      if (!newRoutine.shouldGenerateOn(date)) {
+        await _softDeleteRoutineTodo(newRoutine.title, date);
+        continue;
+      }
+
+      // 原本就不符合旧规则 → 跳过
+      if (!oldRoutine.shouldGenerateOn(date)) continue;
+
+      // 符合新规则 → 软删除旧的，重新生成
+      await _softDeleteRoutineTodo(newRoutine.title, date);
+      await _generateSingleRoutineTodo(newRoutine, date);
+    }
+  }
+
+  Future<void> _softDeleteRoutineTodo(String routineTitle, DateTime date) async {
+    final datasource = ref.read(datasourceProvider);
+    await datasource.softDeleteFutureRoutineTodos(routineTitle, date);
+  }
+
+  Future<void> _generateSingleRoutineTodo(Routine routine, DateTime date) async {
+    final datasource = ref.read(datasourceProvider);
+    final allTodos = await datasource.getAllTodos();
+    final alreadyExists = allTodos.any(
+      (t) => t.title == routine.title && t.source == 'routine' && t.date == date,
+    );
+    if (alreadyExists) return;
+
+    final now = DateTime.now();
+    final todo = Todo(
+      id: const Uuid().v4(),
+      title: routine.title,
+      description: routine.description,
+      source: 'routine',
+      type: routine.type,
+      tags: routine.tags,
+      time: routine.time,
+      date: date,
+      createdAt: now,
+      updatedAt: now,
+    );
+    final repo = ref.read(todoRepoProvider);
+    await repo.addTodo(todo);
   }
 }
 
