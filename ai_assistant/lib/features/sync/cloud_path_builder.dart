@@ -17,6 +17,10 @@ class CloudPathBuilder {
     return 'MyAssistant/$username/index/$module/${subType}_index.json';
   }
 
+  String buildTagsIndexPath() {
+    return 'MyAssistant/$username/tags/index.json';
+  }
+
   List<String> get requiredDirectories {
     final now = DateTime.now();
     final y = now.year.toString();
@@ -34,6 +38,7 @@ class CloudPathBuilder {
       'MyAssistant/$username/bills',
       'MyAssistant/$username/notes',
       'MyAssistant/$username/copilot',
+      'MyAssistant/$username/tags',
       'MyAssistant/$username/profile',
     ];
   }

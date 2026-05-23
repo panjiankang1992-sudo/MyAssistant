@@ -5,6 +5,7 @@ import '../../data/datasources/local_sync_datasource.dart';
 import '../../data/datasources/webdav_datasource.dart';
 import '../../domain/models/todo.dart' as model;
 import '../../domain/models/routine.dart' as model_routine;
+import '../../domain/models/tag.dart';
 import '../../features/sync/cloud_path_builder.dart';
 import '../../features/sync/providers/sync_provider.dart';
 
@@ -17,8 +18,21 @@ class SyncEngine {
   SyncEngine(this._localDs, this._localSyncDs, this._webdav, this._pathBuilder);
 
   Future<SyncResult> sync(String module) async {
+    // Pull tags first so we have latest tag definitions
+    final cloudTags = await pullTags();
+    if (cloudTags.isNotEmpty) {
+      for (final tag in cloudTags) {
+        await _localDs.insertTag(tag);
+      }
+    }
+
     final pullCount = await _pullViaIndex(module);
     final pushCount = await _pushAll(module);
+
+    // Push tags after todo sync
+    final localTags = await _localDs.getAllTags();
+    await pushTags(localTags);
+
     return SyncResult(
       module: module,
       pullCount: pullCount,
@@ -140,10 +154,15 @@ class SyncEngine {
     final todos = await _localDs.getAllTodos();
     final todoIndex = await _localSyncDs.getSyncIndexForType('todo');
     for (final todo in todos) {
-      if (todo.deleted) continue;
       final li = todoIndex.where((e) => e.dataId == todo.id).firstOrNull;
+      if (todo.deleted) {
+        // Always push deletion so cloud reflects the delete
+        await _uploadTodoFile(todo, deleted: true);
+        pushed++;
+        continue;
+      }
       if (li != null && li.localVersion <= li.cloudVersion) continue;
-      await _uploadTodoFile(todo);
+      await _uploadTodoFile(todo, deleted: false);
       pushed++;
     }
     await _updateCloudIndex(module, 'todo');
@@ -163,7 +182,7 @@ class SyncEngine {
     return pushed;
   }
 
-  Future<void> _uploadTodoFile(model.Todo todo) async {
+  Future<void> _uploadTodoFile(model.Todo todo, {required bool deleted}) async {
     final dateStr = _dateStr(todo.date);
     final path = _pathBuilder.buildFilePath('todo', dateStr, todo.id);
     final pd = path.substring(0, path.lastIndexOf('/'));
@@ -176,9 +195,21 @@ class SyncEngine {
         'source': todo.source, 'type': todo.type, 'time': todo.time,
         'date': dateStr, 'completed': todo.completed,
         'createdAt': todo.createdAt.toIso8601String(),
-      }, 'deleted': false,
+      }, 'deleted': deleted,
     });
-    await _webdav.putFile(path, Uint8List.fromList(utf8.encode(data)));
+    try {
+      await _webdav.putFile(path, Uint8List.fromList(utf8.encode(data)), contentType: 'application/json');
+    } on Exception catch (e) {
+      if (e.toString().contains('409')) {
+        // Cloud has newer version — treat as synced, refresh cloud version
+        final cloudVersion = await _getCloudFileVersion(path);
+        if (cloudVersion != null) {
+          await _localSyncDs.upsertSyncIndex(todo.id, 'todo', todo.version, cloudVersion, 'synced');
+        }
+        return;
+      }
+      rethrow;
+    }
     await _localSyncDs.upsertSyncIndex(todo.id, 'todo', todo.version, todo.version, 'synced');
   }
 
@@ -197,8 +228,29 @@ class SyncEngine {
         'createdAt': routine.createdAt.toIso8601String(),
       }, 'deleted': routine.deleted,
     });
-    await _webdav.putFile(path, Uint8List.fromList(utf8.encode(data)));
+    try {
+      await _webdav.putFile(path, Uint8List.fromList(utf8.encode(data)), contentType: 'application/json');
+    } on Exception catch (e) {
+      if (e.toString().contains('409')) {
+        final cloudVersion = await _getCloudFileVersion(path);
+        if (cloudVersion != null) {
+          await _localSyncDs.upsertSyncIndex(routine.uuid!, 'routine', routine.version, cloudVersion, 'synced');
+        }
+        return;
+      }
+      rethrow;
+    }
     await _localSyncDs.upsertSyncIndex(routine.uuid!, 'routine', routine.version, routine.version, 'synced');
+  }
+
+  Future<int?> _getCloudFileVersion(String path) async {
+    try {
+      final bytes = await _webdav.getFile(path);
+      final data = jsonDecode(utf8.decode(bytes)) as Map<String, dynamic>;
+      return data['version'] as int?;
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> _updateCloudIndex(String module, String subType) async {
@@ -225,7 +277,12 @@ class SyncEngine {
     final path = _pathBuilder.buildIndexPath(module, subType);
     final pd = path.substring(0, path.lastIndexOf('/'));
     try { await _webdav.createDirectory(pd); } catch (_) {}
-    await _webdav.putFile(path, Uint8List.fromList(utf8.encode(jsonEncode(index))));
+    try {
+      await _webdav.putFile(path, Uint8List.fromList(utf8.encode(jsonEncode(index))), contentType: 'application/json');
+    } on Exception catch (e) {
+      // 409 on index is non-critical, just log
+      if (!e.toString().contains('409')) rethrow;
+    }
   }
 
   // ── 全量同步：目录扫描 + 逐文件下载对比 ──
@@ -233,6 +290,15 @@ class SyncEngine {
   Future<SyncResult> fullSync(String module) async {
     final diag = StringBuffer();
     int totalPulled = 0;
+
+    // Pull tags first so we have latest tag definitions
+    final cloudTags = await pullTags();
+    if (cloudTags.isNotEmpty) {
+      for (final tag in cloudTags) {
+        await _localDs.insertTag(tag);
+      }
+      diag.writeln('拉取 ${cloudTags.length} 个标签');
+    }
 
     final pushed = await _pushAll(module);
 
@@ -274,6 +340,11 @@ class SyncEngine {
         diag.writeln('  routine目录不存在或无法访问');
       }
     } catch (_) {}
+
+    // Push tags after todo sync
+    final localTags = await _localDs.getAllTags();
+    await pushTags(localTags);
+    diag.writeln('推送 ${localTags.length} 个标签');
 
     return SyncResult(
       module: module,
@@ -352,12 +423,41 @@ class SyncEngine {
   // ── 公开的单条上传 (给 repository 的 auto-sync 用) ──
 
   Future<void> uploadSingleTodo(model.Todo todo) async {
-    await _uploadTodoFile(todo);
+    await _uploadTodoFile(todo, deleted: todo.deleted);
     await _updateCloudIndex('todos', 'todo');
   }
 
   Future<void> uploadSingleRoutine(model_routine.Routine routine) async {
     await _uploadRoutineFile(routine);
     await _updateCloudIndex('todos', 'routine');
+  }
+
+  // ── 标签同步 ──
+
+  Future<void> pushTags(List<Tag> tags) async {
+    final path = _pathBuilder.buildTagsIndexPath();
+    final pd = path.substring(0, path.lastIndexOf('/'));
+    try { await _webdav.createDirectory(pd); } catch (_) {}
+    final data = jsonEncode({
+      'updatedAt': DateTime.now().toIso8601String(),
+      'tags': tags.map((t) => t.toJson()).toList(),
+    });
+    try {
+      await _webdav.putFile(path, Uint8List.fromList(utf8.encode(data)), contentType: 'application/json');
+    } on Exception catch (e) {
+      if (!e.toString().contains('409')) rethrow;
+    }
+  }
+
+  Future<List<Tag>> pullTags() async {
+    try {
+      final path = _pathBuilder.buildTagsIndexPath();
+      final bytes = await _webdav.getFile(path);
+      final data = jsonDecode(utf8.decode(bytes)) as Map<String, dynamic>;
+      final list = data['tags'] as List? ?? [];
+      return list.map((e) => Tag.fromJson(e as Map<String, dynamic>)).toList();
+    } catch (_) {
+      return [];
+    }
   }
 }
