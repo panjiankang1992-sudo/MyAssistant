@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../domain/models/routine.dart';
+import '../../../domain/models/tag.dart';
+import '../../../shared/widgets/tag_chip.dart';
 import '../providers/routine_provider.dart';
+import 'tag_selector.dart';
 
 void showRoutineModal(BuildContext context) {
   showModalBottomSheet(
@@ -61,7 +64,7 @@ class _RoutineModalContentState extends ConsumerState<_RoutineModalContent> {
   Future<void> _showAddDialog() async {
     final titleController = TextEditingController();
     final formKey = GlobalKey<FormState>();
-    String type = 'work';
+    List<Tag> tags = [];
     int hour = 9;
 
     await showDialog(
@@ -90,24 +93,12 @@ class _RoutineModalContentState extends ConsumerState<_RoutineModalContent> {
                       },
                     ),
                     const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      value: type,
-                      decoration: const InputDecoration(
-                        labelText: '类型',
-                        border: OutlineInputBorder(),
-                      ),
-                      items: const [
-                        DropdownMenuItem(value: 'bill', child: Text('帐单')),
-                        DropdownMenuItem(value: 'work', child: Text('工作')),
-                        DropdownMenuItem(value: 'personal', child: Text('个人')),
-                        DropdownMenuItem(value: 'health', child: Text('健康')),
-                      ],
+                    TagSelector(
+                      selectedTags: tags,
                       onChanged: (value) {
-                        if (value != null) {
-                          setState(() {
-                            type = value;
-                          });
-                        }
+                        setState(() {
+                          tags = value;
+                        });
                       },
                     ),
                     const SizedBox(height: 12),
@@ -146,7 +137,8 @@ class _RoutineModalContentState extends ConsumerState<_RoutineModalContent> {
                     final routine = Routine(
                       id: 0,
                       title: titleController.text.trim(),
-                      type: type,
+                      type: tags.isNotEmpty ? tags.first.name : 'work',
+                      tags: tags,
                       time: '${hour.toString().padLeft(2, '0')}:00',
                       createdAt: DateTime.now(),
                     );
@@ -253,14 +245,20 @@ class _RoutineModalContentState extends ConsumerState<_RoutineModalContent> {
                       return ListTile(
                         title: Text(routine.title),
                         subtitle: Text(routine.time),
-                        leading: Chip(
-                          label: Text(
-                            _getTypeLabel(routine.type),
-                            style: const TextStyle(fontSize: 12),
-                          ),
-                          padding: EdgeInsets.zero,
-                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
+                        leading: routine.tags.isNotEmpty
+                            ? Wrap(
+                                spacing: 4,
+                                runSpacing: 4,
+                                children: routine.tags.map((tag) => TagChip.fromTag(label: tag.name, colorKey: tag.colorKey)).toList(),
+                              )
+                            : Chip(
+                                label: Text(
+                                  _getTypeLabel(routine.type),
+                                  style: const TextStyle(fontSize: 12),
+                                ),
+                                padding: EdgeInsets.zero,
+                                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
                         trailing: IconButton(
                           icon: const Icon(Icons.delete, color: Colors.red),
                           onPressed: () => _confirmDelete(routine),

@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
+import '../../../domain/models/tag.dart';
 import '../../../domain/models/todo.dart';
 import '../../../core/theme/app_theme.dart';
 import '../providers/todo_provider.dart';
 import '../services/todo_text_parser.dart';
 import 'smart_input.dart';
 import 'routine_tab.dart';
+import 'tag_selector.dart';
 
 void showAddTodoModal(BuildContext context) {
   showModalBottomSheet(
@@ -38,7 +40,7 @@ class _AddTodoModalContentState extends ConsumerState<_AddTodoModalContent>
   final _descriptionController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
 
-  String _type = 'personal';
+  List<Tag> _tags = [];
   String _source = 'recommend';
   DateTime _date = DateTime.now();
   int _hour = 9;
@@ -86,7 +88,8 @@ class _AddTodoModalContentState extends ConsumerState<_AddTodoModalContent>
           ? null
           : _descriptionController.text.trim(),
       source: _source,
-      type: _type,
+      type: _tags.isNotEmpty ? _tags.first.name : 'personal',
+      tags: _tags,
       time: time,
       date: DateTime(_date.year, _date.month, _date.day),
       createdAt: now,
@@ -115,6 +118,7 @@ class _AddTodoModalContentState extends ConsumerState<_AddTodoModalContent>
         description: result.description,
         source: result.source,
         type: result.type,
+        tags: [_tagForType(result.type)],
         time: result.time,
         date: result.date,
         createdAt: now,
@@ -129,6 +133,44 @@ class _AddTodoModalContentState extends ConsumerState<_AddTodoModalContent>
           SnackBar(content: Text('添加失败: $e'), backgroundColor: AppColors.danger),
         );
       }
+    }
+  }
+
+  Tag _tagForType(String type) {
+    final now = DateTime.now();
+    switch (type) {
+      case 'work':
+        return Tag(
+          id: 'tag-preset-work',
+          name: '工作',
+          colorKey: 'blue',
+          createdAt: now,
+          updatedAt: now,
+        );
+      case 'bill':
+        return Tag(
+          id: 'tag-preset-bill',
+          name: '账单',
+          colorKey: 'pink',
+          createdAt: now,
+          updatedAt: now,
+        );
+      case 'health':
+        return Tag(
+          id: 'tag-preset-health',
+          name: '健康',
+          colorKey: 'green',
+          createdAt: now,
+          updatedAt: now,
+        );
+      default:
+        return Tag(
+          id: 'tag-preset-personal',
+          name: '个人',
+          colorKey: 'purple',
+          createdAt: now,
+          updatedAt: now,
+        );
     }
   }
 
@@ -242,41 +284,21 @@ class _AddTodoModalContentState extends ConsumerState<_AddTodoModalContent>
                             ),
                           ),
                           const SizedBox(height: 16),
-                          _buildFormField(
-                            label: '类型',
-                            child: DropdownButtonFormField<String>(
-                              value: _type,
-                              decoration: InputDecoration(
-                                filled: true,
-                                fillColor: AppColors.inputBg,
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                  borderSide: const BorderSide(color: AppColors.border),
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                  borderSide: const BorderSide(color: AppColors.border),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                  borderSide: const BorderSide(color: AppColors.primary),
-                                ),
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                              ),
-                              items: const [
-                                DropdownMenuItem(value: 'work', child: Text('工作')),
-                                DropdownMenuItem(value: 'personal', child: Text('个人')),
-                                DropdownMenuItem(value: 'bill', child: Text('帐单')),
-                                DropdownMenuItem(value: 'health', child: Text('健康')),
-                              ],
-                              onChanged: (value) {
-                                if (value != null) {
-                                  setState(() {
-                                    _type = value;
-                                  });
-                                }
-                              },
+                          const Text(
+                            '标签',
+                            style: TextStyle(
+                              fontFamily: 'PingFang SC',
+                              fontFamilyFallback: ['.SF Pro Text', 'system-ui', 'sans-serif'],
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textSecondary,
+                              letterSpacing: 0.5,
                             ),
+                          ),
+                          const SizedBox(height: 6),
+                          TagSelector(
+                            selectedTags: _tags,
+                            onChanged: (tags) => setState(() => _tags = tags),
                           ),
                           const SizedBox(height: 16),
                           _buildFormField(
