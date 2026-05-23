@@ -1,7 +1,10 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart';
 import '../../core/database/database.dart';
 import '../../domain/models/todo.dart' as model;
 import '../../domain/models/routine.dart' as model;
+import '../../domain/models/tag.dart' as model_tag;
 
 class LocalDatasource {
   final AppDatabase _db;
@@ -17,7 +20,7 @@ class LocalDatasource {
     final start = DateTime(date.year, date.month, date.day);
     final end = start.add(const Duration(days: 1));
     final rows = await (_db.select(_db.todos)
-      ..where((t) => t.date.isBiggerOrEqualValue(start) & t.date.isSmallerThanValue(end))
+      ..where((t) => t.date.isBiggerOrEqualValue(start) & t.date.isSmallerThanValue(end) & t.deleted.equals(false))
       ..orderBy([
         // 未完成优先，然后按时间排序
         (t) => OrderingTerm.asc(t.completed),
@@ -35,6 +38,7 @@ class LocalDatasource {
         description: Value(todo.description),
         source: Value(todo.source),
         type: Value(todo.type),
+        tags: Value(encodeTags(todo.tags)),
         time: Value(todo.time),
         date: Value(todo.date),
         completed: Value(todo.completed),
@@ -54,6 +58,7 @@ class LocalDatasource {
           description: Value(todo.description),
           source: Value(todo.source),
           type: Value(todo.type),
+          tags: Value(encodeTags(todo.tags)),
           time: Value(todo.time),
           date: Value(todo.date),
           completed: Value(todo.completed),
@@ -64,11 +69,15 @@ class LocalDatasource {
   }
 
   Future<void> softDeleteTodo(String id) async {
+    final now = DateTime.now();
+    final rows = await (_db.select(_db.todos)..where((t) => t.id.equals(id))).get();
+    if (rows.isEmpty) return;
     await (_db.update(_db.todos)
       ..where((t) => t.id.equals(id)))
         .write(TodosCompanion(
           deleted: const Value(true),
-          updatedAt: Value(DateTime.now()),
+          updatedAt: Value(now),
+          version: Value(rows.first.version + 1),
         ));
   }
 
@@ -86,7 +95,9 @@ class LocalDatasource {
   }
 
   Future<List<model.Routine>> getAllRoutines() async {
-    final rows = await _db.select(_db.routines).get();
+    final rows = await (_db.select(_db.routines)
+      ..where((r) => r.deleted.equals(false)))
+        .get();
     return rows.map(_mapRoutine).toList();
   }
 
@@ -97,6 +108,7 @@ class LocalDatasource {
         title: Value(routine.title),
         description: Value(routine.description),
         type: Value(routine.type),
+        tags: Value(encodeTags(routine.tags)),
         time: Value(routine.time),
         repeatRule: Value(routine.repeatRule),
         repeatDays: Value(routine.repeatDays),
@@ -109,12 +121,41 @@ class LocalDatasource {
   }
 
   Future<void> softDeleteRoutine(int id) async {
+    final now = DateTime.now();
+    final rows = await (_db.select(_db.routines)..where((r) => r.id.equals(id))).get();
+    if (rows.isEmpty) return;
     await (_db.update(_db.routines)
       ..where((r) => r.id.equals(id)))
         .write(RoutinesCompanion(
           deleted: const Value(true),
+          updatedAt: Value(now),
+          version: Value(rows.first.version + 1),
+        ));
+  }
+
+  Future<void> softDeleteFutureRoutineTodos(String routineTitle, DateTime cutoff) async {
+    final today = DateTime(cutoff.year, cutoff.month, cutoff.day);
+    final tomorrow = today.add(const Duration(days: 1));
+    // Delete all routine todos from tomorrow onward
+    await (_db.update(_db.todos)
+      ..where((t) => t.source.equals('routine') & t.title.equals(routineTitle) & t.date.isBiggerOrEqualValue(tomorrow)))
+        .write(TodosCompanion(
+          deleted: const Value(true),
           updatedAt: Value(DateTime.now()),
         ));
+    // For today, delete routine todos whose time hasn't arrived yet
+    final todayTodos = await (_db.select(_db.todos)
+      ..where((t) => t.source.equals('routine') & t.title.equals(routineTitle) & t.date.equals(today) & t.deleted.equals(false)))
+        .get();
+    final cutoffMinutes = cutoff.hour * 60 + cutoff.minute;
+    for (final row in todayTodos) {
+      final parts = row.time.split(':');
+      final todoMinutes = (int.tryParse(parts.first) ?? 0) * 60 + (int.tryParse(parts.elementAt(1)) ?? 0);
+      if (todoMinutes > cutoffMinutes) {
+        await (_db.update(_db.todos)..where((t) => t.id.equals(row.id)))
+            .write(TodosCompanion(deleted: const Value(true), updatedAt: Value(DateTime.now())));
+      }
+    }
   }
 
   Future<void> deleteRoutine(int id) async {
@@ -128,6 +169,7 @@ class LocalDatasource {
       description: row.description,
       source: row.source,
       type: row.type,
+      tags: decodeTags(row.tags),
       time: row.time,
       date: row.date,
       completed: row.completed,
@@ -145,6 +187,7 @@ class LocalDatasource {
       title: row.title,
       description: row.description,
       type: row.type,
+      tags: decodeTags(row.tags),
       time: row.time,
       repeatRule: row.repeatRule,
       repeatDays: row.repeatDays,
@@ -153,5 +196,66 @@ class LocalDatasource {
       version: row.version,
       deleted: row.deleted,
     );
+  }
+
+  // Tag CRUD
+
+  Future<List<model_tag.Tag>> getAllTags() async {
+    final rows = await (_db.select(_db.tags)
+          ..orderBy([(t) => OrderingTerm.asc(t.sortOrder)]))
+        .get();
+    return rows
+        .map((r) => model_tag.Tag(
+              id: r.id,
+              name: r.name,
+              colorKey: r.colorKey,
+              sortOrder: r.sortOrder,
+              isPreset: r.isPreset,
+              createdAt: r.createdAt,
+              updatedAt: r.updatedAt,
+            ))
+        .toList();
+  }
+
+  Future<void> insertTag(model_tag.Tag tag) async {
+    await _db.into(_db.tags).insertOnConflictUpdate(TagsCompanion(
+          id: Value(tag.id),
+          name: Value(tag.name),
+          colorKey: Value(tag.colorKey),
+          sortOrder: Value(tag.sortOrder),
+          isPreset: Value(tag.isPreset),
+          createdAt: Value(tag.createdAt),
+          updatedAt: Value(tag.updatedAt),
+        ));
+  }
+
+  Future<void> updateTag(model_tag.Tag tag) async {
+    await (_db.update(_db.tags)..where((t) => t.id.equals(tag.id))).write(
+        TagsCompanion(
+          name: Value(tag.name),
+          colorKey: Value(tag.colorKey),
+          sortOrder: Value(tag.sortOrder),
+          updatedAt: Value(DateTime.now()),
+        ));
+  }
+
+  Future<void> deleteTag(String id) async {
+    await (_db.delete(_db.tags)..where((t) => t.id.equals(id))).go();
+  }
+
+  static String encodeTags(List<model_tag.Tag> tags) =>
+      jsonEncode(tags.map((t) => t.toCompactJson()).toList());
+
+  static List<model_tag.Tag> decodeTags(String json) {
+    if (json.isEmpty || json == '[]') return [];
+    try {
+      final list = jsonDecode(json) as List;
+      return list
+          .map((e) =>
+              model_tag.Tag.fromCompactJson(e as Map<String, dynamic>))
+          .toList();
+    } catch (_) {
+      return [];
+    }
   }
 }

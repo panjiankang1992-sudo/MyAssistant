@@ -1,9 +1,12 @@
+import 'tag.dart';
+
 class Routine {
   final int id;
   final String? uuid;
   final String title;
   final String? description;
   final String type;
+  final List<Tag> tags;
   final String time;
   final String repeatRule;
   final String? repeatDays;
@@ -18,6 +21,7 @@ class Routine {
     required this.title,
     this.description,
     required this.type,
+    this.tags = const [],
     required this.time,
     this.repeatRule = 'daily',
     this.repeatDays,
@@ -33,6 +37,7 @@ class Routine {
     String? title,
     String? description,
     String? type,
+    List<Tag>? tags,
     String? time,
     String? repeatRule,
     String? repeatDays,
@@ -47,6 +52,7 @@ class Routine {
       title: title ?? this.title,
       description: description ?? this.description,
       type: type ?? this.type,
+      tags: tags ?? this.tags,
       time: time ?? this.time,
       repeatRule: repeatRule ?? this.repeatRule,
       repeatDays: repeatDays ?? this.repeatDays,

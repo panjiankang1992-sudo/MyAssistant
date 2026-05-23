@@ -1,9 +1,12 @@
+import 'tag.dart';
+
 class Todo {
   final String id;
   final String title;
   final String? description;
   final String source;
   final String type;
+  final List<Tag> tags;
   final String time;
   final DateTime date;
   final bool completed;
@@ -18,6 +21,7 @@ class Todo {
     this.description,
     required this.source,
     required this.type,
+    this.tags = const [],
     required this.time,
     required this.date,
     this.completed = false,
@@ -33,6 +37,7 @@ class Todo {
     String? description,
     String? source,
     String? type,
+    List<Tag>? tags,
     String? time,
     DateTime? date,
     bool? completed,
@@ -47,6 +52,7 @@ class Todo {
       description: description ?? this.description,
       source: source ?? this.source,
       type: type ?? this.type,
+      tags: tags ?? this.tags,
       time: time ?? this.time,
       date: date ?? this.date,
       completed: completed ?? this.completed,
