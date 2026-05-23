@@ -120,6 +120,24 @@ class LocalDatasource {
     );
   }
 
+  Future<void> updateRoutine(model.Routine routine) async {
+    await _db.into(_db.routines).insertOnConflictUpdate(
+      RoutinesCompanion(
+        uuid: Value(routine.uuid ?? ''),
+        title: Value(routine.title),
+        description: Value(routine.description),
+        type: Value(routine.type),
+        tags: Value(encodeTags(routine.tags)),
+        time: Value(routine.time),
+        repeatRule: Value(routine.repeatRule),
+        repeatDays: Value(routine.repeatDays),
+        updatedAt: Value(DateTime.now()),
+        version: Value(routine.version + 1),
+        deleted: Value(routine.deleted),
+      ),
+    );
+  }
+
   Future<void> softDeleteRoutine(int id) async {
     final now = DateTime.now();
     final rows = await (_db.select(_db.routines)..where((r) => r.id.equals(id))).get();
