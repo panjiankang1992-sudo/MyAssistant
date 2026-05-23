@@ -6,6 +6,7 @@ class Routines extends Table {
   TextColumn get title => text()();
   TextColumn get description => text().nullable()();
   TextColumn get type => text()();
+  TextColumn get tags => text().withDefault(const Constant('[]'))();
   TextColumn get time => text()();
   TextColumn get repeatRule => text().withDefault(const Constant('daily'))();
   TextColumn get repeatDays => text().nullable()();

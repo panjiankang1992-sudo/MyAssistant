@@ -6,6 +6,7 @@ class Todos extends Table {
   TextColumn get description => text().nullable()();
   TextColumn get source => text()();
   TextColumn get type => text()();
+  TextColumn get tags => text().withDefault(const Constant('[]'))();
   TextColumn get time => text()();
   DateTimeColumn get date => dateTime()();
   BoolColumn get completed => boolean().withDefault(const Constant(false))();
