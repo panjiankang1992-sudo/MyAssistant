@@ -27,36 +27,43 @@ class TodoNotifier extends Notifier<List<Todo>> {
   Future<void> _generateRoutineTodos() async {
     final routineRepo = ref.read(routineRepoProvider);
     final todoRepo = ref.read(todoRepoProvider);
+    final datasource = ref.read(datasourceProvider);
     final routines = await routineRepo.getRoutines();
     if (routines.isEmpty) return;
 
-    final today = DateTime.now();
-    final todayDate = DateTime(today.year, today.month, today.day);
-    final existingTodos = state;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    // Get all existing todos to check for duplicates across 30 days
+    final allTodos = await datasource.getAllTodos();
 
-    for (final routine in routines) {
-      if (!routine.shouldGenerateOn(todayDate)) continue;
+    for (int offset = 0; offset < 30; offset++) {
+      final date = today.add(Duration(days: offset));
+      for (final routine in routines) {
+        if (!routine.shouldGenerateOn(date)) continue;
 
-      final alreadyExists = existingTodos.any(
-        (t) => t.title == routine.title && t.source == 'routine' && t.date == todayDate,
-      );
-      if (alreadyExists) continue;
+        final alreadyExists = allTodos.any(
+          (t) => t.title == routine.title && t.source == 'routine' && t.date == date,
+        );
+        if (alreadyExists) continue;
 
-      final todo = Todo(
-        id: const Uuid().v4(),
-        title: routine.title,
-        description: routine.description,
-        source: 'routine',
-        type: routine.type,
-        time: routine.time,
-        date: todayDate,
-        createdAt: today,
-        updatedAt: today,
-      );
-      await todoRepo.addTodo(todo);
+        final todo = Todo(
+          id: const Uuid().v4(),
+          title: routine.title,
+          description: routine.description,
+          source: 'routine',
+          type: routine.type,
+          tags: routine.tags,
+          time: routine.time,
+          date: date,
+          createdAt: now,
+          updatedAt: now,
+        );
+        await todoRepo.addTodo(todo);
+      }
     }
 
-    state = await todoRepo.getTodayTodos();
+    final selectedDate = ref.read(selectedDateProvider);
+    state = await todoRepo.getTodosByDate(selectedDate);
   }
 
   Future<void> loadTodayTodos() async {
@@ -82,6 +89,13 @@ class TodoNotifier extends Notifier<List<Todo>> {
   Future<void> deleteTodo(String id) async {
     final repo = ref.read(todoRepoProvider);
     await repo.deleteTodo(id);
+    final selectedDate = ref.read(selectedDateProvider);
+    await _loadTodosForDate(selectedDate);
+  }
+
+  Future<void> updateTodo(Todo todo) async {
+    final repo = ref.read(todoRepoProvider);
+    await repo.updateTodo(todo);
     final selectedDate = ref.read(selectedDateProvider);
     await _loadTodosForDate(selectedDate);
   }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../domain/models/tag.dart';
 import '../../../domain/models/todo.dart';
 import '../../../shared/widgets/tag_chip.dart';
 import '../../../core/theme/app_theme.dart';
@@ -74,28 +75,15 @@ class _TodoItemState extends State<TodoItem> with SingleTickerProviderStateMixin
     }
   }
 
-  String _getTypeLabel(String type) {
-    switch (type) {
-      case 'bill': return '帐单';
-      case 'work': return '工作';
-      case 'personal': return '个人';
-      case 'health': return '健康';
-      default: return type;
-    }
-  }
-
-  (Color, Color, String) _getActionStyle(String type) {
-    switch (type) {
-      case 'bill': return (AppColors.billBg, AppColors.billText, '💰');
-      case 'work': return (AppColors.workBg, AppColors.primary, '▶');
-      case 'personal': return (AppColors.personalBg, AppColors.purple, '→');
-      default: return (AppColors.personalBg, AppColors.purple, '→');
-    }
+  (Color, Color, String) _getActionStyle() {
+    if (widget.todo.tags.isEmpty) return (AppColors.personalBg, AppColors.purple, '→');
+    final colorKey = widget.todo.tags.first.colorKey;
+    return (TagPalette.bgColor(colorKey), TagPalette.textColor(colorKey), '→');
   }
 
   @override
   Widget build(BuildContext context) {
-    final actionStyle = _getActionStyle(widget.todo.type);
+    final actionStyle = _getActionStyle();
 
     return GestureDetector(
       onTapDown: widget.readOnly ? null : (_) => setState(() => _itemPressed = true),
@@ -195,8 +183,15 @@ class _TodoItemState extends State<TodoItem> with SingleTickerProviderStateMixin
                         children: [
                           TagChip(label: _getSourceLabel(widget.todo.source), type: 'source', value: widget.todo.source),
                           const SizedBox(width: 6),
-                          TagChip(label: _getTypeLabel(widget.todo.type), type: 'type', value: widget.todo.type),
-                          const SizedBox(width: 6),
+                          ...widget.todo.tags.take(3).map((tag) => Padding(
+                            padding: const EdgeInsets.only(right: 4),
+                            child: TagChip.fromTag(label: tag.name, colorKey: tag.colorKey),
+                          )),
+                          if (widget.todo.tags.length > 3)
+                            const Padding(
+                              padding: EdgeInsets.only(right: 4),
+                              child: Text('…', style: TextStyle(fontSize: 11, color: AppColors.textTertiary)),
+                            ),
                           Text(
                             widget.todo.time,
                             style: const TextStyle(

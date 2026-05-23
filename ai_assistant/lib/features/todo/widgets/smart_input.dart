@@ -172,7 +172,7 @@ class _SmartInputState extends State<SmartInput> {
                   const SizedBox(height: 10),
                   Text(_result!.title, style: const TextStyle(fontFamily: 'PingFang SC', fontFamilyFallback: ['.SF Pro Text', 'system-ui', 'sans-serif'], fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.text)),
                   const SizedBox(height: 8),
-                  _buildPreviewRow('类型', _getTypeLabel(_result!.type)),
+                  _buildPreviewRow('标签', _getTypeLabel(_result!.type)),
                   _buildPreviewRow('时间', _result!.time),
                   _buildPreviewRow('日期', '${_result!.date.year}-${_result!.date.month.toString().padLeft(2, '0')}-${_result!.date.day.toString().padLeft(2, '0')}'),
                   _buildPreviewRow('来源', _getSourceLabel(_result!.source)),
