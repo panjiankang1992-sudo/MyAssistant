@@ -27,17 +27,14 @@ class CopilotHero extends ConsumerWidget {
             child: const Center(
               child: Text(
                 '✦',
-                style: TextStyle(
-                  fontSize: 26,
-                  color: Colors.white,
-                ),
+                style: TextStyle(fontSize: 26, color: Colors.white),
               ),
             ),
           ),
           const SizedBox(height: 12),
           Text(
             '你好，${profile.name}',
-            style: TextStyle(
+            style: const TextStyle(
               fontFamily: 'PingFang SC',
               fontFamilyFallback: ['.SF Pro Text', 'system-ui', 'sans-serif'],
               fontSize: 22,

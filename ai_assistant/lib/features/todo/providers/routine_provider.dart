@@ -19,8 +19,8 @@ class RoutineNotifier extends Notifier<List<Routine>> {
     final repo = ref.read(routineRepoProvider);
     await repo.addRoutine(routine);
     await loadRoutines();
-    // 添加例行后刷新今天待办（自动生成今天的例行待办）
-    await ref.read(todoNotifierProvider.notifier).loadTodayTodos();
+    // 添加例行后刷新当前查看日期，并补生成未来 30 天内的例行待办。
+    await ref.read(todoNotifierProvider.notifier).loadSelectedDateTodos();
   }
 
   Future<void> deleteRoutine(int id) async {
@@ -31,9 +31,13 @@ class RoutineNotifier extends Notifier<List<Routine>> {
     await repo.deleteRoutine(id);
     await loadRoutines();
     // Cascade: soft-delete future routine-generated todos (today's past todos kept)
-    if (routine != null) {
-      await todoRepo.deleteFutureRoutineTodos(routine.title, DateTime.now());
-      await ref.read(todoNotifierProvider.notifier).loadTodayTodos();
+    if (routine != null && routine.uuid != null && routine.uuid!.isNotEmpty) {
+      await todoRepo.deleteFutureRoutineTodosByRoutineId(
+        routine.uuid!,
+        DateTime.now(),
+        fallbackTitle: routine.title,
+      );
+      await ref.read(todoNotifierProvider.notifier).loadSelectedDateTodos();
     }
   }
 
@@ -51,9 +55,10 @@ class RoutineNotifier extends Notifier<List<Routine>> {
     // 级联：更新未来待办
     if (oldRoutine != null) {
       await todoNotifier.updateRoutineTodos(oldRoutine, newRoutine);
-      await todoNotifier.loadTodayTodos();
+      await todoNotifier.loadSelectedDateTodos();
     }
   }
 }
 
-final routineNotifierProvider = NotifierProvider<RoutineNotifier, List<Routine>>(RoutineNotifier.new);
+final routineNotifierProvider =
+    NotifierProvider<RoutineNotifier, List<Routine>>(RoutineNotifier.new);

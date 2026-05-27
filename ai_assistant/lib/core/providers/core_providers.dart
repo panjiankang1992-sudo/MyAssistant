@@ -9,11 +9,17 @@ import '../../data/repositories/routine_repository.dart';
 import '../../data/repositories/tag_repository.dart';
 import '../../domain/models/tag.dart';
 import '../../features/sync/cloud_path_builder.dart';
+import '../../features/sync/data_sync_service.dart';
+import '../../features/sync/providers/sync_provider.dart';
 import '../../features/sync/sync_engine.dart';
 
 final databaseProvider = Provider<AppDatabase>((ref) => AppDatabase());
-final datasourceProvider = Provider<LocalDatasource>((ref) => LocalDatasource(ref.watch(databaseProvider)));
-final localSyncDsProvider = Provider<LocalSyncDatasource>((ref) => LocalSyncDatasource(ref.watch(databaseProvider)));
+final datasourceProvider = Provider<LocalDatasource>(
+  (ref) => LocalDatasource(ref.watch(databaseProvider)),
+);
+final localSyncDsProvider = Provider<LocalSyncDatasource>(
+  (ref) => LocalSyncDatasource(ref.watch(databaseProvider)),
+);
 
 final syncEngineProvider = FutureProvider<SyncEngine?>((ref) async {
   final keychain = KeychainService();
@@ -24,7 +30,11 @@ final syncEngineProvider = FutureProvider<SyncEngine?>((ref) async {
   if (creds == null) return null;
 
   final webdav = WebDavDatasource();
-  await webdav.initialize(baseUrl: lastUrl, username: creds['username']!, password: creds['password']!);
+  await webdav.initialize(
+    baseUrl: lastUrl,
+    username: creds['username']!,
+    password: creds['password']!,
+  );
 
   final localDs = ref.watch(datasourceProvider);
   final localSyncDs = ref.watch(localSyncDsProvider);
@@ -33,22 +43,35 @@ final syncEngineProvider = FutureProvider<SyncEngine?>((ref) async {
   return SyncEngine(localDs, localSyncDs, webdav, pathBuilder);
 });
 
+final dataSyncServiceProvider = Provider<DataSyncService>((ref) {
+  final service = DataSyncService(
+    engineLoader: () => ref.read(syncEngineProvider.future),
+    localSync: ref.watch(localSyncDsProvider),
+    notifier: ref.read(syncNotifierProvider.notifier),
+  )..start();
+  ref.onDispose(service.dispose);
+  return service;
+});
+
 final todoRepoProvider = Provider<TodoRepository>((ref) {
   return TodoRepository(
     ref.watch(datasourceProvider),
-    syncEngine: () async => ref.read(syncEngineProvider).value,
+    syncService: ref.watch(dataSyncServiceProvider),
   );
 });
 
 final routineRepoProvider = Provider<RoutineRepository>((ref) {
   return RoutineRepository(
     ref.watch(datasourceProvider),
-    syncEngine: () async => ref.read(syncEngineProvider).value,
+    syncService: ref.watch(dataSyncServiceProvider),
   );
 });
 
 final tagRepoProvider = Provider<TagRepository>((ref) {
-  return TagRepository(ref.watch(datasourceProvider));
+  return TagRepository(
+    ref.watch(datasourceProvider),
+    syncService: ref.watch(dataSyncServiceProvider),
+  );
 });
 
 final allTagsProvider = FutureProvider<List<Tag>>((ref) async {

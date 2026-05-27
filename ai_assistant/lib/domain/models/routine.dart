@@ -7,6 +7,7 @@ class Routine {
   final String? description;
   final String type;
   final List<Tag> tags;
+  final String action;
   final String time;
   final String repeatRule;
   final String? repeatDays;
@@ -22,6 +23,7 @@ class Routine {
     this.description,
     required this.type,
     this.tags = const [],
+    this.action = 'none',
     required this.time,
     this.repeatRule = 'daily',
     this.repeatDays,
@@ -38,6 +40,7 @@ class Routine {
     String? description,
     String? type,
     List<Tag>? tags,
+    String? action,
     String? time,
     String? repeatRule,
     String? repeatDays,
@@ -53,6 +56,7 @@ class Routine {
       description: description ?? this.description,
       type: type ?? this.type,
       tags: tags ?? this.tags,
+      action: action ?? this.action,
       time: time ?? this.time,
       repeatRule: repeatRule ?? this.repeatRule,
       repeatDays: repeatDays ?? this.repeatDays,

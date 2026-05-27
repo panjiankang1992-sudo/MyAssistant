@@ -9,36 +9,40 @@ class TagChip extends StatelessWidget {
   final String? _colorKey;
   final Color? _bgColor;
   final Color? _textColor;
+  final bool selected;
 
   const TagChip({
     super.key,
     required this.label,
     this.type = '',
     this.value = '',
-  })  : _colorKey = null,
-        _bgColor = null,
-        _textColor = null;
+    this.selected = false,
+  }) : _colorKey = null,
+       _bgColor = null,
+       _textColor = null;
 
   const TagChip.fromTag({
     super.key,
     required this.label,
     required String colorKey,
-  })  : type = '',
-        value = '',
-        _colorKey = colorKey,
-        _bgColor = null,
-        _textColor = null;
+    this.selected = false,
+  }) : type = '',
+       value = '',
+       _colorKey = colorKey,
+       _bgColor = null,
+       _textColor = null;
 
   const TagChip.withColor({
     super.key,
     required this.label,
     required Color bgColor,
     required Color textColor,
-  })  : type = '',
-        value = '',
-        _colorKey = null,
-        _bgColor = bgColor,
-        _textColor = textColor;
+    this.selected = false,
+  }) : type = '',
+       value = '',
+       _colorKey = null,
+       _bgColor = bgColor,
+       _textColor = textColor;
 
   Color _getBackgroundColor() {
     if (_bgColor != null) return _bgColor;
@@ -108,21 +112,54 @@ class TagChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+    final bg = _getBackgroundColor();
+    final fg = _getTextColor();
+    return AnimatedContainer(
+      duration: AppAnimations.shortDuration,
+      padding: EdgeInsets.fromLTRB(selected ? 8 : 10, 5, 10, 5),
       decoration: BoxDecoration(
-        color: _getBackgroundColor(),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontFamily: 'PingFang SC',
-          fontFamilyFallback: const ['.SF Pro Text', 'system-ui', 'sans-serif'],
-          fontSize: 11,
-          fontWeight: FontWeight.w500,
-          color: _getTextColor(),
+        color: selected
+            ? fg.withValues(alpha: 0.16)
+            : bg.withValues(alpha: 0.62),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: selected
+              ? fg.withValues(alpha: 0.72)
+              : fg.withValues(alpha: 0.14),
+          width: selected ? 1.4 : 1,
         ),
+        boxShadow: selected
+            ? [
+                BoxShadow(
+                  color: fg.withValues(alpha: 0.12),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ]
+            : null,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (selected) ...[
+            Icon(Icons.check_rounded, size: 13, color: fg),
+            const SizedBox(width: 3),
+          ],
+          Text(
+            label,
+            style: TextStyle(
+              fontFamily: 'PingFang SC',
+              fontFamilyFallback: const [
+                '.SF Pro Text',
+                'system-ui',
+                'sans-serif',
+              ],
+              fontSize: 12,
+              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              color: fg.withValues(alpha: selected ? 1 : 0.86),
+            ),
+          ),
+        ],
       ),
     );
   }

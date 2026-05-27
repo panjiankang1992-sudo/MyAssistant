@@ -1,6 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'providers/todo_provider.dart';
@@ -10,7 +8,8 @@ import 'widgets/todo_detail_modal.dart';
 import 'widgets/todo_list.dart';
 import 'widgets/week_calendar_strip.dart';
 import '../../core/theme/app_theme.dart';
-import '../profile/profile_provider.dart';
+import '../../shared/widgets/app_controls.dart';
+import '../../shared/widgets/profile_avatar_button.dart';
 
 class TodoPage extends ConsumerStatefulWidget {
   final VoidCallback? onAvatarTap;
@@ -21,7 +20,8 @@ class TodoPage extends ConsumerStatefulWidget {
   ConsumerState<TodoPage> createState() => _TodoPageState();
 }
 
-class _TodoPageState extends ConsumerState<TodoPage> with TickerProviderStateMixin {
+class _TodoPageState extends ConsumerState<TodoPage>
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   final _poetryLines = [
     '山重水复疑无路，柳暗花明又一村。',
     '长风破浪会有时，直挂云帆济沧海。',
@@ -30,53 +30,80 @@ class _TodoPageState extends ConsumerState<TodoPage> with TickerProviderStateMix
     '纸上得来终觉浅，绝知此事要躬行。',
     '不畏浮云遮望望眼，自缘身在最高层。',
   ];
-  static const _avatarColors = [
-    [Color(0xFF667EEA), Color(0xFF764BA2)],
-    [Color(0xFF0071E3), Color(0xFF00C6FF)],
-    [Color(0xFFFF6B6B), Color(0xFFFF8E53)],
-    [Color(0xFF34C759), Color(0xFF30D5C8)],
-    [Color(0xFFFF9500), Color(0xFFFF5E3A)],
-    [Color(0xFFAF52DE), Color(0xFF5856D6)],
-  ];
   int _poetryIndex = 0;
   Timer? _poetryTimer;
+  Timer? _bookkeepingFeedbackTimer;
   bool _poetryVisible = true;
+  bool _showBookkeepingFeedback = false;
+  bool _bookkeepingFeedbackSuccess = false;
+  int _bookkeepingFeedbackTick = 0;
 
   Offset _fabOffset = Offset.zero;
 
   @override
   void initState() {
     super.initState();
-    _poetryTimer = Timer.periodic(
-      const Duration(seconds: 8),
-      (_) {
-        setState(() => _poetryVisible = false);
-        Future.delayed(const Duration(milliseconds: 300), () {
-          if (mounted) {
-            setState(() {
-              _poetryIndex = (_poetryIndex + 1) % _poetryLines.length;
-              _poetryVisible = true;
-            });
-          }
-        });
-      },
-    );
+    WidgetsBinding.instance.addObserver(this);
+    Future.microtask(() {
+      if (mounted) {
+        ref.read(todoNotifierProvider.notifier).loadSelectedDateTodos();
+      }
+    });
+    _poetryTimer = Timer.periodic(const Duration(seconds: 8), (_) {
+      setState(() => _poetryVisible = false);
+      Future.delayed(const Duration(milliseconds: 300), () {
+        if (mounted) {
+          setState(() {
+            _poetryIndex = (_poetryIndex + 1) % _poetryLines.length;
+            _poetryVisible = true;
+          });
+        }
+      });
+    });
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _poetryTimer?.cancel();
+    _bookkeepingFeedbackTimer?.cancel();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      ref.read(todoNotifierProvider.notifier).loadSelectedDateTodos();
+    }
   }
 
   bool _isToday(DateTime date) {
     final now = DateTime.now();
-    return date.year == now.year && date.month == now.month && date.day == now.day;
+    return date.year == now.year &&
+        date.month == now.month &&
+        date.day == now.day;
   }
 
   String _titleForDate(DateTime date) {
     if (_isToday(date)) return '今日待办';
     return '${date.month}月${date.day}日 待办';
+  }
+
+  void _displayBookkeepingFeedback({required bool success}) {
+    _bookkeepingFeedbackTimer?.cancel();
+    setState(() {
+      _bookkeepingFeedbackTick++;
+      _bookkeepingFeedbackSuccess = success;
+      _showBookkeepingFeedback = true;
+    });
+  }
+
+  void _hideBookkeepingFeedback() {
+    _bookkeepingFeedbackTimer?.cancel();
+    _bookkeepingFeedbackTimer = Timer(const Duration(milliseconds: 650), () {
+      if (!mounted) return;
+      setState(() => _showBookkeepingFeedback = false);
+    });
   }
 
   @override
@@ -87,99 +114,427 @@ class _TodoPageState extends ConsumerState<TodoPage> with TickerProviderStateMix
 
     return Scaffold(
       backgroundColor: AppColors.scaffoldBg,
-      body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 200),
-                          child: Text(
-                            _titleForDate(selectedDate),
-                            key: ValueKey(selectedDate),
-                            style: const TextStyle(
-                              fontFamily: 'PingFang SC',
-                              fontFamilyFallback: ['.SF Pro Text', 'system-ui', 'sans-serif'],
-                              fontSize: 30,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: -0.3,
-                              color: AppColors.text,
+      body: Stack(
+        children: [
+          SafeArea(
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                AnimatedSwitcher(
+                                  duration: const Duration(milliseconds: 200),
+                                  child: Text(
+                                    _titleForDate(selectedDate),
+                                    key: ValueKey(selectedDate),
+                                    style: const TextStyle(
+                                      fontFamily: 'PingFang SC',
+                                      fontFamilyFallback: [
+                                        '.SF Pro Text',
+                                        'system-ui',
+                                        'sans-serif',
+                                      ],
+                                      fontSize: 30,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: -0.3,
+                                      color: AppColors.text,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                GestureDetector(
+                                  onTap: () async {
+                                    final picked = await showAppDatePicker(
+                                      context: context,
+                                      initialDate: selectedDate,
+                                      firstDate: DateTime(2020),
+                                      lastDate: DateTime(2030),
+                                    );
+                                    if (picked != null) {
+                                      ref
+                                              .read(
+                                                selectedDateProvider.notifier,
+                                              )
+                                              .date =
+                                          picked;
+                                    }
+                                  },
+                                  child: const Icon(
+                                    Icons.calendar_month_outlined,
+                                    size: 24,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        AnimatedOpacity(
-                          opacity: _poetryVisible ? 1.0 : 0.0,
-                          duration: const Duration(milliseconds: 300),
-                          child: Text(
-                            _poetryLines[_poetryIndex],
-                            style: const TextStyle(
-                              fontFamily: 'PingFang SC',
-                              fontFamilyFallback: ['.SF Pro Text', 'system-ui', 'sans-serif'],
-                              fontSize: 12,
-                              fontWeight: FontWeight.w400,
-                              fontStyle: FontStyle.italic,
-                              color: AppColors.textTertiary,
+                            const SizedBox(height: 2),
+                            AnimatedOpacity(
+                              opacity: _poetryVisible ? 1.0 : 0.0,
+                              duration: const Duration(milliseconds: 300),
+                              child: Text(
+                                _poetryLines[_poetryIndex],
+                                style: const TextStyle(
+                                  fontFamily: 'PingFang SC',
+                                  fontFamilyFallback: [
+                                    '.SF Pro Text',
+                                    'system-ui',
+                                    'sans-serif',
+                                  ],
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w400,
+                                  fontStyle: FontStyle.italic,
+                                  color: AppColors.textTertiary,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                          ],
                         ),
-                      ],
+                      ),
+                      const SizedBox(width: 12),
+                      ProfileAvatarButton(onTap: widget.onAvatarTap),
+                    ],
+                  ),
+                ),
+                WeekCalendarStrip(
+                  selectedDate: selectedDate,
+                  onDateSelected: (date) {
+                    ref.read(selectedDateProvider.notifier).date = date;
+                  },
+                ),
+                Expanded(
+                  child: TodoList(
+                    todos: todos,
+                    readOnly: !isToday,
+                    onToggle: (todo) {
+                      ref
+                          .read(todoNotifierProvider.notifier)
+                          .toggleComplete(todo.id);
+                    },
+                    onDelete: (todo) {
+                      ref
+                          .read(todoNotifierProvider.notifier)
+                          .deleteTodo(todo.id);
+                    },
+                    onTap: (todo) {
+                      showTodoDetail(context, todo, readOnly: !isToday);
+                    },
+                    onActionTap: (todo) async {
+                      final messenger = ScaffoldMessenger.of(context);
+                      if (todo.action == 'bookkeeping') {
+                        _displayBookkeepingFeedback(success: false);
+                      }
+                      final created = await ref
+                          .read(todoNotifierProvider.notifier)
+                          .executeTodoAction(todo);
+                      if (!mounted || todo.action != 'bookkeeping') return;
+                      if (created) {
+                        _displayBookkeepingFeedback(success: true);
+                        _hideBookkeepingFeedback();
+                      } else {
+                        setState(() => _showBookkeepingFeedback = false);
+                        messenger.showSnackBar(
+                          const SnackBar(content: Text('未识别到金额，未记账')),
+                        );
+                      }
+                    },
+                    onComplete: (todo) {
+                      ref
+                          .read(todoNotifierProvider.notifier)
+                          .toggleComplete(todo.id);
+                    },
+                    onDefer: (todo) {
+                      ref.read(todoNotifierProvider.notifier).updateTodo(todo);
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (_showBookkeepingFeedback)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: Center(
+                  child: _BookkeepingFeedbackAnimation(
+                    key: ValueKey(
+                      '$_bookkeepingFeedbackTick-$_bookkeepingFeedbackSuccess',
                     ),
+                    success: _bookkeepingFeedbackSuccess,
                   ),
-                  const SizedBox(width: 12),
-                  _AvatarButton(
-                    onTap: widget.onAvatarTap,
-                    letter: ref.watch(profileProvider).name.isNotEmpty
-                        ? ref.watch(profileProvider).name[0]
-                        : '?',
-                    gradientColors: _avatarColors[ref.watch(profileProvider).avatarColorIndex.clamp(0, _avatarColors.length - 1)],
-                    serverAvatarUrl: ref.watch(profileProvider).serverAvatarUrl,
-                    localAvatarPath: ref.watch(profileProvider).avatarPath,
-                  ),
-                ],
+                ),
               ),
             ),
-            WeekCalendarStrip(
-              selectedDate: selectedDate,
-              onDateSelected: (date) {
-                ref.read(selectedDateProvider.notifier).date = date;
-              },
-            ),
-            Expanded(
-              child: TodoList(
-                todos: todos,
-                readOnly: !isToday,
-                onToggle: (todo) {
-                  ref.read(todoNotifierProvider.notifier).toggleComplete(todo.id);
-                },
-                onDelete: (todo) {
-                  ref.read(todoNotifierProvider.notifier).deleteTodo(todo.id);
-                },
-                onTap: (todo) {
-                  showTodoDetail(context, todo);
-                },
-              ),
-            ),
-          ],
-        ),
+        ],
       ),
-      floatingActionButton: isToday
-          ? _DraggableFAB(
-              offset: _fabOffset,
-              onOffsetChanged: (o) => setState(() => _fabOffset = o),
-              onPressed: () => showAddTodoModal(context),
-            )
-          : null,
+      floatingActionButton: _DraggableFAB(
+        offset: _fabOffset == Offset.zero ? const Offset(0, -14) : _fabOffset,
+        onOffsetChanged: (o) => setState(() => _fabOffset = o),
+        onPressed: () => showAddTodoModal(context, initialDate: selectedDate),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
+  }
+}
+
+class _BookkeepingFeedbackAnimation extends StatefulWidget {
+  final bool success;
+
+  const _BookkeepingFeedbackAnimation({super.key, required this.success});
+
+  @override
+  State<_BookkeepingFeedbackAnimation> createState() =>
+      _BookkeepingFeedbackAnimationState();
+}
+
+class _BookkeepingFeedbackAnimationState
+    extends State<_BookkeepingFeedbackAnimation>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _scale;
+  late final Animation<double> _opacity;
+  late final Animation<double> _progress;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: Duration(milliseconds: widget.success ? 560 : 760),
+    );
+    if (widget.success) {
+      _controller.forward();
+    } else {
+      _controller.repeat();
+    }
+    _scale = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween(
+          begin: 0.82,
+          end: 1.06,
+        ).chain(CurveTween(curve: Curves.easeOutBack)),
+        weight: 38,
+      ),
+      TweenSequenceItem(
+        tween: Tween(
+          begin: 1.06,
+          end: 1.0,
+        ).chain(CurveTween(curve: Curves.easeOutCubic)),
+        weight: 62,
+      ),
+    ]).animate(_controller);
+    _opacity = widget.success
+        ? TweenSequence<double>([
+            TweenSequenceItem(tween: Tween(begin: 0.0, end: 1.0), weight: 18),
+            TweenSequenceItem(tween: ConstantTween(1.0), weight: 52),
+            TweenSequenceItem(tween: Tween(begin: 1.0, end: 0.0), weight: 30),
+          ]).animate(
+            CurvedAnimation(parent: _controller, curve: Curves.easeOut),
+          )
+        : const AlwaysStoppedAnimation(1.0);
+    _progress = CurvedAnimation(parent: _controller, curve: Curves.easeInOut);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        final penX = -34 + 68 * _progress.value;
+        final penY = 3 - 8 * Curves.easeInOut.transform(_progress.value);
+        final title = widget.success ? '已记录' : '正在记账...';
+        final subtitle = widget.success ? '账单已保存' : '正在写入账单';
+        return Opacity(
+          opacity: _opacity.value,
+          child: Transform.scale(
+            scale: _scale.value,
+            child: Semantics(
+              liveRegion: true,
+              label: title,
+              child: Container(
+                width: 188,
+                height: 138,
+                padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(
+                    color: AppColors.primary.withValues(alpha: 0.12),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withValues(alpha: 0.16),
+                      blurRadius: 28,
+                      offset: const Offset(0, 16),
+                    ),
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.08),
+                      blurRadius: 18,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      height: 58,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Positioned(
+                            left: 22,
+                            right: 22,
+                            top: 28,
+                            child: CustomPaint(
+                              size: const Size(double.infinity, 22),
+                              painter: _BookkeepingLinePainter(
+                                progress: _progress.value,
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            top: 3 + penY,
+                            left: 76 + penX,
+                            child: Transform.rotate(
+                              angle: -0.45,
+                              child: Container(
+                                width: 42,
+                                height: 42,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  gradient: const LinearGradient(
+                                    colors: [
+                                      Color(0xFFFFB340),
+                                      Color(0xFFFF7A59),
+                                    ],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: const Color(
+                                        0xFFFF9500,
+                                      ).withValues(alpha: 0.25),
+                                      blurRadius: 14,
+                                      offset: const Offset(0, 6),
+                                    ),
+                                  ],
+                                ),
+                                child: const Icon(
+                                  Icons.edit_rounded,
+                                  color: Colors.white,
+                                  size: 24,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontFamily: 'PingFang SC',
+                        fontFamilyFallback: [
+                          '.SF Pro Text',
+                          'system-ui',
+                          'sans-serif',
+                        ],
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.text,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        fontFamily: 'PingFang SC',
+                        fontFamilyFallback: [
+                          '.SF Pro Text',
+                          'system-ui',
+                          'sans-serif',
+                        ],
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.textTertiary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _BookkeepingLinePainter extends CustomPainter {
+  final double progress;
+
+  const _BookkeepingLinePainter({required this.progress});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final basePaint = Paint()
+      ..color = AppColors.border
+      ..strokeWidth = 3
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+    final inkPaint = Paint()
+      ..color = AppColors.primary
+      ..strokeWidth = 4
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+    final path = Path()
+      ..moveTo(0, size.height * 0.45)
+      ..cubicTo(
+        size.width * 0.22,
+        size.height * 0.1,
+        size.width * 0.35,
+        size.height * 0.78,
+        size.width * 0.52,
+        size.height * 0.46,
+      )
+      ..cubicTo(
+        size.width * 0.68,
+        size.height * 0.17,
+        size.width * 0.76,
+        size.height * 0.75,
+        size.width,
+        size.height * 0.42,
+      );
+    canvas.drawPath(path, basePaint);
+
+    for (final metric in path.computeMetrics()) {
+      canvas.drawPath(
+        metric.extractPath(0, metric.length * progress.clamp(0.0, 1.0)),
+        inkPaint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _BookkeepingLinePainter oldDelegate) {
+    return oldDelegate.progress != progress;
   }
 }
 
@@ -229,112 +584,44 @@ class _DraggableFABState extends State<_DraggableFAB> {
         onPanEnd: (_) {
           Future.microtask(() => setState(() => _isDragging = false));
         },
-        onTap: _isDragging ? null : widget.onPressed,
-        child: FloatingActionButton(
-          onPressed: widget.onPressed,
-          backgroundColor: AppColors.primary,
-          elevation: 4,
-          highlightElevation: 6,
-          child: const Icon(Icons.add, size: 22, color: Colors.white),
-        ),
-      ),
-    );
-  }
-}
-
-class _AvatarButton extends StatefulWidget {
-  final VoidCallback? onTap;
-  final String letter;
-  final List<Color> gradientColors;
-  final String? serverAvatarUrl;
-  final String? localAvatarPath;
-
-  _AvatarButton({this.onTap, this.letter = '?', this.gradientColors = const [Color(0xFF667EEA), Color(0xFF764BA2)], this.serverAvatarUrl, this.localAvatarPath});
-
-  @override
-  State<_AvatarButton> createState() => _AvatarButtonState();
-}
-
-class _AvatarButtonState extends State<_AvatarButton> {
-  bool _pressed = false;
-
-  @override
-  Widget build(BuildContext context) {
-    Widget avatarChild;
-    if (widget.serverAvatarUrl != null && widget.serverAvatarUrl!.isNotEmpty) {
-      final url = widget.serverAvatarUrl!;
-      if (url.startsWith('data:')) {
-        final base64Str = url.split(',').last;
-        try {
-          final bytes = base64Decode(base64Str);
-          avatarChild = ClipOval(
-            child: Image.memory(bytes, width: 40, height: 40, fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => _buildGradientAvatar()),
-          );
-        } catch (_) {
-          avatarChild = _buildGradientAvatar();
-        }
-      } else {
-        avatarChild = ClipOval(
-          child: Image.network(url, width: 40, height: 40, fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => _buildGradientAvatar()),
-        );
-      }
-    } else if (widget.localAvatarPath != null && widget.localAvatarPath!.isNotEmpty) {
-      avatarChild = ClipOval(
-        child: Image.file(
-          File(widget.localAvatarPath!),
-          width: 40, height: 40, fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => _buildGradientAvatar(),
-        ),
-      );
-    } else {
-      avatarChild = _buildGradientAvatar();
-    }
-
-    return GestureDetector(
-      onTapDown: (_) => setState(() => _pressed = true),
-      onTapUp: (_) {
-        setState(() => _pressed = false);
-        widget.onTap?.call();
-      },
-      onTapCancel: () => setState(() => _pressed = false),
-      child: AnimatedScale(
-        scale: _pressed ? 0.92 : 1.0,
-        duration: const Duration(milliseconds: 120),
-        curve: Curves.easeOut,
-        child: avatarChild,
-      ),
-    );
-  }
-
-  Widget _buildGradientAvatar() {
-    return Container(
-      width: 40,
-      height: 40,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: LinearGradient(
-          colors: widget.gradientColors,
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Color(0x33764BA2),
-            blurRadius: 8,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Center(
-        child: Text(
-          widget.letter,
-          style: TextStyle(
-            fontFamily: 'PingFang SC',
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Colors.white,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: _isDragging ? null : widget.onPressed,
+            borderRadius: BorderRadius.circular(30),
+            child: AnimatedScale(
+              duration: const Duration(milliseconds: 140),
+              scale: _isDragging ? 1.04 : 1,
+              child: Container(
+                width: 58,
+                height: 58,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF8B5CF6), Color(0xFF0A84FF)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF0A84FF).withValues(alpha: 0.26),
+                      blurRadius: 18,
+                      offset: const Offset(0, 8),
+                    ),
+                    BoxShadow(
+                      color: const Color(0xFF8B5CF6).withValues(alpha: 0.18),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.add_rounded,
+                  size: 28,
+                  color: Colors.white,
+                ),
+              ),
+            ),
           ),
         ),
       ),

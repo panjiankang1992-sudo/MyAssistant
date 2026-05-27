@@ -5,7 +5,8 @@ import '../../../domain/models/routine.dart';
 import '../../../domain/models/tag.dart';
 import '../../../shared/widgets/tag_chip.dart';
 import '../providers/routine_provider.dart';
-import 'tag_selector.dart';
+import '../../tags/tag_selector.dart';
+import 'form_controls.dart';
 
 void showRoutineModal(BuildContext context) {
   showModalBottomSheet(
@@ -20,11 +21,20 @@ void showRoutineModal(BuildContext context) {
   );
 }
 
+String _normalizeRoutineTime(String raw) {
+  final match = RegExp(r'^(\d{1,2})(?:[:：点](\d{1,2}))?$').firstMatch(raw);
+  if (match == null) return '09:00';
+  final hour = (int.tryParse(match.group(1) ?? '') ?? 9).clamp(0, 23);
+  final minute = (int.tryParse(match.group(2) ?? '0') ?? 0).clamp(0, 59);
+  return '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}';
+}
+
 class _RoutineModalContent extends ConsumerStatefulWidget {
   const _RoutineModalContent();
 
   @override
-  ConsumerState<_RoutineModalContent> createState() => _RoutineModalContentState();
+  ConsumerState<_RoutineModalContent> createState() =>
+      _RoutineModalContentState();
 }
 
 class _RoutineModalContentState extends ConsumerState<_RoutineModalContent> {
@@ -66,7 +76,7 @@ class _RoutineModalContentState extends ConsumerState<_RoutineModalContent> {
     final titleController = TextEditingController();
     final formKey = GlobalKey<FormState>();
     List<Tag> tags = [];
-    int hour = 9;
+    String time = '09:00';
 
     await showDialog(
       context: context,
@@ -103,25 +113,10 @@ class _RoutineModalContentState extends ConsumerState<_RoutineModalContent> {
                       },
                     ),
                     const SizedBox(height: 12),
-                    DropdownButtonFormField<int>(
-                      initialValue: hour,
-                      decoration: const InputDecoration(
-                        labelText: '时间',
-                        border: OutlineInputBorder(),
-                      ),
-                      items: List.generate(
-                        24,
-                        (i) => DropdownMenuItem(
-                          value: i,
-                          child: Text('${i.toString().padLeft(2, '0')}:00'),
-                        ),
-                      ),
+                    TimeInputField(
+                      value: time,
                       onChanged: (value) {
-                        if (value != null) {
-                          setState(() {
-                            hour = value;
-                          });
-                        }
+                        setState(() => time = value);
                       },
                     ),
                   ],
@@ -140,10 +135,12 @@ class _RoutineModalContentState extends ConsumerState<_RoutineModalContent> {
                       title: titleController.text.trim(),
                       type: tags.isNotEmpty ? tags.first.name : 'work',
                       tags: tags,
-                      time: '${hour.toString().padLeft(2, '0')}:00',
+                      time: time,
                       createdAt: DateTime.now(),
                     );
-                    ref.read(routineNotifierProvider.notifier).addRoutine(routine);
+                    ref
+                        .read(routineNotifierProvider.notifier)
+                        .addRoutine(routine);
                     Navigator.of(context).pop();
                   },
                   child: const Text('保存'),
@@ -185,8 +182,7 @@ class _RoutineModalContentState extends ConsumerState<_RoutineModalContent> {
     final titleController = TextEditingController(text: routine.title);
     final formKey = GlobalKey<FormState>();
     List<Tag> tags = List.from(routine.tags);
-    final timeParts = routine.time.split(':');
-    int hour = int.tryParse(timeParts[0]) ?? 9;
+    String time = _normalizeRoutineTime(routine.time);
 
     await showDialog(
       context: context,
@@ -207,7 +203,9 @@ class _RoutineModalContentState extends ConsumerState<_RoutineModalContent> {
                         border: OutlineInputBorder(),
                       ),
                       validator: (value) {
-                        if (value == null || value.trim().isEmpty) return '请输入标题';
+                        if (value == null || value.trim().isEmpty) {
+                          return '请输入标题';
+                        }
                         return null;
                       },
                     ),
@@ -217,22 +215,9 @@ class _RoutineModalContentState extends ConsumerState<_RoutineModalContent> {
                       onChanged: (value) => setDialogState(() => tags = value),
                     ),
                     const SizedBox(height: 12),
-                    DropdownButtonFormField<int>(
-                      initialValue: hour,
-                      decoration: const InputDecoration(
-                        labelText: '时间',
-                        border: OutlineInputBorder(),
-                      ),
-                      items: List.generate(
-                        24,
-                        (i) => DropdownMenuItem(
-                          value: i,
-                          child: Text('${i.toString().padLeft(2, '0')}:00'),
-                        ),
-                      ),
-                      onChanged: (value) {
-                        if (value != null) setDialogState(() => hour = value);
-                      },
+                    TimeInputField(
+                      value: time,
+                      onChanged: (value) => setDialogState(() => time = value),
                     ),
                   ],
                 ),
@@ -249,10 +234,12 @@ class _RoutineModalContentState extends ConsumerState<_RoutineModalContent> {
                       title: titleController.text.trim(),
                       type: tags.isNotEmpty ? tags.first.name : routine.type,
                       tags: tags,
-                      time: '${hour.toString().padLeft(2, '0')}:00',
+                      time: time,
                       updatedAt: DateTime.now(),
                     );
-                    ref.read(routineNotifierProvider.notifier).updateRoutine(newRoutine);
+                    ref
+                        .read(routineNotifierProvider.notifier)
+                        .updateRoutine(newRoutine);
                     Navigator.of(context).pop();
                   },
                   child: const Text('保存'),
@@ -291,11 +278,8 @@ class _RoutineModalContentState extends ConsumerState<_RoutineModalContent> {
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 8),
               child: Text(
-                '例行管理',
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w600,
-                ),
+                '例行代办',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
               ),
             ),
             const Divider(height: 1),
@@ -351,11 +335,16 @@ class _RoutineListItem extends StatelessWidget {
 
   String _getTypeLabel(String type) {
     switch (type) {
-      case 'bill': return '帐单';
-      case 'work': return '工作';
-      case 'personal': return '个人';
-      case 'health': return '健康';
-      default: return type;
+      case 'bill':
+        return '帐单';
+      case 'work':
+        return '工作';
+      case 'personal':
+        return '个人';
+      case 'health':
+        return '健康';
+      default:
+        return type;
     }
   }
 
@@ -366,7 +355,9 @@ class _RoutineListItem extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: const BoxDecoration(
-          border: Border(bottom: BorderSide(color: Color(0xFFE5E5EA), width: 0.5)),
+          border: Border(
+            bottom: BorderSide(color: Color(0xFFE5E5EA), width: 0.5),
+          ),
         ),
         child: Row(
           children: [
@@ -377,25 +368,53 @@ class _RoutineListItem extends StatelessWidget {
                   Row(
                     children: [
                       if (routine.tags.isNotEmpty)
-                        ...routine.tags.take(3).map((tag) => Padding(
-                          padding: const EdgeInsets.only(right: 4),
-                          child: TagChip.fromTag(label: tag.name, colorKey: tag.colorKey),
-                        ))
+                        ...routine.tags
+                            .take(3)
+                            .map(
+                              (tag) => Padding(
+                                padding: const EdgeInsets.only(right: 4),
+                                child: TagChip.fromTag(
+                                  label: tag.name,
+                                  colorKey: tag.colorKey,
+                                ),
+                              ),
+                            )
                       else
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: const Color(0xFFE8F2FD),
                             borderRadius: BorderRadius.circular(6),
                           ),
-                          child: Text(_getTypeLabel(routine.type), style: const TextStyle(fontSize: 11, color: Color(0xFF4A90D9))),
+                          child: Text(
+                            _getTypeLabel(routine.type),
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF4A90D9),
+                            ),
+                          ),
                         ),
                     ],
                   ),
                   const SizedBox(height: 4),
-                  Text(routine.title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
+                  Text(
+                    routine.title,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
                   const SizedBox(height: 2),
-                  Text(routine.time, style: const TextStyle(fontSize: 13, color: Color(0xFF8E8E93))),
+                  Text(
+                    routine.time,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF8E8E93),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -407,7 +426,10 @@ class _RoutineListItem extends StatelessWidget {
                   'assets/icons/edit.svg',
                   width: 18,
                   height: 18,
-                  colorFilter: const ColorFilter.mode(Color(0xFF8E8E93), BlendMode.srcIn),
+                  colorFilter: const ColorFilter.mode(
+                    Color(0xFF8E8E93),
+                    BlendMode.srcIn,
+                  ),
                 ),
               ),
             ),
@@ -441,12 +463,16 @@ class _SwipeToDeleteRoutineState extends State<_SwipeToDeleteRoutine>
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 200));
-    _animation = Tween<double>(begin: 0, end: 0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
-    )..addListener(() {
-        if (!_dragging) setState(() => _offset = _animation.value);
-      });
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 200),
+    );
+    _animation =
+        Tween<double>(begin: 0, end: 0).animate(
+          CurvedAnimation(parent: _controller, curve: Curves.easeOut),
+        )..addListener(() {
+          if (!_dragging) setState(() => _offset = _animation.value);
+        });
   }
 
   @override
@@ -456,9 +482,10 @@ class _SwipeToDeleteRoutineState extends State<_SwipeToDeleteRoutine>
   }
 
   void _animateTo(double target) {
-    _animation = Tween<double>(begin: _offset, end: target).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
-    );
+    _animation = Tween<double>(
+      begin: _offset,
+      end: target,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
     _controller.forward(from: 0);
   }
 
@@ -488,15 +515,25 @@ class _SwipeToDeleteRoutineState extends State<_SwipeToDeleteRoutine>
                         height: 36,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: const Color(0xFFFF3B30).withValues(alpha: 0.08),
-                          border: Border.all(color: const Color(0xFFFF3B30).withValues(alpha: 0.25), width: 1.2),
+                          color: const Color(
+                            0xFFFF3B30,
+                          ).withValues(alpha: 0.08),
+                          border: Border.all(
+                            color: const Color(
+                              0xFFFF3B30,
+                            ).withValues(alpha: 0.25),
+                            width: 1.2,
+                          ),
                         ),
                         child: Center(
                           child: SvgPicture.asset(
                             'assets/icons/delete.svg',
                             width: 17,
                             height: 17,
-                            colorFilter: const ColorFilter.mode(Color(0xFFFF3B30), BlendMode.srcIn),
+                            colorFilter: const ColorFilter.mode(
+                              Color(0xFFFF3B30),
+                              BlendMode.srcIn,
+                            ),
                           ),
                         ),
                       ),

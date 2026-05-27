@@ -43,20 +43,41 @@ class _AuthPageState extends ConsumerState<AuthPage> {
             children: [
               const SizedBox(height: 80),
               Container(
-                width: 72, height: 72,
-                decoration: BoxDecoration(
+                width: 72,
+                height: 72,
+                decoration: const BoxDecoration(
                   shape: BoxShape.circle,
-                  gradient: const LinearGradient(
+                  gradient: LinearGradient(
                     colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
-                    begin: Alignment.topLeft, end: Alignment.bottomRight,
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
                 ),
-                child: const Center(child: Text('M', style: TextStyle(fontSize: 30, fontWeight: FontWeight.w700, color: Colors.white))),
+                child: const Center(
+                  child: Text(
+                    'M',
+                    style: TextStyle(
+                      fontSize: 30,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
               ),
               const SizedBox(height: 24),
-              const Text('MyAssistant', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: AppColors.text)),
+              const Text(
+                'MyAssistant',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.text,
+                ),
+              ),
               const SizedBox(height: 8),
-              const Text('AI 个人助手', style: TextStyle(fontSize: 15, color: AppColors.textTertiary)),
+              const Text(
+                'AI 个人助手',
+                style: TextStyle(fontSize: 15, color: AppColors.textTertiary),
+              ),
               const SizedBox(height: 48),
               Form(
                 key: _formKey,
@@ -73,13 +94,32 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                         hintText: '用户名或邮箱',
                         filled: true,
                         fillColor: const Color(0xFFF9F9FB),
-                        prefixIcon: const Icon(Icons.person_outline, size: 20, color: AppColors.textTertiary),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.border)),
-                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.border)),
-                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.primary)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                        prefixIcon: const Icon(
+                          Icons.person_outline,
+                          size: 20,
+                          color: AppColors.textTertiary,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(color: AppColors.border),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(color: AppColors.border),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(
+                            color: AppColors.primary,
+                          ),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 14,
+                        ),
                       ),
-                      validator: (v) => (v == null || v.trim().isEmpty) ? '请输入用户名' : null,
+                      validator: (v) =>
+                          (v == null || v.trim().isEmpty) ? '请输入用户名' : null,
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
@@ -92,45 +132,96 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                         hintText: '密码',
                         filled: true,
                         fillColor: const Color(0xFFF9F9FB),
-                        prefixIcon: const Icon(Icons.lock_outline, size: 20, color: AppColors.textTertiary),
-                        suffixIcon: IconButton(
-                          icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility, size: 20, color: AppColors.textTertiary),
-                          onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                        prefixIcon: const Icon(
+                          Icons.lock_outline,
+                          size: 20,
+                          color: AppColors.textTertiary,
                         ),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.border)),
-                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.border)),
-                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.primary)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscurePassword
+                                ? Icons.visibility_off
+                                : Icons.visibility,
+                            size: 20,
+                            color: AppColors.textTertiary,
+                          ),
+                          onPressed: () => setState(
+                            () => _obscurePassword = !_obscurePassword,
+                          ),
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(color: AppColors.border),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(color: AppColors.border),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(
+                            color: AppColors.primary,
+                          ),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 14,
+                        ),
                       ),
-                      validator: (v) => (v == null || v.trim().isEmpty) ? '请输入密码' : null,
+                      validator: (v) =>
+                          (v == null || v.trim().isEmpty) ? '请输入密码' : null,
                     ),
                     const SizedBox(height: 24),
                     SizedBox(
-                      width: double.infinity, height: 50,
+                      width: double.infinity,
+                      height: 50,
                       child: ElevatedButton(
                         onPressed: authState.isLoading ? null : _login,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primary,
                           foregroundColor: Colors.white,
                           elevation: 0,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(25),
+                          ),
                         ),
                         child: authState.isLoading
-                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                          : const Text('登录', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text(
+                                '登录',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                       ),
                     ),
                     if (authState.error != null)
                       Padding(
                         padding: const EdgeInsets.only(top: 12),
-                        child: Text(authState.error!, style: const TextStyle(color: AppColors.danger, fontSize: 13)),
+                        child: Text(
+                          authState.error!,
+                          style: const TextStyle(
+                            color: AppColors.danger,
+                            fontSize: 13,
+                          ),
+                        ),
                       ),
                   ],
                 ),
               ),
               const SizedBox(height: 60),
-              const Text('登录即表示同意《用户协议》和《隐私政策》',
-                style: TextStyle(fontSize: 11, color: AppColors.textTertiary)),
+              const Text(
+                '登录即表示同意《用户协议》和《隐私政策》',
+                style: TextStyle(fontSize: 11, color: AppColors.textTertiary),
+              ),
             ],
           ),
         ),

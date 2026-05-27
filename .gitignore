@@ -1,2 +1,38 @@
 
+# OS
 .DS_Store
+Thumbs.db
+
+# Editor / local caches
+.idea/
+.playwright-mcp/
+.sisyphus/
+.superpowers/
+*.iml
+*.ipr
+*.iws
+
+# Flutter / Dart
+**/.dart_tool/
+**/.packages
+**/build/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+
+# Generated code
+**/*.g.dart
+**/*.freezed.dart
+**/*.mocks.dart
+
+# Android / macOS generated state
+**/android/.gradle/
+**/android/app/build/
+**/android/local.properties
+**/macos/Pods/
+**/macos/.build/
+**/macos/Runner.xcworkspace/xcuserdata/
+
+# Environment / logs
+.env
+.env.*
+*.log

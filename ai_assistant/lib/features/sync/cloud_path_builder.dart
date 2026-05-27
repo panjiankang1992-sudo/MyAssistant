@@ -21,6 +21,10 @@ class CloudPathBuilder {
     return 'MyAssistant/$username/tags/index.json';
   }
 
+  String buildMetadataIndexPath() {
+    return 'MyAssistant/$username/metadata/index.json';
+  }
+
   List<String> get requiredDirectories {
     final now = DateTime.now();
     final y = now.year.toString();
@@ -39,6 +43,7 @@ class CloudPathBuilder {
       'MyAssistant/$username/notes',
       'MyAssistant/$username/copilot',
       'MyAssistant/$username/tags',
+      'MyAssistant/$username/metadata',
       'MyAssistant/$username/profile',
     ];
   }

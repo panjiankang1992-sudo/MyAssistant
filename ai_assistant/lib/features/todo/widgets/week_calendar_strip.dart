@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
 
@@ -16,53 +17,71 @@ class WeekCalendarStrip extends StatefulWidget {
 }
 
 class _WeekCalendarStripState extends State<WeekCalendarStrip> {
-  late PageController _pageController;
-  late DateTime _initialWeekStart;
+  final _scrollController = ScrollController();
+  final _rangeBefore = 3650;
+  final _rangeAfter = 3650;
+  late DateTime _anchorDate;
+  bool _didInitialPosition = false;
+  DateTime? _lastTappedDate;
 
   static const _weekdays = ['一', '二', '三', '四', '五', '六', '日'];
-  static const _initialPage = 520; // middle of 1040 pages (~20 year range)
 
   @override
   void initState() {
     super.initState();
-    _initialWeekStart = _mondayOfWeek(widget.selectedDate);
-    _pageController = PageController(initialPage: _initialPage);
+    _anchorDate = _dateOnly(DateTime.now());
   }
 
   @override
   void didUpdateWidget(covariant WeekCalendarStrip oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!_isSameDay(widget.selectedDate, oldWidget.selectedDate)) {
-      final targetPage = _pageForDate(widget.selectedDate);
-      if (_pageController.hasClients && (_pageController.page?.round() ?? _initialPage) != targetPage) {
-        _pageController.animateToPage(
-          targetPage,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
+      if (_lastTappedDate != null &&
+          _isSameDay(widget.selectedDate, _lastTappedDate!)) {
+        _lastTappedDate = null;
+        return;
       }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_scrollController.hasClients) return;
+        final width = context.size?.width;
+        if (width == null || width <= 0) return;
+        _scrollToDate(widget.selectedDate, width / 7, animate: true);
+      });
     }
   }
 
   @override
   void dispose() {
-    _pageController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
-  DateTime _mondayOfWeek(DateTime date) {
-    final d = date.weekday;
-    return DateTime(date.year, date.month, date.day).subtract(Duration(days: d - 1));
+  DateTime _dateOnly(DateTime date) {
+    return DateTime(date.year, date.month, date.day);
   }
 
-  int _pageForDate(DateTime date) {
-    final monday = _mondayOfWeek(date);
-    final diff = monday.difference(_initialWeekStart).inDays;
-    return _initialPage + diff ~/ 7;
+  DateTime _dateForIndex(int index) {
+    return _anchorDate.add(Duration(days: index - _rangeBefore));
   }
 
-  DateTime _weekStartForPage(int page) {
-    return _initialWeekStart.add(Duration(days: (page - _initialPage) * 7));
+  int _indexForDate(DateTime date) {
+    return _dateOnly(date).difference(_anchorDate).inDays + _rangeBefore;
+  }
+
+  void _scrollToDate(DateTime date, double itemWidth, {required bool animate}) {
+    final target = ((_indexForDate(date) - 3) * itemWidth).clamp(
+      0.0,
+      _scrollController.position.maxScrollExtent,
+    );
+    if (animate) {
+      _scrollController.animateTo(
+        target,
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeOutCubic,
+      );
+    } else {
+      _scrollController.jumpTo(target);
+    }
   }
 
   bool _isSameDay(DateTime a, DateTime b) {
@@ -74,70 +93,112 @@ class _WeekCalendarStripState extends State<WeekCalendarStrip> {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
 
-    return SizedBox(
-      height: 64,
-      child: PageView.builder(
-        controller: _pageController,
-        itemCount: 1040,
-        itemBuilder: (context, page) {
-          final weekStart = _weekStartForPage(page);
-          return Row(
-            children: List.generate(7, (i) {
-              final day = weekStart.add(Duration(days: i));
-              final isToday = _isSameDay(day, today);
-              final isSelected = _isSameDay(day, widget.selectedDate);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final itemWidth = constraints.maxWidth / 7;
+        if (!_didInitialPosition) {
+          _didInitialPosition = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted || !_scrollController.hasClients) return;
+            _scrollToDate(widget.selectedDate, itemWidth, animate: false);
+          });
+        }
 
-              return Expanded(
-                child: GestureDetector(
-                  onTap: () => widget.onDateSelected(day),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        _weekdays[i],
-                        style: TextStyle(
-                          fontFamily: 'PingFang SC',
-                          fontFamilyFallback: const ['.SF Pro Text', 'system-ui', 'sans-serif'],
-                          fontSize: 10,
-                          fontWeight: FontWeight.w400,
-                          color: isSelected
-                              ? AppColors.primary
-                              : AppColors.textTertiary,
+        return ScrollConfiguration(
+          behavior: const MaterialScrollBehavior().copyWith(
+            dragDevices: {
+              PointerDeviceKind.touch,
+              PointerDeviceKind.mouse,
+              PointerDeviceKind.trackpad,
+            },
+          ),
+          child: SizedBox(
+            height: 64,
+            child: ListView.builder(
+              controller: _scrollController,
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(
+                parent: AlwaysScrollableScrollPhysics(),
+              ),
+              itemCount: _rangeBefore + _rangeAfter + 1,
+              itemBuilder: (context, index) {
+                final day = _dateForIndex(index);
+                final isToday = _isSameDay(day, today);
+                final isSelected = _isSameDay(day, widget.selectedDate);
+
+                return SizedBox(
+                  width: itemWidth,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () {
+                      _lastTappedDate = day;
+                      widget.onDateSelected(day);
+                    },
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          _weekdays[day.weekday - 1],
+                          style: TextStyle(
+                            fontFamily: 'PingFang SC',
+                            fontFamilyFallback: const [
+                              '.SF Pro Text',
+                              'system-ui',
+                              'sans-serif',
+                            ],
+                            fontSize: 10,
+                            fontWeight: FontWeight.w400,
+                            color: isSelected
+                                ? AppColors.primary
+                                : AppColors.textTertiary,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 4),
-                      Container(
-                        width: 30,
-                        height: 30,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: isSelected
-                              ? (isToday ? AppColors.primary : AppColors.primaryLight)
-                              : Colors.transparent,
-                        ),
-                        child: Center(
-                          child: Text(
-                            '${day.day}',
-                            style: TextStyle(
-                              fontFamily: 'PingFang SC',
-                              fontFamilyFallback: const ['.SF Pro Text', 'system-ui', 'sans-serif'],
-                              fontSize: 15,
-                              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                              color: isSelected
-                                  ? (isToday ? Colors.white : AppColors.primary)
-                                  : (isToday ? AppColors.primary : AppColors.text),
+                        const SizedBox(height: 4),
+                        Container(
+                          width: 30,
+                          height: 30,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: isSelected
+                                ? (isToday
+                                      ? AppColors.primary
+                                      : AppColors.primaryLight)
+                                : Colors.transparent,
+                          ),
+                          child: Center(
+                            child: Text(
+                              '${day.day}',
+                              style: TextStyle(
+                                fontFamily: 'PingFang SC',
+                                fontFamilyFallback: const [
+                                  '.SF Pro Text',
+                                  'system-ui',
+                                  'sans-serif',
+                                ],
+                                fontSize: 15,
+                                fontWeight: isSelected
+                                    ? FontWeight.w600
+                                    : FontWeight.w400,
+                                color: isSelected
+                                    ? (isToday
+                                          ? Colors.white
+                                          : AppColors.primary)
+                                    : (isToday
+                                          ? AppColors.primary
+                                          : AppColors.text),
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              );
-            }),
-          );
-        },
-      ),
+                );
+              },
+            ),
+          ),
+        );
+      },
     );
   }
 }

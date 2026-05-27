@@ -45,17 +45,17 @@ class AppAnimations {
   static List<BoxShadow> layeredShadow({double opacity = 0.08}) {
     return [
       BoxShadow(
-        color: Colors.black.withOpacity(opacity * 0.3),
+        color: Colors.black.withValues(alpha: opacity * 0.3),
         blurRadius: 1,
         offset: const Offset(0, 1),
       ),
       BoxShadow(
-        color: Colors.black.withOpacity(opacity * 0.7),
+        color: Colors.black.withValues(alpha: opacity * 0.7),
         blurRadius: 6,
         offset: const Offset(0, 2),
       ),
       BoxShadow(
-        color: Colors.black.withOpacity(opacity),
+        color: Colors.black.withValues(alpha: opacity),
         blurRadius: 16,
         offset: const Offset(0, 8),
       ),
@@ -65,12 +65,12 @@ class AppAnimations {
   static List<BoxShadow> cardShadow() {
     return [
       BoxShadow(
-        color: Colors.black.withOpacity(0.04),
+        color: Colors.black.withValues(alpha: 0.04),
         blurRadius: 2,
         offset: const Offset(0, 1),
       ),
       BoxShadow(
-        color: Colors.black.withOpacity(0.06),
+        color: Colors.black.withValues(alpha: 0.06),
         blurRadius: 8,
         offset: const Offset(0, 4),
       ),
@@ -80,12 +80,12 @@ class AppAnimations {
   static List<BoxShadow> elevatedShadow() {
     return [
       BoxShadow(
-        color: Colors.black.withOpacity(0.08),
+        color: Colors.black.withValues(alpha: 0.08),
         blurRadius: 4,
         offset: const Offset(0, 2),
       ),
       BoxShadow(
-        color: Colors.black.withOpacity(0.12),
+        color: Colors.black.withValues(alpha: 0.12),
         blurRadius: 16,
         offset: const Offset(0, 8),
       ),
@@ -173,9 +173,7 @@ class AppTheme {
       cardTheme: CardThemeData(
         elevation: 0,
         color: AppColors.surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         shadowColor: const Color(0x0F000000),
       ),
       textTheme: const TextTheme(
@@ -302,9 +300,7 @@ class AppTheme {
           fontWeight: FontWeight.w500,
           color: AppColors.primary,
         ),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         side: BorderSide.none,
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       ),
@@ -335,7 +331,10 @@ class AppTheme {
           borderRadius: BorderRadius.circular(8),
           borderSide: const BorderSide(color: AppColors.primary, width: 1),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 12,
+        ),
         hintStyle: const TextStyle(
           fontFamily: 'PingFang SC',
           fontFamilyFallback: ['.SF Pro Text', 'system-ui', 'sans-serif'],

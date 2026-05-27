@@ -3,8 +3,10 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
+import '../ai_settings/ai_model_page.dart';
 import '../auth/auth_provider.dart';
 import '../settings/settings_page.dart';
+import '../tags/tag_manage_page.dart';
 import 'edit_profile_modal.dart';
 import 'password_change_modal.dart';
 import 'profile_provider.dart';
@@ -54,7 +56,7 @@ class _ProfilePanelState extends State<ProfilePanel>
   }
 
   void _closePanel() {
-    _controller.reverse().then((_) => widget.onClose());
+    _controller.reverse().then((value) => widget.onClose());
   }
 
   Widget _buildAvatar(UserProfile profile) {
@@ -66,14 +68,21 @@ class _ProfilePanelState extends State<ProfilePanel>
         try {
           final bytes = base64Decode(base64Str);
           return Container(
-            width: 80, height: 80,
+            width: 80,
+            height: 80,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(color: AppColors.border, width: 2),
             ),
             child: ClipOval(
-              child: Image.memory(bytes, width: 80, height: 80, fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => _buildGradientAvatar(profile)),
+              child: Image.memory(
+                bytes,
+                width: 80,
+                height: 80,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) =>
+                    _buildGradientAvatar(profile),
+              ),
             ),
           );
         } catch (_) {
@@ -81,7 +90,8 @@ class _ProfilePanelState extends State<ProfilePanel>
         }
       }
       return Container(
-        width: 80, height: 80,
+        width: 80,
+        height: 80,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           border: Border.all(color: AppColors.border, width: 2),
@@ -89,22 +99,32 @@ class _ProfilePanelState extends State<ProfilePanel>
         child: ClipOval(
           child: Image.network(
             avatarUrl,
-            width: 80, height: 80, fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => _buildGradientAvatar(profile),
+            width: 80,
+            height: 80,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) =>
+                _buildGradientAvatar(profile),
           ),
         ),
       );
     }
     if (profile.hasCustomAvatar) {
       return Container(
-        width: 80, height: 80,
+        width: 80,
+        height: 80,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           border: Border.all(color: AppColors.border, width: 2),
         ),
         child: ClipOval(
-          child: Image.file(File(profile.avatarPath!), width: 80, height: 80, fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => _buildGradientAvatar(profile)),
+          child: Image.file(
+            File(profile.avatarPath!),
+            width: 80,
+            height: 80,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) =>
+                _buildGradientAvatar(profile),
+          ),
         ),
       );
     }
@@ -113,25 +133,43 @@ class _ProfilePanelState extends State<ProfilePanel>
 
   Widget _buildGradientAvatar(UserProfile profile) {
     return Container(
-      width: 80, height: 80,
+      width: 80,
+      height: 80,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         gradient: LinearGradient(
-          colors: _avatarColors[profile.avatarColorIndex.clamp(0, _avatarColors.length - 1)],
-          begin: Alignment.topLeft, end: Alignment.bottomRight,
+          colors:
+              _avatarColors[profile.avatarColorIndex.clamp(
+                0,
+                _avatarColors.length - 1,
+              )],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
         boxShadow: [
           BoxShadow(
-            color: _avatarColors[profile.avatarColorIndex.clamp(0, _avatarColors.length - 1)].last.withOpacity(0.3),
-            blurRadius: 12, offset: const Offset(0, 4),
+            color:
+                _avatarColors[profile.avatarColorIndex.clamp(
+                      0,
+                      _avatarColors.length - 1,
+                    )]
+                    .last
+                    .withValues(alpha: 0.3),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Center(
-        child: Text(profile.avatarLetter, style: const TextStyle(
-          fontFamily: 'PingFang SC',
-          fontSize: 28, fontWeight: FontWeight.w600, color: Colors.white,
-        )),
+        child: Text(
+          profile.avatarLetter,
+          style: const TextStyle(
+            fontFamily: 'PingFang SC',
+            fontSize: 28,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
+        ),
       ),
     );
   }
@@ -142,16 +180,25 @@ class _ProfilePanelState extends State<ProfilePanel>
     );
   }
 
+  void _afterClose(VoidCallback action) {
+    _controller.reverse().then((_) {
+      widget.onClose();
+      if (mounted) action();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: _closePanel,
       child: Container(
-        color: Colors.black.withOpacity(0.4),
+        color: Colors.black.withValues(alpha: 0.4),
         child: Stack(
           children: [
             Positioned(
-              right: 0, top: 0, bottom: 0,
+              right: 0,
+              top: 0,
+              bottom: 0,
               child: GestureDetector(
                 onTap: () {},
                 child: SlideTransition(
@@ -159,13 +206,14 @@ class _ProfilePanelState extends State<ProfilePanel>
                   child: FadeTransition(
                     opacity: _fadeAnimation,
                     child: Container(
-                      width: 300,
+                      width: 320,
                       decoration: BoxDecoration(
-                        color: AppColors.scaffoldBg,
+                        color: AppColors.surface,
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.15),
-                            blurRadius: 24, offset: const Offset(-4, 0),
+                            color: Colors.black.withValues(alpha: 0.15),
+                            blurRadius: 24,
+                            offset: const Offset(-4, 0),
                           ),
                         ],
                       ),
@@ -173,98 +221,211 @@ class _ProfilePanelState extends State<ProfilePanel>
                         child: Consumer(
                           builder: (context, ref, child) {
                             final profile = ref.watch(profileProvider);
-                            return Column(
-                              children: [
-                                Padding(
-                                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.end,
-                                    children: [
-                                      GestureDetector(
-                                        onTap: _closePanel,
-                                        child: Container(
-                                          width: 32, height: 32,
-                                          decoration: BoxDecoration(
-                                            color: AppColors.chipBg,
-                                            shape: BoxShape.circle,
+                            return DefaultTextStyle.merge(
+                              style: const TextStyle(
+                                decoration: TextDecoration.none,
+                              ),
+                              child: Column(
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                      18,
+                                      14,
+                                      18,
+                                      0,
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        const Spacer(),
+                                        GestureDetector(
+                                          onTap: _closePanel,
+                                          child: Container(
+                                            width: 30,
+                                            height: 30,
+                                            decoration: BoxDecoration(
+                                              color: AppColors.inputBg,
+                                              shape: BoxShape.circle,
+                                              border: Border.all(
+                                                color: AppColors.border,
+                                              ),
+                                            ),
+                                            child: const Icon(
+                                              Icons.close_rounded,
+                                              size: 17,
+                                              color: AppColors.textSecondary,
+                                            ),
                                           ),
-                                          child: const Icon(Icons.close, size: 18, color: AppColors.textSecondary),
                                         ),
-                                      ),
-                                    ],
+                                      ],
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(height: 20),
-                                GestureDetector(
-                                  onTap: () => showEditProfileModal(context),
-                                  child: _buildAvatar(profile),
-                                ),
-                                const SizedBox(height: 14),
-                                Text(profile.name.isEmpty ? '未设置昵称' : profile.name,
-                                  style: const TextStyle(
-                                    fontFamily: 'PingFang SC',
-                                    fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.text,
+                                  const SizedBox(height: 18),
+                                  GestureDetector(
+                                    onTap: () => _afterClose(
+                                      () => showEditProfileModal(context),
+                                    ),
+                                    child: _buildAvatar(profile),
                                   ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(profile.email.isEmpty ? '' : profile.email,
-                                  style: const TextStyle(
-                                    fontFamily: 'PingFang SC',
-                                    fontSize: 13, fontWeight: FontWeight.w400, color: AppColors.textTertiary,
+                                  const SizedBox(height: 14),
+                                  Text(
+                                    profile.name.isEmpty
+                                        ? '未设置昵称'
+                                        : profile.name,
+                                    style: const TextStyle(
+                                      fontFamily: 'PingFang SC',
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.text,
+                                      decoration: TextDecoration.none,
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(height: 24),
-                                Container(
-                                  margin: const EdgeInsets.symmetric(horizontal: 16),
-                                  height: 0.5, color: AppColors.border,
-                                ),
-                                const SizedBox(height: 12),
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                                  child: Column(
-                                    children: [
-                                      _MenuItemCard(icon: Icons.person_outline, label: '个人信息', onTap: () => showEditProfileModal(context)),
-                                      const SizedBox(height: 8),
-                                      _MenuItemCard(icon: Icons.lock_outline, label: '修改密码', onTap: () {
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    profile.email.isEmpty ? '' : profile.email,
+                                    style: const TextStyle(
+                                      fontFamily: 'PingFang SC',
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w400,
+                                      color: AppColors.textTertiary,
+                                      decoration: TextDecoration.none,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 22),
+                                  Container(
+                                    margin: const EdgeInsets.symmetric(
+                                      horizontal: 18,
+                                    ),
+                                    height: 1,
+                                    color: AppColors.border,
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 14,
+                                    ),
+                                    child: Column(
+                                      children: [
+                                        _MenuItemCard(
+                                          icon: Icons.person_outline_rounded,
+                                          label: '个人信息',
+                                          onTap: () => _afterClose(
+                                            () => showEditProfileModal(context),
+                                          ),
+                                        ),
+                                        _MenuItemCard(
+                                          icon: Icons.lock_outline_rounded,
+                                          label: '修改密码',
+                                          onTap: () => _afterClose(
+                                            () => showPasswordChangeModal(
+                                              context,
+                                            ),
+                                          ),
+                                        ),
+                                        _MenuItemCard(
+                                          icon: Icons.palette_outlined,
+                                          label: '主题设置',
+                                          onTap: () => _afterClose(
+                                            () => _showToast('功能开发中'),
+                                          ),
+                                        ),
+                                        _MenuItemCard(
+                                          icon: Icons.memory_rounded,
+                                          label: 'AI 模型',
+                                          onTap: () => _afterClose(() {
+                                            Navigator.of(context).push(
+                                              profileSidePageRoute(
+                                                const AiModelPage(),
+                                              ),
+                                            );
+                                          }),
+                                        ),
+                                        _MenuItemCard(
+                                          icon: Icons.storage_outlined,
+                                          label: '数据管理',
+                                          onTap: () => _afterClose(() {
+                                            Navigator.of(context).push(
+                                              profileSidePageRoute(
+                                                const SettingsPage(),
+                                              ),
+                                            );
+                                          }),
+                                        ),
+                                        _MenuItemCard(
+                                          icon: Icons.sell_outlined,
+                                          label: '标签管理',
+                                          onTap: () => _afterClose(() {
+                                            Navigator.of(context).push(
+                                              profileSidePageRoute(
+                                                const TagManagePage(),
+                                              ),
+                                            );
+                                          }),
+                                        ),
+                                        _MenuItemCard(
+                                          icon: Icons.help_outline_rounded,
+                                          label: '帮助与反馈',
+                                          onTap: () => _afterClose(
+                                            () => _showToast('功能开发中'),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  Container(
+                                    margin: const EdgeInsets.symmetric(
+                                      horizontal: 18,
+                                    ),
+                                    height: 1,
+                                    color: AppColors.border,
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.only(
+                                      bottom: 40,
+                                      top: 16,
+                                    ),
+                                    child: GestureDetector(
+                                      onTap: () {
                                         _closePanel();
-                                        showPasswordChangeModal(context);
-                                      }),
-                                      const SizedBox(height: 8),
-                                      _MenuItemCard(icon: Icons.palette_outlined, label: '主题设置', onTap: () => _showToast('功能开发中')),
-                                      const SizedBox(height: 8),
-                                      _MenuItemCard(icon: Icons.storage_outlined, label: '数据管理', onTap: () {
-                                        _closePanel();
-                                        Navigator.of(context).push(
-                                          MaterialPageRoute(builder: (_) => const SettingsPage()),
-                                        );
-                                      }),
-                                      const SizedBox(height: 8),
-                                      _MenuItemCard(icon: Icons.help_outline, label: '帮助与反馈', onTap: () => _showToast('功能开发中')),
-                                    ],
-                                  ),
-                                ),
-                                const Spacer(),
-                                Container(
-                                  margin: const EdgeInsets.symmetric(horizontal: 16),
-                                  height: 0.5, color: AppColors.border,
-                                ),
-                                Padding(
-                                  padding: const EdgeInsets.only(bottom: 40, top: 16),
-                                  child: GestureDetector(
-                                    onTap: () {
-                                      _closePanel();
-                                      ref.read(authProvider.notifier).logout();
-                                    },
-                                    child: const Text(
-                                      '退出登录',
-                                      style: TextStyle(
-                                        fontFamily: 'PingFang SC',
-                                        fontSize: 15, fontWeight: FontWeight.w500, color: AppColors.danger,
+                                        ref
+                                            .read(authProvider.notifier)
+                                            .logout();
+                                      },
+                                      child: Container(
+                                        height: 40,
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 18,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.danger.withValues(
+                                            alpha: 0.08,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            20,
+                                          ),
+                                          border: Border.all(
+                                            color: AppColors.danger.withValues(
+                                              alpha: 0.14,
+                                            ),
+                                          ),
+                                        ),
+                                        child: const Center(
+                                          child: Text(
+                                            '退出登录',
+                                            style: TextStyle(
+                                              fontFamily: 'PingFang SC',
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w600,
+                                              color: AppColors.danger,
+                                              decoration: TextDecoration.none,
+                                            ),
+                                          ),
+                                        ),
                                       ),
                                     ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             );
                           },
                         ),
@@ -285,35 +446,49 @@ class _MenuItemCard extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback onTap;
-  const _MenuItemCard({required this.icon, required this.label, required this.onTap});
+  const _MenuItemCard({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 8, offset: const Offset(0, 2),
-            ),
-          ],
-        ),
+        height: 48,
+        padding: const EdgeInsets.symmetric(horizontal: 4),
         child: Row(
           children: [
-            Icon(icon, size: 20, color: AppColors.textSecondary),
+            Container(
+              width: 30,
+              height: 30,
+              decoration: BoxDecoration(
+                color: AppColors.inputBg,
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Icon(icon, size: 17, color: AppColors.textSecondary),
+            ),
             const SizedBox(width: 12),
             Expanded(
-              child: Text(label, style: const TextStyle(
-                fontFamily: 'PingFang SC',
-                fontSize: 15, fontWeight: FontWeight.w400, color: AppColors.text,
-              )),
+              child: Text(
+                label,
+                style: const TextStyle(
+                  fontFamily: 'PingFang SC',
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.text,
+                  decoration: TextDecoration.none,
+                ),
+              ),
             ),
-            const Icon(Icons.chevron_right, size: 18, color: AppColors.textTertiary),
+            const Icon(
+              Icons.chevron_right_rounded,
+              size: 18,
+              color: AppColors.textTertiary,
+            ),
           ],
         ),
       ),

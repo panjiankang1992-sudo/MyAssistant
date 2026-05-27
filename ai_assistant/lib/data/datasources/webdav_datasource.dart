@@ -27,8 +27,12 @@ class WebDavDatasource {
     return await _client!.get(path);
   }
 
-  Future<void> putFile(String path, Uint8List data) async {
-    await _client!.put(path, data);
+  Future<void> putFile(String path, Uint8List data, {String? contentType}) async {
+    if (contentType != null) {
+      await _client!.putWithContentType(path, data, contentType);
+    } else {
+      await _client!.put(path, data);
+    }
   }
 
   Future<void> deleteFile(String path) async {

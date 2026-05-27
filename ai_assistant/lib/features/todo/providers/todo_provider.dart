@@ -3,6 +3,7 @@ import 'package:uuid/uuid.dart';
 import '../../../core/providers/core_providers.dart';
 import '../../../domain/models/routine.dart';
 import '../../../domain/models/todo.dart';
+import '../../bookkeeping/bookkeeping_action_service.dart';
 import 'selected_date_provider.dart';
 
 class TodoNotifier extends Notifier<List<Todo>> {
@@ -15,14 +16,17 @@ class TodoNotifier extends Notifier<List<Todo>> {
 
   Future<void> _loadTodosForDate(DateTime date) async {
     final repo = ref.read(todoRepoProvider);
-    final todos = await repo.getTodosByDate(date);
-    state = todos;
-
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    if (date == today) {
+    final normalizedDate = DateTime(date.year, date.month, date.day);
+    final lastGeneratedDate = today.add(const Duration(days: 29));
+
+    if (!normalizedDate.isBefore(today) &&
+        !normalizedDate.isAfter(lastGeneratedDate)) {
       await _generateRoutineTodos();
     }
+
+    state = await repo.getTodosByDate(normalizedDate);
   }
 
   Future<void> _generateRoutineTodos() async {
@@ -41,9 +45,13 @@ class TodoNotifier extends Notifier<List<Todo>> {
       final date = today.add(Duration(days: offset));
       for (final routine in routines) {
         if (!routine.shouldGenerateOn(date)) continue;
+        final routineId = routine.uuid;
+        if (routineId == null || routineId.isEmpty) continue;
 
-        final alreadyExists = allTodos.any(
-          (t) => t.title == routine.title && t.source == 'routine' && t.date == date,
+        final alreadyExists = _routineTodoAlreadyExists(
+          allTodos,
+          routineId,
+          date,
         );
         if (alreadyExists) continue;
 
@@ -52,12 +60,15 @@ class TodoNotifier extends Notifier<List<Todo>> {
           title: routine.title,
           description: routine.description,
           source: 'routine',
+          routineId: routineId,
           type: routine.type,
           tags: routine.tags,
+          action: routine.action,
           time: routine.time,
           date: date,
           createdAt: now,
           updatedAt: now,
+          priority: 0,
         );
         await todoRepo.addTodo(todo);
       }
@@ -71,6 +82,11 @@ class TodoNotifier extends Notifier<List<Todo>> {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     ref.read(selectedDateProvider.notifier).date = today;
+  }
+
+  Future<void> loadSelectedDateTodos() async {
+    final selectedDate = ref.read(selectedDateProvider);
+    await _loadTodosForDate(selectedDate);
   }
 
   Future<void> addTodo(Todo todo) async {
@@ -101,29 +117,49 @@ class TodoNotifier extends Notifier<List<Todo>> {
     await _loadTodosForDate(selectedDate);
   }
 
-  Future<void> updateRoutineTodos(Routine oldRoutine, Routine newRoutine) async {
+  Future<bool> executeTodoAction(Todo todo) async {
+    if (todo.action == 'bookkeeping') {
+      return BookkeepingActionService().createExpenseFromTodo(
+        ref: ref,
+        todo: todo,
+      );
+    }
+    return false;
+  }
+
+  Future<void> updateRoutineTodos(
+    Routine oldRoutine,
+    Routine newRoutine,
+  ) async {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final tomorrow = today.add(const Duration(days: 1));
     final datasource = ref.read(datasourceProvider);
 
-    // Single bulk soft-delete of all future todos for the old routine title
-    await datasource.softDeleteFutureRoutineTodos(oldRoutine.title, tomorrow);
+    // Rebuild upcoming generated todos for this routine from now onward.
+    final oldRoutineId = oldRoutine.uuid;
+    if (oldRoutineId == null || oldRoutineId.isEmpty) return;
+    await datasource.softDeleteFutureRoutineTodosByRoutineId(
+      oldRoutineId,
+      now,
+      fallbackTitle: oldRoutine.title,
+    );
 
-    for (int offset = 1; offset <= 30; offset++) {
+    for (int offset = 0; offset < 30; offset++) {
       final date = today.add(Duration(days: offset));
       if (!newRoutine.shouldGenerateOn(date)) continue;
-      if (!oldRoutine.shouldGenerateOn(date)) continue;
       await _generateSingleRoutineTodo(newRoutine, date);
     }
   }
 
-  Future<void> _generateSingleRoutineTodo(Routine routine, DateTime date) async {
+  Future<void> _generateSingleRoutineTodo(
+    Routine routine,
+    DateTime date,
+  ) async {
+    final routineId = routine.uuid;
+    if (routineId == null || routineId.isEmpty) return;
     final datasource = ref.read(datasourceProvider);
     final allTodos = await datasource.getAllTodos();
-    final alreadyExists = allTodos.any(
-      (t) => t.title == routine.title && t.source == 'routine' && t.date == date,
-    );
+    final alreadyExists = _routineTodoAlreadyExists(allTodos, routineId, date);
     if (alreadyExists) return;
 
     final todo = Todo(
@@ -131,16 +167,39 @@ class TodoNotifier extends Notifier<List<Todo>> {
       title: routine.title,
       description: routine.description,
       source: 'routine',
+      routineId: routineId,
       type: routine.type,
       tags: routine.tags,
+      action: routine.action,
       time: routine.time,
       date: date,
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
+      priority: 0,
     );
     final repo = ref.read(todoRepoProvider);
     await repo.addTodo(todo);
   }
+
+  bool _routineTodoAlreadyExists(
+    List<Todo> todos,
+    String routineId,
+    DateTime date,
+  ) {
+    return todos.any(
+      (t) =>
+          t.source == 'routine' &&
+          !t.deleted &&
+          t.routineId == routineId &&
+          _isSameDay(t.date, date),
+    );
+  }
+
+  bool _isSameDay(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
 }
 
-final todoNotifierProvider = NotifierProvider<TodoNotifier, List<Todo>>(TodoNotifier.new);
+final todoNotifierProvider = NotifierProvider<TodoNotifier, List<Todo>>(
+  TodoNotifier.new,
+);

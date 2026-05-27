@@ -1,14 +1,13 @@
-import 'dart:async';
 import '../../domain/models/todo.dart';
 import '../datasources/local_datasource.dart';
-import '../../features/sync/sync_engine.dart';
+import '../../features/sync/data_sync_service.dart';
 
 class TodoRepository {
   final LocalDatasource _datasource;
-  final Future<SyncEngine?> Function() _syncEngine;
+  final DataSyncService? _syncService;
 
-  TodoRepository(this._datasource, {Future<SyncEngine?> Function()? syncEngine})
-    : _syncEngine = syncEngine ?? (() async => null);
+  TodoRepository(this._datasource, {DataSyncService? syncService})
+    : _syncService = syncService;
 
   Future<List<Todo>> getTodayTodos() async {
     return _datasource.getTodosByDate(DateTime.now());
@@ -20,31 +19,83 @@ class TodoRepository {
 
   Future<void> addTodo(Todo todo) async {
     await _datasource.insertTodo(todo);
-    _trySync();
+    await _markDirty(todo, 'upsert');
   }
 
   Future<void> updateTodo(Todo todo) async {
-    await _datasource.updateTodo(todo);
-    _trySync();
+    final next = todo.copyWith(
+      version: todo.version + 1,
+      updatedAt: DateTime.now(),
+    );
+    await _datasource.updateTodo(next);
+    await _markDirty(next, 'upsert');
   }
 
   Future<void> toggleTodo(String id) async {
     final todos = await _datasource.getAllTodos();
     final todo = todos.firstWhere((t) => t.id == id);
     await _datasource.toggleComplete(id, !todo.completed);
-    _trySync();
+    await _markDirty(
+      todo.copyWith(
+        completed: !todo.completed,
+        version: todo.version + 1,
+        updatedAt: DateTime.now(),
+      ),
+      'upsert',
+    );
   }
 
   Future<void> deleteTodo(String id) async {
+    final todos = await _datasource.getAllTodos();
+    final todo = todos.where((t) => t.id == id).firstOrNull;
     await _datasource.softDeleteTodo(id);
-    _trySync();
+    await _syncService?.markDirty(
+      DataSyncType.todo,
+      id,
+      operation: 'delete',
+      version: (todo?.version ?? 0) + 1,
+    );
   }
 
-  void _trySync() {
-    _syncEngine().then((engine) {
-      if (engine != null) {
-        engine.sync('todos');
-      }
-    });
+  Future<void> deleteFutureRoutineTodos(
+    String routineTitle,
+    DateTime cutoff,
+  ) async {
+    await _datasource.softDeleteFutureRoutineTodos(routineTitle, cutoff);
+    await _syncService?.markDirty(
+      DataSyncType.todo,
+      'routine-title-$routineTitle',
+      operation: 'bulk-delete',
+    );
+  }
+
+  Future<void> deleteFutureRoutineTodosByRoutineId(
+    String routineId,
+    DateTime cutoff, {
+    String? fallbackTitle,
+  }) async {
+    await _datasource.softDeleteFutureRoutineTodosByRoutineId(
+      routineId,
+      cutoff,
+      fallbackTitle: fallbackTitle,
+    );
+    await _syncService?.markDirty(
+      DataSyncType.todo,
+      'routine-$routineId',
+      operation: 'bulk-delete',
+    );
+  }
+
+  Future<void> _markDirty(Todo todo, String operation) async {
+    await _syncService?.markDirty(
+      DataSyncType.todo,
+      todo.id,
+      operation: operation,
+      version: todo.version,
+      payload: {
+        'title': todo.title,
+        'updatedAt': todo.updatedAt.toIso8601String(),
+      },
+    );
   }
 }

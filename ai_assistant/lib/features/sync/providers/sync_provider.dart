@@ -16,12 +16,11 @@ class SyncResult {
     this.pullCount = 0,
     this.pushCount = 0,
     this.errorCount = 0,
-    String? error,
+    this.error,
     DateTime? timestamp,
     this.todosIndexCount = 0,
     this.routinesIndexCount = 0,
-  })  : error = error,
-        timestamp = timestamp ?? DateTime.now();
+  }) : timestamp = timestamp ?? DateTime.now();
 
   bool get hasErrors => errorCount > 0 || error != null;
 }
@@ -58,15 +57,16 @@ class SyncState {
   }
 
   SyncState clearError() => SyncState(
-        lastSyncTime: lastSyncTime,
-        lastPullCount: lastPullCount,
-        lastPushCount: lastPushCount,
-        syncing: syncing,
-      );
+    lastSyncTime: lastSyncTime,
+    lastPullCount: lastPullCount,
+    lastPushCount: lastPushCount,
+    syncing: syncing,
+  );
 }
 
 class SyncNotifier extends Notifier<SyncState> {
-  final StreamController<SyncResult> _resultController = StreamController<SyncResult>.broadcast();
+  final StreamController<SyncResult> _resultController =
+      StreamController<SyncResult>.broadcast();
 
   Stream<SyncResult> get syncStream => _resultController.stream;
 
@@ -97,4 +97,6 @@ class SyncNotifier extends Notifier<SyncState> {
   }
 }
 
-final syncNotifierProvider = NotifierProvider<SyncNotifier, SyncState>(SyncNotifier.new);
+final syncNotifierProvider = NotifierProvider<SyncNotifier, SyncState>(
+  SyncNotifier.new,
+);

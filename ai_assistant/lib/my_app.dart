@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/theme/app_theme.dart';
+import 'core/providers/core_providers.dart';
 import 'features/auth/auth_provider.dart';
 import 'features/auth/auth_page.dart';
+import 'features/bookkeeping/bookkeeping_page.dart';
 import 'features/todo/todo_page.dart';
 import 'features/copilot/copilot_page.dart';
+import 'features/notes/notes_page.dart';
 import 'features/profile/profile_panel.dart';
 import 'features/profile/profile_provider.dart';
 import 'data/api/api_client.dart';
@@ -20,6 +24,13 @@ class App extends StatelessWidget {
       title: 'AI 助手',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
+      localizationsDelegates: [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [Locale('zh', 'CN'), Locale('en', 'US')],
+      locale: const Locale('zh', 'CN'),
       home: const AuthWrapper(),
     );
   }
@@ -53,9 +64,7 @@ class _AuthWrapperState extends ConsumerState<AuthWrapper> {
   @override
   Widget build(BuildContext context) {
     if (_checking) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     final authState = ref.watch(authProvider);
     if (!authState.isLoggedIn) {
@@ -79,9 +88,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
   List<Widget> _pages() => [
     TodoPage(onAvatarTap: _openProfile),
-    const _PlaceholderPage(icon: Icons.account_balance_wallet_outlined, label: '记账'),
-    const _PlaceholderPage(icon: Icons.edit_note, label: '随手记'),
-    const CopilotPage(),
+    BookkeepingPage(onAvatarTap: _openProfile),
+    NotesPage(onAvatarTap: _openProfile),
+    CopilotPage(onAvatarTap: _openProfile),
   ];
 
   void _openProfile() {
@@ -98,6 +107,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       children: [
         Consumer(
           builder: (context, ref, child) {
+            ref.watch(dataSyncServiceProvider);
             if (!_profileFetched) {
               _profileFetched = true;
               Future.microtask(() async {
@@ -127,74 +137,141 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             switchOutCurve: Curves.easeIn,
             child: KeyedSubtree(
               key: ValueKey(_currentIndex),
-              child: IndexedStack(
-                index: _currentIndex,
-                children: _pages(),
-              ),
+              child: IndexedStack(index: _currentIndex, children: _pages()),
             ),
           ),
           bottomNavigationBar: Container(
+            padding: const EdgeInsets.fromLTRB(12, 7, 12, 8),
             decoration: BoxDecoration(
               color: AppColors.surface,
-              border: const Border(top: BorderSide(color: AppColors.border, width: 0.5)),
+              border: const Border(
+                top: BorderSide(color: AppColors.border, width: 0.5),
+              ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
-                  blurRadius: 8,
-                  offset: const Offset(0, -2),
+                  color: Colors.black.withValues(alpha: 0.025),
+                  blurRadius: 5,
+                  offset: const Offset(0, -1),
                 ),
               ],
             ),
-            child: NavigationBar(
-              selectedIndex: _currentIndex,
-              onDestinationSelected: (i) => setState(() => _currentIndex = i),
-              backgroundColor: Colors.transparent,
-              elevation: 0,
-              height: 56,
-              indicatorColor: Colors.transparent,
-              destinations: const [
-                NavigationDestination(icon: Icon(Icons.check_circle_outline), label: '待办'),
-                NavigationDestination(icon: Icon(Icons.account_balance_wallet_outlined), label: '记账'),
-                NavigationDestination(icon: Icon(Icons.edit_note), label: '随手记'),
-                NavigationDestination(icon: Icon(Icons.auto_awesome), label: 'Copilot'),
-              ],
+            child: SafeArea(
+              top: false,
+              child: SizedBox(
+                height: 54,
+                child: Row(
+                  children: [
+                    _BottomNavItem(
+                      icon: Icons.check_circle_outline,
+                      label: '待办',
+                      selected: _currentIndex == 0,
+                      onTap: () => setState(() => _currentIndex = 0),
+                    ),
+                    _BottomNavItem(
+                      icon: Icons.account_balance_wallet_outlined,
+                      label: '记账',
+                      selected: _currentIndex == 1,
+                      onTap: () => setState(() => _currentIndex = 1),
+                    ),
+                    _BottomNavItem(
+                      icon: Icons.edit_note,
+                      label: '随手记',
+                      selected: _currentIndex == 2,
+                      onTap: () => setState(() => _currentIndex = 2),
+                    ),
+                    _BottomNavItem(
+                      icon: Icons.auto_awesome,
+                      label: 'Copilot',
+                      selected: _currentIndex == 3,
+                      onTap: () => setState(() => _currentIndex = 3),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ),
-        if (_profileOpen)
-          ProfilePanel(
-            onClose: _closeProfile,
-          ),
+        if (_profileOpen) ProfilePanel(onClose: _closeProfile),
       ],
     );
   }
 }
 
-class _PlaceholderPage extends StatelessWidget {
+class _BottomNavItem extends StatelessWidget {
   final IconData icon;
   final String label;
+  final bool selected;
+  final VoidCallback onTap;
 
-  const _PlaceholderPage({required this.icon, required this.label});
+  const _BottomNavItem({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 56, color: AppColors.textTertiary.withOpacity(0.6)),
-          const SizedBox(height: 8),
-          Text(
-            '$label 功能开发中',
-            style: const TextStyle(
-              fontFamily: 'PingFang SC',
-              fontFamilyFallback: ['.SF Pro Text', 'system-ui', 'sans-serif'],
-              fontSize: 15,
-              fontWeight: FontWeight.w400,
-              color: AppColors.textTertiary,
+    final color = selected ? AppColors.primary : AppColors.textTertiary;
+    return Expanded(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(18),
+            splashColor: AppColors.primary.withValues(alpha: 0.04),
+            highlightColor: AppColors.primary.withValues(alpha: 0.025),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOut,
+              height: 50,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+              decoration: BoxDecoration(
+                color: selected
+                    ? AppColors.primary.withValues(alpha: 0.055)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: selected
+                      ? AppColors.primary.withValues(alpha: 0.10)
+                      : Colors.transparent,
+                  width: 0.6,
+                ),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, size: 20, color: color),
+                  const SizedBox(height: 3),
+                  Flexible(
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontFamily: 'PingFang SC',
+                        fontFamilyFallback: const [
+                          '.SF Pro Text',
+                          'system-ui',
+                          'sans-serif',
+                        ],
+                        fontSize: 11,
+                        fontWeight: selected
+                            ? FontWeight.w600
+                            : FontWeight.w500,
+                        color: color,
+                        decoration: TextDecoration.none,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-        ],
+        ),
       ),
     );
   }
