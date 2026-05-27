@@ -327,7 +327,7 @@ class AppFloatingActionBar extends StatelessWidget {
   const AppFloatingActionBar({
     super.key,
     required this.actions,
-    this.padding = const EdgeInsets.fromLTRB(22, 10, 22, 18),
+    this.padding = const EdgeInsets.fromLTRB(22, 8, 22, 14),
   });
 
   @override
@@ -335,10 +335,10 @@ class AppFloatingActionBar extends StatelessWidget {
     return Padding(
       padding: padding,
       child: Container(
-        padding: const EdgeInsets.all(10),
+        padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: 0.96),
-          borderRadius: BorderRadius.circular(34),
+          borderRadius: BorderRadius.circular(28),
           border: Border.all(color: Colors.white.withValues(alpha: 0.85)),
           boxShadow: [
             BoxShadow(
@@ -368,7 +368,7 @@ class AppPillActionButton extends StatelessWidget {
   const AppPillActionButton({
     super.key,
     required this.action,
-    this.height = 58,
+    this.height = 48,
   });
 
   Color get _background {
@@ -403,9 +403,9 @@ class AppPillActionButton extends StatelessWidget {
           foregroundColor: _foreground,
           elevation: 0,
           shadowColor: Colors.transparent,
-          padding: const EdgeInsets.symmetric(horizontal: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(28),
+            borderRadius: BorderRadius.circular(24),
             side: action.tone == AppActionButtonTone.neutral
                 ? BorderSide(color: AppColors.border.withValues(alpha: 0.8))
                 : BorderSide.none,
@@ -416,8 +416,8 @@ class AppPillActionButton extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (action.icon != null) ...[
-              Icon(action.icon, size: 22),
-              const SizedBox(width: 8),
+              Icon(action.icon, size: 19),
+              const SizedBox(width: 6),
             ],
             Flexible(
               child: Text(
@@ -425,7 +425,7 @@ class AppPillActionButton extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                  fontSize: 17,
+                  fontSize: 15,
                   fontWeight: FontWeight.w900,
                 ),
               ),

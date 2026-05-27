@@ -183,10 +183,8 @@ class _AddTodoModalContentState extends ConsumerState<_AddTodoModalContent>
   Duration? _quickTime;
   int _priority = 0;
   bool _aiParsing = false;
-  bool _showVoicePrompt = true;
   bool _speechReady = false;
   bool _isListening = false;
-  String _voiceText = '';
 
   @override
   void initState() {
@@ -207,9 +205,7 @@ class _AddTodoModalContentState extends ConsumerState<_AddTodoModalContent>
         '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
     final initialVoiceText = widget.initialVoiceText?.trim() ?? '';
     if (initialVoiceText.isNotEmpty) {
-      _voiceText = initialVoiceText;
       _titleController.text = initialVoiceText;
-      _showVoicePrompt = false;
     }
     Future.microtask(() async {
       await _initSpeech();
@@ -265,7 +261,6 @@ class _AddTodoModalContentState extends ConsumerState<_AddTodoModalContent>
       return;
     }
     setState(() {
-      _voiceText = '';
       _isListening = true;
     });
     await _speech.listen(
@@ -281,11 +276,9 @@ class _AddTodoModalContentState extends ConsumerState<_AddTodoModalContent>
   Future<void> _handleSpeechResult(SpeechRecognitionResult result) async {
     final text = result.recognizedWords.trim();
     if (!mounted || text.isEmpty) return;
-    setState(() => _voiceText = text);
     if (!result.finalResult) return;
     setState(() {
       _titleController.text = text;
-      _showVoicePrompt = false;
       _isListening = false;
     });
     await _applyAiParse();
@@ -756,36 +749,6 @@ class _AddTodoModalContentState extends ConsumerState<_AddTodoModalContent>
                         const RoutineTab(),
                       ],
                     ),
-                    if (_showVoicePrompt)
-                      ListenableBuilder(
-                        listenable: _tabController,
-                        builder: (context, child) {
-                          if (_tabController.index != 0) {
-                            return const SizedBox.shrink();
-                          }
-                          return Positioned.fill(
-                            child: GestureDetector(
-                              behavior: HitTestBehavior.translucent,
-                              onTap: () =>
-                                  setState(() => _showVoicePrompt = false),
-                              child: Align(
-                                alignment: const Alignment(0, 0.48),
-                                child: GestureDetector(
-                                  onTap: _toggleVoiceInput,
-                                  child: ScaleTransition(
-                                    scale: _voicePulseController,
-                                    child: _VoiceInputPrompt(
-                                      listening: _isListening,
-                                      speechReady: _speechReady,
-                                      text: _voiceText,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
                     _buildBottomActions(),
                   ],
                 ),
@@ -1445,91 +1408,4 @@ String _shortDateLabel(DateTime date) => '${date.month}月${date.day}日';
 String _fullDateLabel(DateTime date) {
   const weekdays = ['一', '二', '三', '四', '五', '六', '日'];
   return '${date.year}年${date.month}月${date.day}日 星期${weekdays[date.weekday - 1]}';
-}
-
-class _VoiceInputPrompt extends StatelessWidget {
-  final bool listening;
-  final bool speechReady;
-  final String text;
-
-  const _VoiceInputPrompt({
-    required this.listening,
-    required this.speechReady,
-    required this.text,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 164,
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
-      decoration: BoxDecoration(
-        color: AppColors.surface.withValues(alpha: 0.96),
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.16)),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.18),
-            blurRadius: 28,
-            offset: const Offset(0, 12),
-          ),
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 64,
-            height: 64,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: LinearGradient(
-                colors: listening
-                    ? const [Color(0xFFFF4D67), Color(0xFFFF9F0A)]
-                    : const [Color(0xFF8B5CF6), Color(0xFF0A84FF)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-            ),
-            child: Icon(
-              listening ? Icons.graphic_eq_rounded : Icons.mic_rounded,
-              color: Colors.white,
-              size: 28,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            listening
-                ? '正在听...'
-                : speechReady
-                ? '语音新增'
-                : '点击启用语音',
-            style: const TextStyle(
-              fontFamily: 'PingFang SC',
-              fontFamilyFallback: ['.SF Pro Text', 'system-ui', 'sans-serif'],
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: AppColors.text,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            text.isEmpty ? '点击麦克风开始说话' : text,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 11,
-              color: AppColors.textSecondary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }

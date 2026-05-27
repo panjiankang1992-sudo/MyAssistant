@@ -7,7 +7,6 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:uuid/uuid.dart';
 
@@ -2717,20 +2716,14 @@ class _AddLedgerPage extends StatefulWidget {
 
 class _AddLedgerPageState extends State<_AddLedgerPage>
     with TickerProviderStateMixin {
-  late final AnimationController _pulseController;
-  final _speech = stt.SpeechToText();
   final _noteController = TextEditingController();
   var _kind = LedgerKind.expense;
   var _category = _expenseCategories.first;
   var _amountText = '';
   var _currency = 'CNY';
   var _aiGenerated = false;
-  var _speechReady = false;
-  var _listening = false;
-  var _voiceText = '';
   var _tags = <Tag>[];
   var _customCategories = <LedgerCategory>[];
-  var _showVoicePrompt = true;
 
   @override
   void initState() {
@@ -2750,23 +2743,13 @@ class _AddLedgerPageState extends State<_AddLedgerPage>
       _aiGenerated = initial.aiGenerated;
       _tags = List.from(initial.tags);
       _noteController.text = initial.note;
-      _showVoicePrompt = false;
     }
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1100),
-      lowerBound: 0.92,
-      upperBound: 1.08,
-    )..repeat(reverse: true);
     final initialVoiceText = widget.initialVoiceText?.trim() ?? '';
     if (initialVoiceText.isNotEmpty && initial == null) {
-      _voiceText = initialVoiceText;
       _noteController.text = initialVoiceText;
-      _showVoicePrompt = false;
       _aiGenerated = true;
     }
     Future.microtask(() async {
-      await _initSpeech();
       await _loadCustomCategories();
       if (initialVoiceText.isNotEmpty && mounted && initial == null) {
         await _parseLedgerText(initialVoiceText);
@@ -2776,22 +2759,8 @@ class _AddLedgerPageState extends State<_AddLedgerPage>
 
   @override
   void dispose() {
-    _speech.cancel();
-    _pulseController.dispose();
     _noteController.dispose();
     super.dispose();
-  }
-
-  Future<void> _initSpeech() async {
-    final ok = await _speech.initialize(
-      onStatus: (status) {
-        if (mounted) setState(() => _listening = status == 'listening');
-      },
-      onError: (_) {
-        if (mounted) setState(() => _listening = false);
-      },
-    );
-    if (mounted) setState(() => _speechReady = ok);
   }
 
   Future<void> _loadCustomCategories() async {
@@ -2809,35 +2778,6 @@ class _AddLedgerPageState extends State<_AddLedgerPage>
     });
   }
 
-  Future<void> _toggleVoice() async {
-    if (_listening) {
-      await _speech.stop();
-      return;
-    }
-    if (!_speechReady) await _initSpeech();
-    if (!_speechReady) return;
-    setState(() {
-      _listening = true;
-      _voiceText = '';
-    });
-    await _speech.listen(
-      onResult: _onSpeech,
-      listenOptions: stt.SpeechListenOptions(
-        localeId: 'zh_CN',
-        listenFor: const Duration(seconds: 20),
-        pauseFor: const Duration(seconds: 3),
-      ),
-    );
-  }
-
-  Future<void> _onSpeech(SpeechRecognitionResult result) async {
-    final text = result.recognizedWords.trim();
-    if (text.isEmpty || !mounted) return;
-    setState(() => _voiceText = text);
-    if (!result.finalResult) return;
-    await _parseLedgerText(text);
-  }
-
   Future<void> _parseLedgerText(String text) async {
     final parsed = await _aiParse(text) ?? _localParse(text);
     final cats = _categoriesFor(parsed.kind);
@@ -2853,8 +2793,6 @@ class _AddLedgerPageState extends State<_AddLedgerPage>
       _currency = parsed.currency;
       _noteController.text = parsed.note;
       _aiGenerated = true;
-      _listening = false;
-      _showVoicePrompt = false;
     });
   }
 
@@ -3179,20 +3117,38 @@ class _AddLedgerPageState extends State<_AddLedgerPage>
                   ListView(
                     padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
                     children: [
-                      Wrap(
-                        spacing: 10,
-                        runSpacing: 10,
-                        children: [
-                          ...cats.map((cat) {
-                            final selected = cat.id == _category.id;
-                            return _CategoryPickTile(
-                              category: cat,
-                              selected: selected,
-                              onTap: () => setState(() => _category = cat),
-                            );
-                          }),
-                          _AddCategoryTile(onTap: _addCustomCategory),
-                        ],
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          const spacing = 8.0;
+                          final columns = constraints.maxWidth < 340
+                              ? 4
+                              : constraints.maxWidth < 520
+                              ? 5
+                              : 6;
+                          final rawWidth =
+                              (constraints.maxWidth - spacing * (columns - 1)) /
+                              columns;
+                          final tileWidth = rawWidth.clamp(64.0, 82.0);
+                          return Wrap(
+                            spacing: spacing,
+                            runSpacing: spacing,
+                            children: [
+                              ...cats.map((cat) {
+                                final selected = cat.id == _category.id;
+                                return _CategoryPickTile(
+                                  width: tileWidth,
+                                  category: cat,
+                                  selected: selected,
+                                  onTap: () => setState(() => _category = cat),
+                                );
+                              }),
+                              _AddCategoryTile(
+                                width: tileWidth,
+                                onTap: _addCustomCategory,
+                              ),
+                            ],
+                          );
+                        },
                       ),
                       const SizedBox(height: 14),
                       Row(
@@ -3253,27 +3209,6 @@ class _AddLedgerPageState extends State<_AddLedgerPage>
                       ),
                     ],
                   ),
-                  if (_showVoicePrompt)
-                    Positioned.fill(
-                      child: GestureDetector(
-                        behavior: HitTestBehavior.translucent,
-                        onTap: () => setState(() => _showVoicePrompt = false),
-                        child: Align(
-                          alignment: const Alignment(0, 0.58),
-                          child: GestureDetector(
-                            onTap: _toggleVoice,
-                            child: ScaleTransition(
-                              scale: _pulseController,
-                              child: _VoiceLedgerButton(
-                                listening: _listening,
-                                speechReady: _speechReady,
-                                text: _voiceText,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
                 ],
               ),
             ),
@@ -3312,11 +3247,13 @@ class _ParsedLedger {
 }
 
 class _CategoryPickTile extends StatelessWidget {
+  final double width;
   final LedgerCategory category;
   final bool selected;
   final VoidCallback onTap;
 
   const _CategoryPickTile({
+    required this.width,
     required this.category,
     required this.selected,
     required this.onTap,
@@ -3328,23 +3265,29 @@ class _CategoryPickTile extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 160),
-        width: 82,
-        padding: const EdgeInsets.symmetric(vertical: 10),
+        width: width,
+        padding: EdgeInsets.symmetric(vertical: width < 72 ? 8 : 10),
         decoration: BoxDecoration(
           color: selected ? category.color : AppColors.surface,
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(width < 72 ? 15 : 18),
           border: Border.all(
             color: selected ? AppColors.primary : AppColors.border,
           ),
         ),
         child: Column(
           children: [
-            Text(category.emoji, style: const TextStyle(fontSize: 30)),
+            Text(
+              category.emoji,
+              style: TextStyle(fontSize: (width * 0.34).clamp(22.0, 29.0)),
+            ),
             const SizedBox(height: 4),
             Text(
               category.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 fontFamily: 'PingFang SC',
+                fontSize: 12,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -3356,27 +3299,36 @@ class _CategoryPickTile extends StatelessWidget {
 }
 
 class _AddCategoryTile extends StatelessWidget {
+  final double width;
   final VoidCallback onTap;
 
-  const _AddCategoryTile({required this.onTap});
+  const _AddCategoryTile({required this.width, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 82,
-        padding: const EdgeInsets.symmetric(vertical: 10),
+        width: width,
+        padding: EdgeInsets.symmetric(vertical: width < 72 ? 8 : 10),
         decoration: BoxDecoration(
           color: AppColors.surface,
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(width < 72 ? 15 : 18),
           border: Border.all(color: AppColors.border),
         ),
-        child: const Column(
+        child: Column(
           children: [
-            Icon(Icons.add_circle_outline_rounded, size: 30),
-            SizedBox(height: 4),
-            Text('自定义', style: TextStyle(fontWeight: FontWeight.w700)),
+            Icon(
+              Icons.add_circle_outline_rounded,
+              size: (width * 0.34).clamp(22.0, 29.0),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              '自定义',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+            ),
           ],
         ),
       ),
@@ -3411,91 +3363,6 @@ class _KindTab extends StatelessWidget {
             decorationThickness: 2,
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _VoiceLedgerButton extends StatelessWidget {
-  final bool listening;
-  final bool speechReady;
-  final String text;
-
-  const _VoiceLedgerButton({
-    required this.listening,
-    required this.speechReady,
-    required this.text,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 190,
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
-      decoration: BoxDecoration(
-        color: AppColors.surface.withValues(alpha: 0.96),
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.16)),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.18),
-            blurRadius: 28,
-            offset: const Offset(0, 12),
-          ),
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 64,
-            height: 64,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: LinearGradient(
-                colors: listening
-                    ? const [Color(0xFFFF5F6D), Color(0xFFFFC371)]
-                    : const [Color(0xFF8B5CF6), Color(0xFF0A84FF)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-            ),
-            child: Icon(
-              listening ? Icons.graphic_eq_rounded : Icons.mic_rounded,
-              color: Colors.white,
-              size: 28,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            listening
-                ? '正在听...'
-                : speechReady
-                ? '语音记账'
-                : '点击启用语音',
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: AppColors.text,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            text.isEmpty ? '点击麦克风开始说话' : text,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 11,
-              color: AppColors.textSecondary,
-            ),
-          ),
-        ],
       ),
     );
   }
