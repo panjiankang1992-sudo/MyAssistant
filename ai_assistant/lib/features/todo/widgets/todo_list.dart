@@ -54,29 +54,21 @@ class TodoList extends StatelessWidget {
         final todo = todos[index];
         return _StaggeredItem(
           index: index,
-          child: readOnly
-              ? TodoItem(
-                  todo: todo,
-                  readOnly: true,
-                  onTap: () => onTap(todo),
-                  onToggle: () => onToggle(todo),
-                  onActionTap: () => onActionTap(todo),
-                )
-              : _SwipeActions(
-                  key: ValueKey(todo.id),
-                  enabled: !todo.completed,
-                  onComplete: () => onComplete(todo),
-                  onDefer: () => _showDeferSheet(context, todo),
-                  onDelete: () => _showDeleteActionSheet(context, todo),
-                  child: TodoItem(
-                    todo: todo,
-                    readOnly: false,
-                    onTap: () => onTap(todo),
-                    onToggle: () => onToggle(todo),
-                    onLongPress: () => _showDeleteActionSheet(context, todo),
-                    onActionTap: () => onActionTap(todo),
-                  ),
-                ),
+          child: _SwipeActions(
+            key: ValueKey(todo.id),
+            enabled: !todo.completed,
+            onComplete: () => onComplete(todo),
+            onDefer: () => _showDeferSheet(context, todo),
+            onDelete: () => _showDeleteActionSheet(context, todo),
+            child: TodoItem(
+              todo: todo,
+              readOnly: readOnly,
+              onTap: () => onTap(todo),
+              onToggle: () => onToggle(todo),
+              onLongPress: () => _showDeleteActionSheet(context, todo),
+              onActionTap: () => onActionTap(todo),
+            ),
+          ),
         );
       },
     );

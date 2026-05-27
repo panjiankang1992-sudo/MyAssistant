@@ -701,6 +701,13 @@ class _BookkeepingPageState extends ConsumerState<BookkeepingPage> {
     await _markBillDirty(entry, 'upsert');
   }
 
+  Future<void> _deleteEntry(LedgerEntry entry) async {
+    final next = _entries.where((item) => item.id != entry.id).toList();
+    setState(() => _entries = next);
+    await _store.saveEntries(next);
+    await _markBillDirty(entry, 'delete');
+  }
+
   Future<void> _markBillDirty(LedgerEntry entry, String operation) {
     return ref
         .read(dataSyncServiceProvider)
@@ -770,6 +777,7 @@ class _BookkeepingPageState extends ConsumerState<BookkeepingPage> {
                 expense: expense,
                 income: income,
                 onEntryTap: _editEntry,
+                onEntryDelete: _deleteEntry,
               ),
             ),
           ],
@@ -904,6 +912,7 @@ class _LedgerDayView extends StatelessWidget {
   final double expense;
   final double income;
   final ValueChanged<LedgerEntry> onEntryTap;
+  final ValueChanged<LedgerEntry> onEntryDelete;
 
   const _LedgerDayView({
     required this.entries,
@@ -911,6 +920,7 @@ class _LedgerDayView extends StatelessWidget {
     required this.expense,
     required this.income,
     required this.onEntryTap,
+    required this.onEntryDelete,
   });
 
   @override
@@ -943,14 +953,46 @@ class _LedgerDayView extends StatelessWidget {
               : Column(
                   children: entries
                       .map(
-                        (entry) =>
-                            _LedgerRow(entry, onTap: () => onEntryTap(entry)),
+                        (entry) => _LedgerSwipeActions(
+                          onEdit: () => onEntryTap(entry),
+                          onDelete: () => _confirmDeleteEntry(context, entry),
+                          child: _LedgerRow(
+                            entry,
+                            onTap: () => onEntryTap(entry),
+                          ),
+                        ),
                       )
                       .toList(),
                 ),
         ),
       ],
     );
+  }
+
+  Future<void> _confirmDeleteEntry(
+    BuildContext context,
+    LedgerEntry entry,
+  ) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('删除账单'),
+        content: Text(
+          '确定删除「${entry.categoryName} ${_money(entry.cnyAmount)}」吗？',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('删除', style: TextStyle(color: AppColors.danger)),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) onEntryDelete(entry);
   }
 }
 
@@ -1755,6 +1797,149 @@ class _SectionCard extends StatelessWidget {
           const SizedBox(height: 12),
           child,
         ],
+      ),
+    );
+  }
+}
+
+class _LedgerSwipeActions extends StatefulWidget {
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+  final Widget child;
+
+  const _LedgerSwipeActions({
+    required this.onEdit,
+    required this.onDelete,
+    required this.child,
+  });
+
+  @override
+  State<_LedgerSwipeActions> createState() => _LedgerSwipeActionsState();
+}
+
+class _LedgerSwipeActionsState extends State<_LedgerSwipeActions>
+    with SingleTickerProviderStateMixin {
+  static const double _actionWidth = 74.0;
+  double _offset = 0;
+  bool _dragging = false;
+  late final AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 220),
+    );
+    _animation =
+        Tween<double>(begin: 0, end: 0).animate(
+          CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
+        )..addListener(() {
+          if (!_dragging) setState(() => _offset = _animation.value);
+        });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _animateTo(double target) {
+    _animation = Tween<double>(
+      begin: _offset,
+      end: target,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
+    _controller.forward(from: 0);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: Row(
+            children: [
+              if (_offset > 8)
+                _LedgerSwipeButton(
+                  icon: Icons.edit_rounded,
+                  color: AppColors.primary,
+                  onTap: () {
+                    _animateTo(0);
+                    widget.onEdit();
+                  },
+                ),
+              const Spacer(),
+              if (_offset < -8)
+                _LedgerSwipeButton(
+                  icon: Icons.delete_outline_rounded,
+                  color: AppColors.danger,
+                  onTap: () {
+                    _animateTo(0);
+                    widget.onDelete();
+                  },
+                ),
+            ],
+          ),
+        ),
+        GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onHorizontalDragStart: (_) => _dragging = true,
+          onHorizontalDragUpdate: (details) {
+            setState(() {
+              _offset += details.delta.dx;
+              if (_offset > _actionWidth) _offset = _actionWidth;
+              if (_offset < -_actionWidth) _offset = -_actionWidth;
+            });
+          },
+          onHorizontalDragEnd: (_) {
+            _dragging = false;
+            if (_offset.abs() > 42) {
+              _animateTo(_offset > 0 ? _actionWidth : -_actionWidth);
+            } else {
+              _animateTo(0);
+            }
+          },
+          child: Transform.translate(
+            offset: Offset(_offset, 0),
+            child: widget.child,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _LedgerSwipeButton extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _LedgerSwipeButton({
+    required this.icon,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: _LedgerSwipeActionsState._actionWidth,
+      child: Center(
+        child: GestureDetector(
+          onTap: onTap,
+          child: Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: color.withValues(alpha: 0.1),
+              border: Border.all(color: color.withValues(alpha: 0.26)),
+            ),
+            child: Icon(icon, size: 18, color: color),
+          ),
+        ),
       ),
     );
   }

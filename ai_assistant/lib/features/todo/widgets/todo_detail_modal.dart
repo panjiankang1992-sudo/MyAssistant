@@ -347,12 +347,6 @@ class _TodoDetailSheetState extends ConsumerState<_TodoDetailSheet> {
   }
 
   Widget _buildFixedBottomActions() {
-    if (!_editing && widget.readOnly) {
-      return _buildSingleButton(
-        label: '关闭',
-        onPressed: () => Navigator.of(context).pop(),
-      );
-    }
     return _editing
         ? _buildButtons(
             leftLabel: '取消',
@@ -606,42 +600,6 @@ class _TodoDetailSheetState extends ConsumerState<_TodoDetailSheet> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildSingleButton({
-    required String label,
-    required VoidCallback onPressed,
-  }) {
-    return Container(
-      padding: const EdgeInsets.only(top: 16),
-      decoration: const BoxDecoration(
-        border: Border(top: BorderSide(color: AppColors.border)),
-      ),
-      child: SizedBox(
-        width: double.infinity,
-        height: 44,
-        child: ElevatedButton(
-          onPressed: onPressed,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
-            foregroundColor: Colors.white,
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(25),
-            ),
-          ),
-          child: Text(
-            label,
-            style: const TextStyle(
-              fontFamily: 'PingFang SC',
-              fontFamilyFallback: ['.SF Pro Text', 'system-ui', 'sans-serif'],
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ),
       ),
     );
   }
