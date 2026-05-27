@@ -1,7 +1,7 @@
 import '../../../data/datasources/local_datasource.dart';
 import '../../../domain/models/ai_model_config.dart';
-import '../../../domain/models/todo.dart';
 import '../../profile/profile_provider.dart';
+import '../../skills/app_data_skill_service.dart';
 import '../../skills/builtin_skill_registry.dart';
 import '../providers/copilot_provider.dart';
 import 'openai_compatible_client.dart';
@@ -44,6 +44,8 @@ class CopilotAgentService {
             '你是 MyAssistant 的轻量化 Agent。你可以使用内置 skill。'
             'MCP 当前处于配置预留阶段，不要假装已连接外部 MCP。'
             '回答要简洁、中文、可执行。'
+            '查询、统计、分析本应用数据时，优先使用应用数据 skill 的结构化结果；'
+            '代办列表必须使用红黄绿灯和表格，不要暴露内部枚举值。'
             '如果 system 上下文包含「app_data skill 已授权并已读取」，'
             '你必须承认已经读取到本应用本地数据，并基于其中数据回答；'
             '禁止回答“无法访问本地数据”“请提供应用数据”。',
@@ -89,6 +91,16 @@ class CopilotAgentService {
         input.contains('明天') ||
         input.contains('今天') ||
         input.contains('例行') ||
+        input.contains('账单') ||
+        input.contains('记账') ||
+        input.contains('收支') ||
+        input.contains('消费') ||
+        input.contains('收入') ||
+        input.contains('随手记') ||
+        input.contains('日记') ||
+        input.contains('文档') ||
+        input.contains('统计') ||
+        input.contains('分析') ||
         input.contains('标签') ||
         input.contains('模型') ||
         input.contains('导入') ||
@@ -102,80 +114,47 @@ class CopilotAgentService {
     }
     if (input.contains('技能') || lower.contains('skill')) {
       final lines = BuiltinSkillRegistry.all
-          .map((skill) => '- **${skill.name}** `${skill.id}`：${skill.summary}')
+          .map(
+            (skill) =>
+                '| ${skill.name} | `${skill.id}` | ${skill.summary.replaceAll('|', '\\|')} |',
+          )
           .join('\n');
+      final answer = [
+        '## 内置 Skill',
+        '',
+        '| 能力 | ID | 适合处理 |',
+        '|---|---|---|',
+        lines,
+        '',
+        '**数据类 skill 输出规范**',
+        '- 代办：🔴 逾期、🟡 待处理、🟢 已完成，并使用表格列表。',
+        '- 记账：展示收入、支出、净额，金额保留两位小数。',
+        '- 随手记：区分日记、文档、归纳文档，默认读取摘要。',
+      ].join('\n');
       return _LocalContext(
         triggered: true,
         promptContext:
             'builtin_skill_list 已读取。当前内置 skill 清单：\n'
             '${BuiltinSkillRegistry.copilotSystemText()}',
-        fallbackAnswer: '当前内置技能有：\n\n$lines',
-        directAnswer: '当前内置技能有：\n\n$lines',
+        fallbackAnswer: answer,
+        directAnswer: answer,
       );
     }
 
-    final allTodos = await datasource.getAllTodos();
-    final routines = await datasource.getAllRoutines();
-    final tags = await datasource.getAllTags();
-    final metadata = await datasource.getMetadataOptions();
-
-    final activeTodos = allTodos.where((item) => !item.deleted).toList()
-      ..sort((a, b) {
-        final byDate = a.date.compareTo(b.date);
-        if (byDate != 0) return byDate;
-        return a.time.compareTo(b.time);
-      });
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final end = today.add(const Duration(days: 7));
-    final upcoming = activeTodos
-        .where((item) => !item.date.isBefore(today) && item.date.isBefore(end))
-        .take(30)
-        .map(
-          (item) =>
-              '- ${_fmt(item.date)} ${item.time} '
-              '${item.completed ? "[已完成]" : "[未完成]"} '
-              '${item.title}'
-              '${item.tags.isEmpty ? "" : " #${item.tags.map((t) => t.name).join(" #")}"}'
-              '${_actionText(item.action)}'
-              '${_sourceText(item.source)}',
-        )
-        .join('\n');
-    final routinesText = routines
-        .take(30)
-        .map(
-          (item) =>
-              '- ${item.title} ${item.time} ${_repeatLabel(item.repeatRule, item.repeatDays)}'
-              '${item.tags.isEmpty ? "" : " #${item.tags.map((t) => t.name).join(" #")}"}',
-        )
-        .join('\n');
-    final tagText = tags.map((t) => t.name).join('、');
-    final sourceText = metadata
-        .where((m) => m.kind == 'source')
-        .map((m) => m.label)
-        .join('、');
-    final actionText = metadata
-        .where((m) => m.kind == 'action')
-        .map((m) => m.label)
-        .join('、');
+    final dataSkill = await AppDataSkillService(
+      datasource: datasource,
+      profile: profile,
+    ).buildFor(input);
     final modelsText = aiModels
         .map((m) => '${m.name}(${m.provider}/${m.model})')
         .join('、');
-    final completedCount = activeTodos.where((t) => t.completed).length;
-    final openCount = activeTodos.length - completedCount;
-    final todoAnswer = _buildTodoAnswer(input, activeTodos);
     final fallback = [
-      '我已读取当前应用内数据，摘要如下：',
+      dataSkill.fallbackAnswer,
+      '',
+      '**本地配置**',
       '- 个人信息：${profile.name.isEmpty ? "未设置昵称" : profile.name}'
           '${profile.email.isEmpty ? "" : "，邮箱 ${profile.email}"}',
-      '- 待办：未删除 ${activeTodos.length} 条，其中未完成 $openCount 条，已完成 $completedCount 条',
-      '- 例行：${routines.length} 条',
-      '- 标签：${tagText.isEmpty ? "暂无" : tagText}',
-      '- 来源选项：${sourceText.isEmpty ? "暂无" : sourceText}',
-      '- 动作选项：${actionText.isEmpty ? "暂无" : actionText}',
       '- AI 模型：${modelsText.isEmpty ? "暂无" : modelsText}',
-      if (upcoming.isNotEmpty) '未来 7 天待办：\n$upcoming',
-      if (routinesText.isNotEmpty) '例行待办：\n$routinesText',
     ].join('\n');
     final directIntent =
         input.contains('看下') ||
@@ -189,95 +168,22 @@ class CopilotAgentService {
         input.contains('我的代办') ||
         input.contains('我的待办') ||
         input.contains('代办列表') ||
+        input.contains('账单') ||
+        input.contains('记账') ||
+        input.contains('收支') ||
+        input.contains('随手记') ||
+        input.contains('统计') ||
+        input.contains('分析') ||
         input.trim() == '待办';
     return _LocalContext(
       triggered: true,
       promptContext:
-          'app_data skill 已授权并已读取本应用本地数据库和本地配置。'
-          '下面是可直接使用的真实应用数据快照，不是用户手工提供的文本：\n'
-          '$fallback\n'
+          '${dataSkill.promptContext}\n\n'
+          '本地配置：AI 模型=${modelsText.isEmpty ? "暂无" : modelsText}\n'
           '约束：只能基于上述数据分析；不要声称无法读取本应用数据。',
-      fallbackAnswer: todoAnswer ?? fallback,
-      directAnswer: directIntent ? (todoAnswer ?? fallback) : null,
+      fallbackAnswer: dataSkill.directAnswer ?? fallback,
+      directAnswer: directIntent ? (dataSkill.directAnswer ?? fallback) : null,
     );
-  }
-
-  String? _buildTodoAnswer(String input, List<Todo> activeTodos) {
-    if (!input.contains('代办') && !input.contains('待办')) return null;
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    DateTime target = today;
-    var title = '今天';
-    if (input.contains('明天')) {
-      target = today.add(const Duration(days: 1));
-      title = '明天';
-    } else if (input.contains('后天')) {
-      target = today.add(const Duration(days: 2));
-      title = '后天';
-    }
-    final todos =
-        activeTodos.where((item) => _sameDay(item.date, target)).toList()
-          ..sort((a, b) => a.time.compareTo(b.time));
-    final open = todos.where((item) => !item.completed).length;
-    if (todos.isEmpty) {
-      return '我已读取本地数据库，$title（${_fmt(target)}）没有待办。';
-    }
-    final lines = todos
-        .map((item) {
-          final tags = item.tags.isEmpty
-              ? ''
-              : ' ${item.tags.map((t) => '#${t.name}').join(' ')}';
-          final action = _actionText(item.action);
-          final source = _sourceText(item.source);
-          return '- **${item.time}** ${item.completed ? "[已完成]" : "[未完成]"} ${item.title}$tags$action$source';
-        })
-        .join('\n');
-    return '我已读取本地数据库，$title（${_fmt(target)}）共有 **${todos.length} 条**代办，其中未完成 **$open 条**：\n\n$lines';
-  }
-
-  String _sourceText(String source) {
-    final label = switch (source.trim().toLowerCase()) {
-      '' => '',
-      'routine' => '例行',
-      'ai' => 'AI',
-      'recommend' => 'AI',
-      'calendar' => '日历',
-      'message' => '消息',
-      'manual' => '手动',
-      _ => source,
-    };
-    return label.isEmpty ? '' : ' 来源:$label';
-  }
-
-  String _actionText(String action) {
-    final label = switch (action.trim().toLowerCase()) {
-      '' => '',
-      'none' => '',
-      'bookkeeping' => '记账',
-      'open_app' => '打开应用',
-      'call' => '拨打电话',
-      'message' => '发消息',
-      _ => action,
-    };
-    return label.isEmpty ? '' : ' 动作:$label';
-  }
-
-  String _fmt(DateTime date) {
-    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-  }
-
-  bool _sameDay(DateTime a, DateTime b) {
-    return a.year == b.year && a.month == b.month && a.day == b.day;
-  }
-
-  String _repeatLabel(String rule, String? days) {
-    return switch (rule) {
-      'daily' => '每天',
-      'weekdays' => '工作日',
-      'weekly' => '每周${days == null || days.isEmpty ? "" : "($days)"}',
-      'monthly' => '每月${days == null || days.isEmpty ? "" : "($days)"}',
-      _ => rule,
-    };
   }
 }
 

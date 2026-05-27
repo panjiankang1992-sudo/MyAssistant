@@ -30,14 +30,78 @@ class BuiltinSkillRegistry {
 
   static const appData = BuiltinSkill(
     id: 'app_data',
-    name: '应用数据读取',
-    summary: '读取个人信息、待办、例行、标签、动作、来源和模型配置摘要',
-    description: '为 Copilot 提供本地应用数据上下文，只读取必要摘要，不直接修改数据。',
+    name: '应用数据总览',
+    summary: '读取个人信息、待办、记账、随手记、标签、动作、来源和模型配置摘要',
+    description: '为 Copilot 提供本地应用数据上下文，只读取必要摘要，不直接修改数据，并按用户友好的格式输出。',
     inputSchema: 'user_query',
-    outputSchema: 'local_context_summary',
-    prompt: '读取本应用本地数据摘要，并基于真实数据回答。',
+    outputSchema: 'markdown_summary',
+    prompt:
+        '读取本应用本地数据摘要，并基于真实数据回答。查询类回答使用 Markdown 表格；'
+        '不要暴露 source/action 等内部枚举值。',
     icon: Icons.storage_rounded,
     color: AppColors.success,
+  );
+
+  static const todoQuery = BuiltinSkill(
+    id: 'todo_query',
+    name: '代办查询',
+    summary: '按日期查询代办列表，使用红黄绿灯展示逾期、待处理、已完成状态',
+    description: '读取本地代办和例行生成项，输出时间、标题、标签、来源、动作和完成率。',
+    inputSchema: 'date_or_range + optional filters(tags, source, action)',
+    outputSchema: 'markdown_table(status_light,time,title,tags,source,action)',
+    prompt:
+        '查询代办时必须使用红黄绿灯：🔴 逾期，🟡 待处理，🟢 已完成。'
+        '列表使用 Markdown 表格，并把 routine/bookkeeping 等内部值转成中文。',
+    icon: Icons.check_circle_rounded,
+    color: AppColors.primary,
+  );
+
+  static const todoStats = BuiltinSkill(
+    id: 'todo_stats',
+    name: '代办统计分析',
+    summary: '统计代办总量、完成率、逾期、标签、来源和动作分布',
+    description: '用于回答今天、本周或指定范围内的代办状态分析。',
+    inputSchema: 'date_or_range + optional group_by',
+    outputSchema: 'markdown_summary + markdown_table',
+    prompt: '先给出红黄绿灯摘要，再用表格展示分组数据和异常项。',
+    icon: Icons.traffic_rounded,
+    color: AppColors.warning,
+  );
+
+  static const ledgerQuery = BuiltinSkill(
+    id: 'ledger_query',
+    name: '记账查询',
+    summary: '按日期查询账单流水，展示收入、支出、净额和分类明细',
+    description: '读取本地记账数据，输出当天或指定日期的账单列表。',
+    inputSchema: 'date_or_range + optional category/type',
+    outputSchema: 'markdown_table(time,category,type,amount,note)',
+    prompt: '金额保留两位小数，收入使用正向表达，支出使用负向表达，分类展示图标和中文名。',
+    icon: Icons.receipt_long_rounded,
+    color: AppColors.primary,
+  );
+
+  static const ledgerStats = BuiltinSkill(
+    id: 'ledger_stats',
+    name: '收支统计分析',
+    summary: '按分类、日期或周期统计收入、支出、净额和占比',
+    description: '用于回答消费结构、收入支出趋势、分类排名等问题。',
+    inputSchema: 'period(day/week/month/year) + optional filters',
+    outputSchema: 'markdown_summary + category_rank_table',
+    prompt: '先展示收入、支出、净额，再按分类给出排行和占比。',
+    icon: Icons.pie_chart_rounded,
+    color: AppColors.success,
+  );
+
+  static const noteQuery = BuiltinSkill(
+    id: 'note_query',
+    name: '随手记查询',
+    summary: '查询日记、文档、归纳文档和最近更新摘要',
+    description: '读取本地随手记数据，区分日记、文档和归纳文档，并展示标签与更新时间。',
+    inputSchema: 'date_or_keyword + optional note_type',
+    outputSchema: 'markdown_table(date,type,title,tags)',
+    prompt: '默认读取摘要；需要编辑时再读取全文。输出时区分日记、文档、归纳。',
+    icon: Icons.edit_note_rounded,
+    color: AppColors.primary,
   );
 
   static const planning = BuiltinSkill(
@@ -108,6 +172,11 @@ class BuiltinSkillRegistry {
 
   static const all = [
     appData,
+    todoQuery,
+    todoStats,
+    ledgerQuery,
+    ledgerStats,
+    noteQuery,
     planning,
     noteAnalysis,
     todoImport,
