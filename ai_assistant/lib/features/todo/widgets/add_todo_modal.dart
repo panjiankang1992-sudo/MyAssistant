@@ -26,6 +26,7 @@ void showAddTodoModal(
   BuildContext context, {
   DateTime? initialDate,
   bool startVoiceInput = false,
+  String? initialVoiceText,
 }) {
   showGeneralDialog(
     context: context,
@@ -37,6 +38,7 @@ void showAddTodoModal(
       return _AddTodoModalContent(
         initialDate: initialDate,
         startVoiceInput: startVoiceInput,
+        initialVoiceText: initialVoiceText,
       );
     },
     transitionBuilder: (context, animation, secondaryAnimation, child) {
@@ -59,8 +61,13 @@ void showAddTodoModal(
 class _AddTodoModalContent extends ConsumerStatefulWidget {
   final DateTime? initialDate;
   final bool startVoiceInput;
+  final String? initialVoiceText;
 
-  const _AddTodoModalContent({this.initialDate, this.startVoiceInput = false});
+  const _AddTodoModalContent({
+    this.initialDate,
+    this.startVoiceInput = false,
+    this.initialVoiceText,
+  });
 
   @override
   ConsumerState<_AddTodoModalContent> createState() =>
@@ -198,9 +205,17 @@ class _AddTodoModalContentState extends ConsumerState<_AddTodoModalContent>
     final now = DateTime.now();
     _time =
         '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+    final initialVoiceText = widget.initialVoiceText?.trim() ?? '';
+    if (initialVoiceText.isNotEmpty) {
+      _voiceText = initialVoiceText;
+      _titleController.text = initialVoiceText;
+      _showVoicePrompt = false;
+    }
     Future.microtask(() async {
       await _initSpeech();
-      if (widget.startVoiceInput && mounted) {
+      if (initialVoiceText.isNotEmpty && mounted) {
+        await _applyAiParse();
+      } else if (widget.startVoiceInput && mounted) {
         await _toggleVoiceInput();
       }
     });

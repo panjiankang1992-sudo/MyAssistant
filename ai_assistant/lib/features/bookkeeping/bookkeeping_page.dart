@@ -669,15 +669,75 @@ class BookkeepingPage extends ConsumerStatefulWidget {
 
 class _BookkeepingPageState extends ConsumerState<BookkeepingPage> {
   final _store = BookkeepingStore();
+  final _fabSpeech = stt.SpeechToText();
   late final ExchangeService _exchangeService;
   var _entries = <LedgerEntry>[];
   var _selectedDate = DateTime.now();
+  var _fabSpeechReady = false;
+  var _fabListening = false;
+  var _fabVoiceText = '';
 
   @override
   void initState() {
     super.initState();
     _exchangeService = ExchangeService(_store);
     _load();
+  }
+
+  @override
+  void dispose() {
+    _fabSpeech.cancel();
+    super.dispose();
+  }
+
+  Future<void> _startFabVoiceInput() async {
+    if (_fabListening) return;
+    if (!_fabSpeechReady) {
+      _fabSpeechReady = await _fabSpeech.initialize(
+        onStatus: (status) {
+          if (!mounted) return;
+          setState(() => _fabListening = status == 'listening');
+        },
+        onError: (_) {
+          if (!mounted) return;
+          setState(() => _fabListening = false);
+        },
+      );
+    }
+    if (!_fabSpeechReady) return;
+    setState(() {
+      _fabListening = true;
+      _fabVoiceText = '';
+    });
+    await _fabSpeech.listen(
+      onResult: (result) {
+        if (!mounted) return;
+        final text = result.recognizedWords.trim();
+        if (text.isNotEmpty) setState(() => _fabVoiceText = text);
+      },
+      listenOptions: stt.SpeechListenOptions(
+        localeId: 'zh_CN',
+        listenFor: const Duration(seconds: 20),
+        pauseFor: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  Future<void> _finishFabVoiceInput() async {
+    if (_fabListening) await _fabSpeech.stop();
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+    if (!mounted) return;
+    final text = _fabVoiceText.trim();
+    setState(() => _fabListening = false);
+    showAddLedgerPage(
+      context,
+      ref: ref,
+      date: _selectedDate,
+      exchangeService: _exchangeService,
+      onSaved: _addEntry,
+      onCategoriesChanged: _markBillCategoriesDirty,
+      initialVoiceText: text.isEmpty ? null : text,
+    );
   }
 
   Future<void> _load() async {
@@ -814,6 +874,7 @@ class _BookkeepingPageState extends ConsumerState<BookkeepingPage> {
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       floatingActionButton: _GradientAddButton(
+        listening: _fabListening,
         onPressed: () => showAddLedgerPage(
           context,
           ref: ref,
@@ -822,6 +883,8 @@ class _BookkeepingPageState extends ConsumerState<BookkeepingPage> {
           onSaved: _addEntry,
           onCategoriesChanged: _markBillCategoriesDirty,
         ),
+        onLongPressStart: _startFabVoiceInput,
+        onLongPressEnd: _finishFabVoiceInput,
       ),
     );
   }
@@ -2541,9 +2604,17 @@ class _CategoryIcon extends StatelessWidget {
 }
 
 class _GradientAddButton extends StatelessWidget {
+  final bool listening;
   final VoidCallback onPressed;
+  final VoidCallback onLongPressStart;
+  final VoidCallback onLongPressEnd;
 
-  const _GradientAddButton({required this.onPressed});
+  const _GradientAddButton({
+    required this.listening,
+    required this.onPressed,
+    required this.onLongPressStart,
+    required this.onLongPressEnd,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -2551,6 +2622,8 @@ class _GradientAddButton extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 12),
       child: GestureDetector(
         onTap: onPressed,
+        onLongPressStart: (_) => onLongPressStart(),
+        onLongPressEnd: (_) => onLongPressEnd(),
         child: Container(
           width: 58,
           height: 58,
@@ -2569,7 +2642,11 @@ class _GradientAddButton extends StatelessWidget {
               ),
             ],
           ),
-          child: const Icon(Icons.add_rounded, color: Colors.white, size: 30),
+          child: Icon(
+            listening ? Icons.mic_rounded : Icons.add_rounded,
+            color: Colors.white,
+            size: 30,
+          ),
         ),
       ),
     );
@@ -2584,6 +2661,7 @@ void showAddLedgerPage(
   required ValueChanged<LedgerEntry> onSaved,
   LedgerEntry? initialEntry,
   VoidCallback? onCategoriesChanged,
+  String? initialVoiceText,
 }) {
   showGeneralDialog(
     context: context,
@@ -2599,6 +2677,7 @@ void showAddLedgerPage(
         onSaved: onSaved,
         initialEntry: initialEntry,
         onCategoriesChanged: onCategoriesChanged,
+        initialVoiceText: initialVoiceText,
       );
     },
     transitionBuilder: (context, animation, secondaryAnimation, child) {
@@ -2620,6 +2699,7 @@ class _AddLedgerPage extends StatefulWidget {
   final ValueChanged<LedgerEntry> onSaved;
   final LedgerEntry? initialEntry;
   final VoidCallback? onCategoriesChanged;
+  final String? initialVoiceText;
 
   const _AddLedgerPage({
     required this.ref,
@@ -2628,6 +2708,7 @@ class _AddLedgerPage extends StatefulWidget {
     required this.onSaved,
     this.initialEntry,
     this.onCategoriesChanged,
+    this.initialVoiceText,
   });
 
   @override
@@ -2677,8 +2758,20 @@ class _AddLedgerPageState extends State<_AddLedgerPage>
       lowerBound: 0.92,
       upperBound: 1.08,
     )..repeat(reverse: true);
-    Future.microtask(_initSpeech);
-    Future.microtask(_loadCustomCategories);
+    final initialVoiceText = widget.initialVoiceText?.trim() ?? '';
+    if (initialVoiceText.isNotEmpty && initial == null) {
+      _voiceText = initialVoiceText;
+      _noteController.text = initialVoiceText;
+      _showVoicePrompt = false;
+      _aiGenerated = true;
+    }
+    Future.microtask(() async {
+      await _initSpeech();
+      await _loadCustomCategories();
+      if (initialVoiceText.isNotEmpty && mounted && initial == null) {
+        await _parseLedgerText(initialVoiceText);
+      }
+    });
   }
 
   @override

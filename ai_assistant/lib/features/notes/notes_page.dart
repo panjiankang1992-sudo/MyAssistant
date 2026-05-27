@@ -159,10 +159,20 @@ class NotesPage extends ConsumerStatefulWidget {
 }
 
 class _NotesPageState extends ConsumerState<NotesPage> {
+  final stt.SpeechToText _fabSpeech = stt.SpeechToText();
   DateTime? _filterDate;
   _NotesViewMode _mode = _NotesViewMode.diary;
   _NotesLayoutMode _layoutMode = _NotesLayoutMode.list;
   bool _analyzing = false;
+  bool _fabSpeechReady = false;
+  bool _fabListening = false;
+  String _fabVoiceText = '';
+
+  @override
+  void dispose() {
+    _fabSpeech.cancel();
+    super.dispose();
+  }
 
   List<QuickNote> _visibleNotes(List<QuickNote> notes) {
     final now = DateTime.now();
@@ -228,11 +238,54 @@ class _NotesPageState extends ConsumerState<NotesPage> {
     setState(() => _filterDate = picked);
   }
 
-  void _openEditor([QuickNote? note]) {
+  Future<void> _startFabVoiceInput() async {
+    if (_fabListening) return;
+    if (!_fabSpeechReady) {
+      _fabSpeechReady = await _fabSpeech.initialize(
+        onStatus: (status) {
+          if (!mounted) return;
+          setState(() => _fabListening = status == 'listening');
+        },
+        onError: (_) {
+          if (!mounted) return;
+          setState(() => _fabListening = false);
+        },
+      );
+    }
+    if (!_fabSpeechReady) return;
+    setState(() {
+      _fabListening = true;
+      _fabVoiceText = '';
+    });
+    await _fabSpeech.listen(
+      onResult: (result) {
+        if (!mounted) return;
+        final text = result.recognizedWords.trim();
+        if (text.isNotEmpty) setState(() => _fabVoiceText = text);
+      },
+      listenOptions: stt.SpeechListenOptions(
+        localeId: 'zh_CN',
+        listenFor: const Duration(seconds: 20),
+        pauseFor: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  Future<void> _finishFabVoiceInput() async {
+    if (_fabListening) await _fabSpeech.stop();
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+    if (!mounted) return;
+    final text = _fabVoiceText.trim();
+    setState(() => _fabListening = false);
+    _openEditor(null, text.isEmpty ? null : text);
+  }
+
+  void _openEditor([QuickNote? note, String? initialText]) {
     Navigator.of(context).push(
       _notesSideRoute(
         _NoteEditorPage(
           initial: note,
+          initialText: initialText,
           initialDate: DateTime.now(),
           readOnly: note?.archived == true,
           onSave: (title, content, date, tags) {
@@ -398,7 +451,7 @@ class _NotesPageState extends ConsumerState<NotesPage> {
                             : _NotesCollection(
                                 notes: visible,
                                 layoutMode: _layoutMode,
-                                onOpen: _openEditor,
+                                onOpen: (note) => _openEditor(note),
                                 onArchive: (note) => ref
                                     .read(notesNotifierProvider.notifier)
                                     .archive(note),
@@ -420,7 +473,7 @@ class _NotesPageState extends ConsumerState<NotesPage> {
                               ))
                       : _AnalysisLibrary(
                           notes: analysisDocs,
-                          onOpen: _openEditor,
+                          onOpen: (note) => _openEditor(note),
                         ),
                 ),
               ],
@@ -430,7 +483,14 @@ class _NotesPageState extends ConsumerState<NotesPage> {
                 left: 0,
                 right: 0,
                 bottom: 14,
-                child: Center(child: _NotesFab(onPressed: () => _openEditor())),
+                child: Center(
+                  child: _NotesFab(
+                    listening: _fabListening,
+                    onPressed: () => _openEditor(),
+                    onLongPressStart: _startFabVoiceInput,
+                    onLongPressEnd: _finishFabVoiceInput,
+                  ),
+                ),
               )
             else
               Positioned(
@@ -1324,8 +1384,18 @@ class _AnalyzeFab extends StatelessWidget {
 }
 
 class _NotesFab extends StatelessWidget {
+  final bool listening;
   final VoidCallback onPressed;
-  const _NotesFab({required this.onPressed});
+  final VoidCallback onLongPressStart;
+  final VoidCallback onLongPressEnd;
+
+  const _NotesFab({
+    required this.listening,
+    required this.onPressed,
+    required this.onLongPressStart,
+    required this.onLongPressEnd,
+  });
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -1344,11 +1414,19 @@ class _NotesFab extends StatelessWidget {
           ),
         ],
       ),
-      child: FloatingActionButton(
-        onPressed: onPressed,
-        elevation: 0,
-        backgroundColor: Colors.transparent,
-        child: const Icon(Icons.add_rounded, size: 34, color: Colors.white),
+      child: GestureDetector(
+        onLongPressStart: (_) => onLongPressStart(),
+        onLongPressEnd: (_) => onLongPressEnd(),
+        child: FloatingActionButton(
+          onPressed: onPressed,
+          elevation: 0,
+          backgroundColor: Colors.transparent,
+          child: Icon(
+            listening ? Icons.mic_rounded : Icons.add_rounded,
+            size: 34,
+            color: Colors.white,
+          ),
+        ),
       ),
     );
   }
@@ -1369,6 +1447,7 @@ class _NotesEmpty extends StatelessWidget {
 
 class _NoteEditorPage extends StatefulWidget {
   final QuickNote? initial;
+  final String? initialText;
   final DateTime initialDate;
   final bool readOnly;
   final void Function(
@@ -1380,6 +1459,7 @@ class _NoteEditorPage extends StatefulWidget {
   onSave;
   const _NoteEditorPage({
     this.initial,
+    this.initialText,
     required this.initialDate,
     this.readOnly = false,
     required this.onSave,
@@ -1409,7 +1489,12 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
     super.initState();
     final parsed = _parseNoteContent(widget.initial?.content ?? '');
     _title = TextEditingController(text: widget.initial?.title ?? '');
-    _content = TextEditingController(text: parsed.text);
+    final initialText = widget.initial == null
+        ? (widget.initialText?.trim() ?? '')
+        : '';
+    _content = TextEditingController(
+      text: initialText.isNotEmpty ? initialText : parsed.text,
+    );
     _speech = stt.SpeechToText();
     _date = widget.initial?.date ?? widget.initialDate;
     _tags = List.from(widget.initial?.tags ?? const []);

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'providers/todo_provider.dart';
 import 'providers/selected_date_provider.dart';
 import 'widgets/add_todo_modal.dart';
@@ -39,6 +40,10 @@ class _TodoPageState extends ConsumerState<TodoPage>
   bool _showBookkeepingFeedback = false;
   bool _bookkeepingFeedbackSuccess = false;
   int _bookkeepingFeedbackTick = 0;
+  final stt.SpeechToText _fabSpeech = stt.SpeechToText();
+  bool _fabSpeechReady = false;
+  bool _fabListening = false;
+  String _fabVoiceText = '';
 
   @override
   void initState() {
@@ -67,7 +72,54 @@ class _TodoPageState extends ConsumerState<TodoPage>
     WidgetsBinding.instance.removeObserver(this);
     _poetryTimer?.cancel();
     _bookkeepingFeedbackTimer?.cancel();
+    _fabSpeech.cancel();
     super.dispose();
+  }
+
+  Future<void> _startFabVoiceInput() async {
+    if (_fabListening) return;
+    if (!_fabSpeechReady) {
+      _fabSpeechReady = await _fabSpeech.initialize(
+        onStatus: (status) {
+          if (!mounted) return;
+          setState(() => _fabListening = status == 'listening');
+        },
+        onError: (_) {
+          if (!mounted) return;
+          setState(() => _fabListening = false);
+        },
+      );
+    }
+    if (!_fabSpeechReady) return;
+    setState(() {
+      _fabListening = true;
+      _fabVoiceText = '';
+    });
+    await _fabSpeech.listen(
+      onResult: (result) {
+        if (!mounted) return;
+        final text = result.recognizedWords.trim();
+        if (text.isNotEmpty) setState(() => _fabVoiceText = text);
+      },
+      listenOptions: stt.SpeechListenOptions(
+        localeId: 'zh_CN',
+        listenFor: const Duration(seconds: 20),
+        pauseFor: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  Future<void> _finishFabVoiceInput(DateTime selectedDate) async {
+    if (_fabListening) await _fabSpeech.stop();
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+    if (!mounted) return;
+    final text = _fabVoiceText.trim();
+    setState(() => _fabListening = false);
+    showAddTodoModal(
+      context,
+      initialDate: selectedDate,
+      initialVoiceText: text.isEmpty ? null : text,
+    );
   }
 
   @override
@@ -304,12 +356,10 @@ class _TodoPageState extends ConsumerState<TodoPage>
         ],
       ),
       floatingActionButton: _AiInputFab(
+        listening: _fabListening,
         onPressed: () => showAddTodoModal(context, initialDate: selectedDate),
-        onLongPress: () => showAddTodoModal(
-          context,
-          initialDate: selectedDate,
-          startVoiceInput: true,
-        ),
+        onLongPressStart: _startFabVoiceInput,
+        onLongPressEnd: () => _finishFabVoiceInput(selectedDate),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
@@ -570,10 +620,17 @@ class _BookkeepingLinePainter extends CustomPainter {
 }
 
 class _AiInputFab extends StatefulWidget {
+  final bool listening;
   final VoidCallback onPressed;
-  final VoidCallback onLongPress;
+  final VoidCallback onLongPressStart;
+  final VoidCallback onLongPressEnd;
 
-  const _AiInputFab({required this.onPressed, required this.onLongPress});
+  const _AiInputFab({
+    required this.listening,
+    required this.onPressed,
+    required this.onLongPressStart,
+    required this.onLongPressEnd,
+  });
 
   @override
   State<_AiInputFab> createState() => _AiInputFabState();
@@ -589,10 +646,11 @@ class _AiInputFabState extends State<_AiInputFab> {
       child: GestureDetector(
         onLongPressStart: (_) {
           setState(() => _armed = true);
-          widget.onLongPress();
+          widget.onLongPressStart();
         },
         onLongPressEnd: (_) {
           if (mounted) setState(() => _armed = false);
+          widget.onLongPressEnd();
         },
         child: Material(
           color: Colors.transparent,
@@ -626,7 +684,9 @@ class _AiInputFabState extends State<_AiInputFab> {
                   ],
                 ),
                 child: Icon(
-                  _armed ? Icons.mic_rounded : Icons.add_rounded,
+                  widget.listening || _armed
+                      ? Icons.mic_rounded
+                      : Icons.add_rounded,
                   size: 28,
                   color: Colors.white,
                 ),
