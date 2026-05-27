@@ -12,10 +12,13 @@
 
 | 文件/目录 | 用途 |
 |-----------|------|
-| `AI助手跨平台实现方案.md` | 架构总方案（跨平台选型、通知读取策略、数据同步、Agent 设计） |
-| `Flutter从零开始技术指导方案.md` | 从零搭建的完整技术指导（环境、项目结构、平台原生集成代码示例） |
-| `todo-app.html` | UI 原型——待办/记账/随手记/Copilot 四个 Tab 的 Apple 风格 Demo |
-| `test-preview.html` | 无关紧要的测试页面 |
+| `docs/design/AI助手跨平台实现方案.md` | 架构总方案（跨平台选型、通知读取策略、数据同步、Agent 设计） |
+| `docs/design/Flutter从零开始技术指导方案.md` | 从零搭建的完整技术指导（环境、项目结构、平台原生集成代码示例） |
+| `docs/design/design_refresh*.md` | 视觉设计迭代记录 |
+| `docs/screenshots/` | 设计和验证截图 |
+| `prototypes/todo-app.html` | UI 原型——待办/记账/随手记/Copilot 四个 Tab 的 Apple 风格 Demo |
+| `prototypes/test-preview.html` | 无关紧要的测试页面 |
+| `scripts/setup_flutter.sh` | Flutter 环境初始化脚本 |
 | `.opencode/` | OpenCode 配置 + SpecKit 工作流命令 |
 | `.specify/` | SpecKit 工作流配置（spec → plan → tasks → implement） |
 
@@ -56,7 +59,7 @@
 - 本项目**无构建命令、无测试命令、无 lint 命令**
 - 不要尝试 `npm install`、`flutter pub get` 或任何包管理器
 - HTML 文件是静态原型，直接在浏览器打开即可预览
-- 修改方案文档时，注意两篇文档间的一致性（`AI助手跨平台实现方案.md` 是高层设计，`Flutter从零开始技术指导方案.md` 是实现指导）
+- 修改方案文档时，注意两篇文档间的一致性（`docs/design/AI助手跨平台实现方案.md` 是高层设计，`docs/design/Flutter从零开始技术指导方案.md` 是实现指导）
 
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,

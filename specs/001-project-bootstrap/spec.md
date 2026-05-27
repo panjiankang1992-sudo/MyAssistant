@@ -133,7 +133,7 @@
 - 鸿蒙（HarmonyOS）环境搭建在本次迭代中暂不包含——鸿蒙需要独立的 DevEco Studio 和 Flutter-OH SDK，将在后续迭代中单独处理。
 - AI 对话的后端服务已单独开发和部署（本 spec 聚焦客户端实现），Copilot 的 AI 回复在开发阶段可使用模拟数据。
 - 待办数据在 V1 阶段仅存储在本地（SQLite），不涉及多端同步和云端存储。
-- 用户界面遵循 Apple 设计风格（参考 `todo-app.html` 低保真原型中的设计语言）。
+- 用户界面遵循 Apple 设计风格（参考 `prototypes/todo-app.html` 低保真原型中的设计语言）。
 - 单用户场景——V1 不考虑多用户协作。
 - 腾讯云 IM SDK 的集成在环境搭建阶段仅做依赖声明和基础初始化，实际消息收发在后续迭代中实现。
-- 项目代码组织遵循 `Flutter从零开始技术指导方案.md` 中定义的目录结构（lib/core、lib/domain、lib/data、lib/features）。
+- 项目代码组织遵循 `docs/design/Flutter从零开始技术指导方案.md` 中定义的目录结构（lib/core、lib/domain、lib/data、lib/features）。

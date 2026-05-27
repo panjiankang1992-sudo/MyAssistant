@@ -196,5 +196,5 @@ Phase 4 内部并行:
 - [USx] 标签将任务映射到具体用户故事，便于追踪
 - 种子数据参考 `data-model.md` 的 Seed Data 章节
 - UI 规格参考 `contracts/ui-contracts.md` 的组件契约
-- 中文解析逻辑参考 `research.md` R5 和 `todo-app.html` 的 JS 参考实现（lines 569-599）
+- 中文解析逻辑参考 `research.md` R5 和 `prototypes/todo-app.html` 的 JS 参考实现（lines 569-599）
 - 每个 Phase 完成后验证一次 `flutter analyze`

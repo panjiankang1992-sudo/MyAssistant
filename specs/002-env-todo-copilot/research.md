@@ -89,7 +89,7 @@ final routerProvider = Provider<GoRouter>((ref) {
 **Decision**: 轻量级正则 + 关键词匹配（不引入 NLP 库）
 
 **Rationale**:
-- 现有低保真原型 (`todo-app.html` lines 569-599) 已包含完整的 `parseTodoText()` JS 实现，可直接移植到 Dart
+- 现有低保真原型 (`prototypes/todo-app.html` lines 569-599) 已包含完整的 `parseTodoText()` JS 实现，可直接移植到 Dart
 - 覆盖所有 spec 要求的分类（4 种类型、5 种时间表达）
 - 无需引入 ML/NLP 依赖（避免增加包体积和初始化延迟）
 
@@ -107,7 +107,7 @@ final routerProvider = Provider<GoRouter>((ref) {
 - 中午不覆盖显式时间
 - 支持 下周一/下周二 等具体下周工作日
 
-**Source**: todo-app.html reference implementation
+**Source**: prototypes/todo-app.html reference implementation
 
 ---
 
@@ -144,4 +144,4 @@ class AppDatabase extends _$AppDatabase {
 - Xcode 16.0+ 是 Flutter 3.41 编译 macOS 桌面的最低要求
 - JDK 17 是 Android Gradle 9.x + Kotlin 2.1+ 的要求
 
-**Source**: Flutter从零开始技术指导方案.md + Flutter 官方文档
+**Source**: docs/design/Flutter从零开始技术指导方案.md + Flutter 官方文档

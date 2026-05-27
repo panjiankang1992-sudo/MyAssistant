@@ -30,7 +30,7 @@ open build/macos/Build/Products/Release/ai_assistant.app
 ```bash
 cd ai_assistant
 
-# Install dependencies (uses Chinese mirrors, see setup_flutter.sh)
+# Install dependencies (uses Chinese mirrors, see scripts/setup_flutter.sh)
 flutter pub get
 
 # Generate Drift/Freezed code (required after schema or model changes)
