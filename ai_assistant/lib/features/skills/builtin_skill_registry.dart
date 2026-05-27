@@ -7,16 +7,17 @@ class BuiltinSkillRegistry {
   static const noteAnalysis = BuiltinSkill(
     id: 'note_archive_analysis',
     name: '随手记归纳分析',
-    summary: '读取未归纳的原始随手记，拆解信息点、合并相近主题、格式化为可编辑归纳文档',
+    summary: '读取未归纳的文档和有意义日记，拆解信息点、合并相近主题、格式化为可编辑归纳文档',
     description:
-        '借鉴 Obsidian + LLM 的 vault 工作流：原始数据保持不变，只处理未归纳内容，'
+        '借鉴 Obsidian + LLM 的 vault 工作流：日记和文档原文保持不变，处理文档和有意义日记，'
         '先拆解为事实、行动和素材，再把相近主题合并为结构化文档，方便后续搜索、整理和二次编辑。',
     inputSchema: 'raw_notes: [{id,title,content,tags,date,updatedAt}]',
     outputSchema:
         'documents: [{category,subcategory,title,summary,facts,actions,materials,sourceNoteIds}]',
     prompt:
-        '你是随手记归纳助手。保留原始笔记，只生成可编辑的归纳文档。'
-        '读取所有输入笔记，先拆解为事实、行动、素材，再合并相近主题并格式化。'
+        '你是随手记归纳助手。保留日记和文档原文，只生成可编辑的归纳文档。'
+        '读取文档类输入笔记，并从日记中过滤空内容、模板和无意义碎片，只保留有信息量的日记。'
+        '先拆解为事实、行动、素材，再合并相近主题并格式化。'
         '既有归纳文档默认只提供摘要用于判断是否命中；若命中同主题，可更新原文档。'
         '只返回 JSON，不要 Markdown。顶层字段 documents。每个文档字段：'
         'category, subcategory, title, summary, facts, actions, materials, sourceNoteIds。'
@@ -89,14 +90,17 @@ class BuiltinSkillRegistry {
   static const noteImport = BuiltinSkill(
     id: 'note_import',
     name: '随手记导入',
-    summary: '智能识别 Markdown、TXT、网页快照、图片附件说明等数据源，转换为随手记并调用内部随手记导入工具',
-    description: '保留 Markdown 正文、标题、标签、附件线索、创建/修改日期；文件名是日期时以文件名日期作为创建和修改时间。',
+    summary: '智能识别 Markdown、TXT、网页快照、图片附件说明等数据源，分别导入为日记或文档',
+    description:
+        '保留 Markdown 正文、标题、标签、附件线索、创建/修改日期；标题或文件名是日期时导入到日记，'
+        '并以文件名日期作为创建和修改时间；其他资料导入到文档。',
     inputSchema: 'source_path_or_text + optional mapping_hint',
     outputSchema:
-        'notes: [{title,content,summary,date,createdAt,updatedAt,tags,category,attachments}]',
+        'notes: [{noteType(diary/document),title,content,summary,date,createdAt,updatedAt,tags,category,attachments}]',
     prompt:
         '你是随手记导入助手。先判断数据源格式，再抽取为标准随手记数组。'
-        '保留 Markdown、代码块、表格和引用。文件名包含日期时，createdAt 和 updatedAt 都使用文件名日期。'
+        '保留 Markdown、代码块、表格和引用。标题或文件名包含日期时 noteType=diary，导入到日记，'
+        'createdAt 和 updatedAt 都使用该日期当天 00:00；其他内容 noteType=document，导入到文档。'
         '生成摘要、标签和分类；确认后调用应用内部随手记导入工具执行写入。',
     icon: Icons.note_add_rounded,
     color: AppColors.primary,

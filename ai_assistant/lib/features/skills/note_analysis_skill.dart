@@ -53,7 +53,14 @@ class NoteAnalysisSkill {
     required AiModelConfig? config,
   }) async {
     final rawNotes = notes
-        .where((note) => !note.deleted && !note.archived && !note.isAnalysis)
+        .where(
+          (note) =>
+              !note.deleted &&
+              !note.archived &&
+              !note.isAnalysis &&
+              (note.noteType == QuickNoteType.document ||
+                  _isMeaningfulDiary(note)),
+        )
         .toList();
     final pending = rawNotes
         .where((note) => !note.analyzed || !analyzedSourceIds.contains(note.id))
@@ -166,7 +173,7 @@ class NoteAnalysisSkill {
               '---',
         )
         .join('\n');
-    return '未归纳原始随手记：\n${rawText.isEmpty ? "无新增原始随手记" : rawText}\n\n'
+    return '未归纳文档和有意义日记：\n${rawText.isEmpty ? "无新增文档或有效日记" : rawText}\n\n'
         '既有归纳文档，请读取并在同主题下编辑、合并、去重，不要忽略人工编辑内容：\n'
         '${existingText.isEmpty ? "无既有归纳文档" : existingText}';
   }
@@ -372,6 +379,7 @@ class NoteAnalysisSkill {
 
   String _inferSubcategory(QuickNote note) {
     final text = '${note.title} ${note.content}';
+    if (note.noteType == QuickNoteType.diary) return '日记洞察';
     if (RegExp('买|购物|清单|牛奶|咖啡|猫粮').hasMatch(text)) return '购物备忘';
     if (RegExp('地铁|公交|打车|交通').hasMatch(text)) return '出行交通';
     if (RegExp('会议|项目|排期').hasMatch(text)) return '项目推进';
@@ -383,6 +391,26 @@ class NoteAnalysisSkill {
 
   bool _looksAction(String item) {
     return RegExp('要|需要|记得|提醒|安排|确认|购买|补|整理|处理|完成|看').hasMatch(item);
+  }
+
+  bool _isMeaningfulDiary(QuickNote note) {
+    if (note.noteType != QuickNoteType.diary) return false;
+    final text = _plain(note.content)
+        .replaceAll(RegExp(r'[#>*`\[\]\-_=|]'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    if (text.length < 12) return false;
+    if (RegExp(r'^\d{4}[-_\.年]\d{1,2}[-_\.月]\d{1,2}(日)?$').hasMatch(text)) {
+      return false;
+    }
+    final invalidPatterns = [
+      RegExp(r'^(无|暂无|今天无事|没什么|空|test|测试)$', caseSensitive: false),
+      RegExp(r'^(todo|日记|随手记|记录)$', caseSensitive: false),
+    ];
+    if (invalidPatterns.any((pattern) => pattern.hasMatch(text))) return false;
+    return RegExp(
+      '想|计划|需要|完成|问题|方案|复盘|今天|明天|工作|生活|学习|项目|购物|健康|情绪|灵感|决定|记录|总结|发现',
+    ).hasMatch(text);
   }
 
   bool _looksMaterial(String item) {
@@ -435,9 +463,9 @@ class NoteAnalysisSkill {
   }
 
   String _summaryOf(List<String> points, List<QuickNote> notes) {
-    if (points.isEmpty) return '已读取 ${notes.length} 条原始随手记，完成主题归纳。';
+    if (points.isEmpty) return '已读取 ${notes.length} 条文档/日记，完成主题归纳。';
     final merged = _dedupe(points).take(3).join('；');
-    return '已读取 ${notes.length} 条原始随手记，拆解并合并为：$merged。';
+    return '已读取 ${notes.length} 条文档/日记，拆解并合并为：$merged。';
   }
 
   String _summaryFromContent(String content) {

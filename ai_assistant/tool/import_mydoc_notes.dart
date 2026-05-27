@@ -41,6 +41,10 @@ void main(List<String> args) async {
     final stat = await file.stat();
     final date = parsed.date ?? stat.modified;
     final now = DateTime.now();
+    final noteType = _looksLikeDiaryTitle(parsed.title) ? 'diary' : 'document';
+    final importedAt = noteType == 'diary'
+        ? DateTime(date.year, date.month, date.day)
+        : now;
     byId[id] = {
       'id': id,
       'title': parsed.title,
@@ -48,13 +52,16 @@ void main(List<String> args) async {
       'summary': _summary(parsed.content),
       'tags': parsed.tags.map((name) => _tag(name, now)).toList(),
       'date': DateTime(date.year, date.month, date.day).toIso8601String(),
-      'createdAt': date.toIso8601String(),
-      'updatedAt': now.toIso8601String(),
+      'createdAt': importedAt.toIso8601String(),
+      'updatedAt': importedAt.toIso8601String(),
       'archived': false,
       'deleted': false,
       'analyzed': false,
       'isAnalysis': false,
-      'category': _category(relative, parsed.content),
+      'noteType': noteType,
+      'category': noteType == 'diary'
+          ? '日记'
+          : _category(relative, parsed.content),
       'subcategory': 'MyDoc',
       'sourceNoteIds': <String>[],
     };
@@ -127,6 +134,12 @@ _ParsedDoc _parseMarkdown(String raw, String relative) {
     tags: tags.take(6).toList(),
     date: date,
   );
+}
+
+bool _looksLikeDiaryTitle(String title) {
+  final text = title.trim();
+  return RegExp(r'^\d{4}[-_\.年]\d{1,2}[-_\.月]\d{1,2}(日)?$').hasMatch(text) ||
+      RegExp(r'^\d{8}$').hasMatch(text);
 }
 
 Map<String, dynamic> _tag(String name, DateTime now) {

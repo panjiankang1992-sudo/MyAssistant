@@ -21,16 +21,22 @@ void main(List<String> args) async {
   var changed = 0;
   for (final item in items) {
     final filename = _filenameCandidate(item);
-    if (filename == null) continue;
-    final date = _dateFromFilename(filename);
-    if (date == null) continue;
-    final iso = DateTime(date.year, date.month, date.day).toIso8601String();
-    final before = '${item['date']}|${item['createdAt']}|${item['updatedAt']}';
-    item
-      ..['date'] = iso
-      ..['createdAt'] = iso
-      ..['updatedAt'] = iso;
-    final after = '${item['date']}|${item['createdAt']}|${item['updatedAt']}';
+    final before =
+        '${item['date']}|${item['createdAt']}|${item['updatedAt']}|${item['noteType']}|${item['category']}';
+    final date = filename == null ? null : _dateFromFilename(filename);
+    if (date != null) {
+      final iso = DateTime(date.year, date.month, date.day).toIso8601String();
+      item
+        ..['date'] = iso
+        ..['createdAt'] = iso
+        ..['updatedAt'] = iso
+        ..['noteType'] = 'diary'
+        ..['category'] = '日记';
+    } else if (item['isAnalysis'] != true && item['noteType'] == null) {
+      item['noteType'] = 'document';
+    }
+    final after =
+        '${item['date']}|${item['createdAt']}|${item['updatedAt']}|${item['noteType']}|${item['category']}';
     if (before != after) changed++;
   }
 

@@ -1,5 +1,25 @@
 import 'tag.dart';
 
+enum QuickNoteType {
+  diary('diary'),
+  document('document');
+
+  final String value;
+  const QuickNoteType(this.value);
+
+  static QuickNoteType fromJson(String? value, String title) {
+    if (value == diary.value) return diary;
+    if (value == document.value) return document;
+    return looksLikeDiaryTitle(title) ? diary : document;
+  }
+}
+
+bool looksLikeDiaryTitle(String title) {
+  final text = title.trim();
+  return RegExp(r'^\d{4}[-_\.年]\d{1,2}[-_\.月]\d{1,2}(日)?$').hasMatch(text) ||
+      RegExp(r'^\d{8}$').hasMatch(text);
+}
+
 class QuickNote {
   final String id;
   final String title;
@@ -14,6 +34,7 @@ class QuickNote {
   final bool pinned;
   final bool analyzed;
   final bool isAnalysis;
+  final QuickNoteType noteType;
   final String category;
   final String subcategory;
   final List<String> sourceNoteIds;
@@ -32,6 +53,7 @@ class QuickNote {
     this.pinned = false,
     this.analyzed = false,
     this.isAnalysis = false,
+    this.noteType = QuickNoteType.document,
     this.category = '未分类',
     this.subcategory = '未归类',
     this.sourceNoteIds = const [],
@@ -51,6 +73,7 @@ class QuickNote {
     bool? pinned,
     bool? analyzed,
     bool? isAnalysis,
+    QuickNoteType? noteType,
     String? category,
     String? subcategory,
     List<String>? sourceNoteIds,
@@ -69,6 +92,7 @@ class QuickNote {
       pinned: pinned ?? this.pinned,
       analyzed: analyzed ?? this.analyzed,
       isAnalysis: isAnalysis ?? this.isAnalysis,
+      noteType: noteType ?? this.noteType,
       category: category ?? this.category,
       subcategory: subcategory ?? this.subcategory,
       sourceNoteIds: sourceNoteIds ?? this.sourceNoteIds,
@@ -101,6 +125,7 @@ class QuickNote {
     'pinned': pinned,
     'analyzed': analyzed,
     'isAnalysis': isAnalysis,
+    'noteType': noteType.value,
     'category': category,
     'subcategory': subcategory,
     'sourceNoteIds': sourceNoteIds,
@@ -139,6 +164,10 @@ class QuickNote {
       pinned: json['pinned'] as bool? ?? false,
       analyzed: json['analyzed'] as bool? ?? true,
       isAnalysis: json['isAnalysis'] as bool? ?? false,
+      noteType: QuickNoteType.fromJson(
+        json['noteType'] as String?,
+        json['title'] as String? ?? '',
+      ),
       category: json['category'] as String? ?? '未分类',
       subcategory: json['subcategory'] as String? ?? '未归类',
       sourceNoteIds: (json['sourceNoteIds'] as List? ?? const [])

@@ -159,7 +159,7 @@ class NotesPage extends ConsumerStatefulWidget {
 
 class _NotesPageState extends ConsumerState<NotesPage> {
   DateTime? _filterDate;
-  _NotesViewMode _mode = _NotesViewMode.raw;
+  _NotesViewMode _mode = _NotesViewMode.diary;
   _NotesLayoutMode _layoutMode = _NotesLayoutMode.list;
   bool _analyzing = false;
 
@@ -172,8 +172,15 @@ class _NotesPageState extends ConsumerState<NotesPage> {
     ).subtract(const Duration(days: 29));
     final result = notes.where((n) {
       if (n.deleted || n.archived || n.isAnalysis) return false;
-      if (_filterDate != null) return _isSameDay(n.date, _filterDate!);
-      return !n.date.isBefore(start);
+      if (_mode == _NotesViewMode.diary) {
+        if (n.noteType != QuickNoteType.diary) return false;
+        if (_filterDate != null) return _isSameDay(n.date, _filterDate!);
+        return !n.date.isBefore(start);
+      }
+      if (_mode == _NotesViewMode.document) {
+        return n.noteType == QuickNoteType.document;
+      }
+      return false;
     }).toList();
     result.sort((a, b) {
       if (a.pinned != b.pinned) return a.pinned ? -1 : 1;
@@ -185,7 +192,11 @@ class _NotesPageState extends ConsumerState<NotesPage> {
   Map<DateTime, int> _counts(List<QuickNote> notes) {
     final result = <DateTime, int>{};
     for (final note in notes.where(
-      (n) => !n.deleted && !n.archived && !n.isAnalysis,
+      (n) =>
+          !n.deleted &&
+          !n.archived &&
+          !n.isAnalysis &&
+          n.noteType == QuickNoteType.diary,
     )) {
       final day = DateTime(note.date.year, note.date.month, note.date.day);
       result[day] = (result[day] ?? 0) + 1;
@@ -243,7 +254,7 @@ class _NotesPageState extends ConsumerState<NotesPage> {
     final messenger = ScaffoldMessenger.of(context);
     messenger.showSnackBar(
       const SnackBar(
-        content: Text('正在归纳未分析的随手记...'),
+        content: Text('正在归纳未分析的文档和有效日记...'),
         duration: Duration(seconds: 1),
       ),
     );
@@ -254,7 +265,7 @@ class _NotesPageState extends ConsumerState<NotesPage> {
       if (!mounted) return;
       messenger.showSnackBar(
         SnackBar(
-          content: Text(count == 0 ? '没有新的随手记需要归纳' : '已归纳 $count 条随手记'),
+          content: Text(count == 0 ? '没有新的文档或有效日记需要归纳' : '已归纳 $count 条文档/日记'),
           backgroundColor: AppColors.success,
         ),
       );
@@ -308,7 +319,7 @@ class _NotesPageState extends ConsumerState<NotesPage> {
                         value: _mode,
                         onChanged: (mode) => setState(() => _mode = mode),
                       ),
-                      if (_mode == _NotesViewMode.raw) ...[
+                      if (_mode == _NotesViewMode.diary) ...[
                         const SizedBox(width: 10),
                         InkWell(
                           onTap: () => _pickDate(notes),
@@ -357,13 +368,20 @@ class _NotesPageState extends ConsumerState<NotesPage> {
                           onChanged: (value) =>
                               setState(() => _layoutMode = value),
                         ),
+                      ] else if (_mode == _NotesViewMode.document) ...[
+                        const SizedBox(width: 10),
+                        _LayoutToggleButton(
+                          value: _layoutMode,
+                          onChanged: (value) =>
+                              setState(() => _layoutMode = value),
+                        ),
                       ],
                       const Spacer(),
                       ProfileAvatarButton(onTap: widget.onAvatarTap),
                     ],
                   ),
                 ),
-                if (_filterDate != null && _mode == _NotesViewMode.raw)
+                if (_filterDate != null && _mode == _NotesViewMode.diary)
                   Align(
                     alignment: Alignment.centerLeft,
                     child: Padding(
@@ -376,7 +394,7 @@ class _NotesPageState extends ConsumerState<NotesPage> {
                     ),
                   ),
                 Expanded(
-                  child: _mode == _NotesViewMode.raw
+                  child: _mode != _NotesViewMode.analysis
                       ? (visible.isEmpty
                             ? const _NotesEmpty()
                             : _NotesCollection(
@@ -409,7 +427,7 @@ class _NotesPageState extends ConsumerState<NotesPage> {
                 ),
               ],
             ),
-            if (_mode == _NotesViewMode.raw)
+            if (_mode != _NotesViewMode.analysis)
               Positioned(
                 left: 0,
                 right: 0,
@@ -435,7 +453,7 @@ class _NotesPageState extends ConsumerState<NotesPage> {
   }
 }
 
-enum _NotesViewMode { raw, analysis }
+enum _NotesViewMode { diary, document, analysis }
 
 enum _NotesLayoutMode { list, grid }
 
@@ -970,7 +988,8 @@ class _NotesModeSegmented extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _modeItem('原始', _NotesViewMode.raw),
+          _modeItem('日记', _NotesViewMode.diary),
+          _modeItem('文档', _NotesViewMode.document),
           _modeItem('归纳', _NotesViewMode.analysis),
         ],
       ),
@@ -984,7 +1003,7 @@ class _NotesModeSegmented extends StatelessWidget {
       borderRadius: BorderRadius.circular(15),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        width: 66,
+        width: 62,
         height: 34,
         alignment: Alignment.center,
         decoration: BoxDecoration(
@@ -1026,7 +1045,7 @@ class _AnalysisLibrary extends StatelessWidget {
         child: Padding(
           padding: EdgeInsets.fromLTRB(24, 0, 24, 100),
           child: Text(
-            '还没有归纳文档，点击下方 AI 按钮开始分析未归纳的随手记',
+            '还没有归纳文档，点击下方 AI 按钮开始分析未归纳的文档和有效日记',
             textAlign: TextAlign.center,
             style: TextStyle(color: AppColors.textTertiary, fontSize: 15),
           ),

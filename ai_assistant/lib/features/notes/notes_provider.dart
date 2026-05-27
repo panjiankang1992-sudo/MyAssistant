@@ -30,7 +30,22 @@ class NotesNotifier extends Notifier<List<QuickNote>> {
         if (note.summary.trim().isEmpty && note.content.trim().isNotEmpty)
           () {
             changed = true;
-            return note.copyWith(summary: _summaryOf(note.content));
+            return note.copyWith(
+              summary: _summaryOf(note.content),
+              noteType: !note.isAnalysis && looksLikeDiaryTitle(note.title)
+                  ? QuickNoteType.diary
+                  : note.noteType,
+              category: !note.isAnalysis && looksLikeDiaryTitle(note.title)
+                  ? '日记'
+                  : note.category,
+            );
+          }()
+        else if (!note.isAnalysis &&
+            note.noteType != QuickNoteType.diary &&
+            looksLikeDiaryTitle(note.title))
+          () {
+            changed = true;
+            return note.copyWith(noteType: QuickNoteType.diary, category: '日记');
           }()
         else
           note,
@@ -64,6 +79,9 @@ class NotesNotifier extends Notifier<List<QuickNote>> {
                   date: DateTime(date.year, date.month, date.day),
                   createdAt: now,
                   updatedAt: now,
+                  noteType: looksLikeDiaryTitle(title)
+                      ? QuickNoteType.diary
+                      : QuickNoteType.document,
                 ))
             .copyWith(
               title: title,
@@ -77,8 +95,15 @@ class NotesNotifier extends Notifier<List<QuickNote>> {
               date: DateTime(date.year, date.month, date.day),
               updatedAt: now,
               analyzed: initial?.isAnalysis == true ? true : false,
+              noteType:
+                  initial?.noteType ??
+                  (looksLikeDiaryTitle(title)
+                      ? QuickNoteType.diary
+                      : QuickNoteType.document),
               category: initial?.isAnalysis == true
                   ? initial!.category
+                  : looksLikeDiaryTitle(title)
+                  ? '日记'
                   : _inferCategory(title, content, tags),
             );
     final next = [
