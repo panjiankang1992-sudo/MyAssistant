@@ -15,11 +15,13 @@ class ChatBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final isUser = message.role == ChatRole.user;
     final screenWidth = MediaQuery.of(context).size.width;
-    final maxWidth = screenWidth > 1100 ? 820.0 : screenWidth * 0.78;
+    final maxWidth = isUser
+        ? (screenWidth > 1100 ? 620.0 : screenWidth * 0.72)
+        : (screenWidth > 1100 ? 860.0 : screenWidth * 0.86);
     final time = DateFormat('HH:mm').format(message.timestamp);
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Align(
         alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
         child: ConstrainedBox(
@@ -45,103 +47,181 @@ class _AgentMessage extends StatelessWidget {
     final isTool =
         message.type == ChatMessageType.toolCall ||
         message.type == ChatMessageType.result;
+    final toneColor = isError
+        ? AppColors.danger
+        : isTool
+        ? AppColors.success
+        : AppColors.primary;
+    final title = isError
+        ? '处理异常'
+        : isTool
+        ? '执行结果'
+        : 'MyAssistant';
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          width: 32,
-          height: 32,
-          margin: const EdgeInsets.only(top: 2),
-          decoration: BoxDecoration(
-            color: isError
-                ? AppColors.danger.withValues(alpha: 0.08)
-                : AppColors.primary.withValues(alpha: 0.09),
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: isError
-                  ? AppColors.danger.withValues(alpha: 0.16)
-                  : AppColors.primary.withValues(alpha: 0.14),
-            ),
-          ),
-          child: Icon(
-            isError ? Icons.error_outline_rounded : Icons.auto_awesome_rounded,
-            size: 16,
-            color: isError ? AppColors.danger : AppColors.primary,
-          ),
-        ),
-        const SizedBox(width: 10),
+        _AssistantAvatar(color: toneColor, isError: isError),
+        const SizedBox(width: 12),
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Text(
-                    'MyAssistant',
-                    style: TextStyle(
-                      fontFamily: 'PingFang SC',
-                      fontFamilyFallback: [
-                        '.SF Pro Text',
-                        'system-ui',
-                        'sans-serif',
-                      ],
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    time,
-                    style: const TextStyle(
-                      fontFamily: 'PingFang SC',
-                      fontFamilyFallback: [
-                        '.SF Pro Text',
-                        'system-ui',
-                        'sans-serif',
-                      ],
-                      fontSize: 11,
-                      fontWeight: FontWeight.w400,
-                      color: AppColors.textTertiary,
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  _CopyMessageButton(content: message.content),
-                ],
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 15),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(8),
+                topRight: Radius.circular(22),
+                bottomLeft: Radius.circular(22),
+                bottomRight: Radius.circular(22),
               ),
-              const SizedBox(height: 6),
-              Container(
-                padding: EdgeInsets.symmetric(
-                  horizontal: isTool || isError ? 12 : 0,
-                  vertical: isTool || isError ? 10 : 0,
-                ),
-                decoration: BoxDecoration(
-                  color: isError
-                      ? AppColors.danger.withValues(alpha: 0.06)
-                      : isTool
-                      ? AppColors.inputBg
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(12),
-                  border: isError
-                      ? Border.all(
-                          color: AppColors.danger.withValues(alpha: 0.14),
-                        )
-                      : isTool
-                      ? Border.all(color: AppColors.border)
-                      : null,
-                ),
-                child: MarkdownBody(
-                  data: message.content,
-                  shrinkWrap: true,
-                  selectable: true,
-                  styleSheet: _markdownStyle(context, isError: isError),
-                ),
+              border: Border.all(
+                color: AppColors.border.withValues(alpha: 0.7),
               ),
-            ],
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.045),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 9,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: toneColor.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            isError
+                                ? Icons.error_outline_rounded
+                                : isTool
+                                ? Icons.task_alt_rounded
+                                : Icons.auto_awesome_rounded,
+                            size: 13,
+                            color: toneColor,
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            title,
+                            style: TextStyle(
+                              fontFamily: 'PingFang SC',
+                              fontFamilyFallback: const [
+                                '.SF Pro Text',
+                                'system-ui',
+                                'sans-serif',
+                              ],
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                              color: toneColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      time,
+                      style: TextStyle(
+                        fontFamily: 'PingFang SC',
+                        fontFamilyFallback: const [
+                          '.SF Pro Text',
+                          'system-ui',
+                          'sans-serif',
+                        ],
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textTertiary.withValues(alpha: 0.9),
+                      ),
+                    ),
+                    const Spacer(),
+                    _CopyMessageButton(content: message.content),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.all(isTool || isError ? 12 : 0),
+                  decoration: BoxDecoration(
+                    color: isError
+                        ? AppColors.danger.withValues(alpha: 0.06)
+                        : isTool
+                        ? AppColors.success.withValues(alpha: 0.06)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(16),
+                    border: isError
+                        ? Border.all(
+                            color: AppColors.danger.withValues(alpha: 0.14),
+                          )
+                        : isTool
+                        ? Border.all(
+                            color: AppColors.success.withValues(alpha: 0.12),
+                          )
+                        : null,
+                  ),
+                  child: MarkdownBody(
+                    data: message.content,
+                    shrinkWrap: true,
+                    selectable: true,
+                    styleSheet: _markdownStyle(context, isError: isError),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ],
+    );
+  }
+}
+
+class _AssistantAvatar extends StatelessWidget {
+  final Color color;
+  final bool isError;
+
+  const _AssistantAvatar({required this.color, required this.isError});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 38,
+      height: 38,
+      margin: const EdgeInsets.only(top: 4),
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(
+          colors: isError
+              ? [
+                  AppColors.danger.withValues(alpha: 0.95),
+                  const Color(0xFFFF9B8F),
+                ]
+              : [AppColors.primary, const Color(0xFF60A5FA)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.18),
+            blurRadius: 16,
+            offset: const Offset(0, 7),
+          ),
+        ],
+      ),
+      child: Icon(
+        isError ? Icons.priority_high_rounded : Icons.auto_awesome_rounded,
+        size: 19,
+        color: Colors.white,
+      ),
     );
   }
 }
@@ -160,23 +240,23 @@ MarkdownStyleSheet _markdownStyle(
       fontFamily: fontFamily,
       fontFamilyFallback: fallback,
       fontSize: 15,
-      height: 1.55,
-      fontWeight: FontWeight.w400,
+      height: 1.62,
+      fontWeight: FontWeight.w500,
       color: textColor,
     ),
     strong: TextStyle(
       fontFamily: fontFamily,
       fontFamilyFallback: fallback,
       fontSize: 15,
-      height: 1.55,
-      fontWeight: FontWeight.w700,
+      height: 1.62,
+      fontWeight: FontWeight.w900,
       color: textColor,
     ),
     em: TextStyle(
       fontFamily: fontFamily,
       fontFamilyFallback: fallback,
       fontSize: 15,
-      height: 1.55,
+      height: 1.62,
       fontStyle: FontStyle.italic,
       color: textColor,
     ),
@@ -184,13 +264,13 @@ MarkdownStyleSheet _markdownStyle(
       fontFamily: fontFamily,
       fontFamilyFallback: fallback,
       fontSize: 15,
-      height: 1.55,
+      height: 1.62,
       color: textColor,
     ),
     h1: TextStyle(
       fontFamily: fontFamily,
       fontFamilyFallback: fallback,
-      fontSize: 20,
+      fontSize: 19,
       height: 1.35,
       fontWeight: FontWeight.w700,
       color: textColor,
@@ -198,7 +278,7 @@ MarkdownStyleSheet _markdownStyle(
     h2: TextStyle(
       fontFamily: fontFamily,
       fontFamilyFallback: fallback,
-      fontSize: 18,
+      fontSize: 17,
       height: 1.35,
       fontWeight: FontWeight.w700,
       color: textColor,
@@ -214,16 +294,16 @@ MarkdownStyleSheet _markdownStyle(
     code: TextStyle(
       fontFamily: 'Menlo',
       fontFamilyFallback: const ['SF Mono', 'monospace'],
-      fontSize: 13,
-      height: 1.45,
+      fontSize: 12.5,
+      height: 1.55,
       color: textColor,
-      backgroundColor: AppColors.inputBg,
+      backgroundColor: Colors.transparent,
     ),
-    codeblockPadding: const EdgeInsets.all(12),
+    codeblockPadding: const EdgeInsets.all(14),
     codeblockDecoration: BoxDecoration(
-      color: AppColors.inputBg,
-      borderRadius: BorderRadius.circular(10),
-      border: Border.all(color: AppColors.border),
+      color: const Color(0xFFF6F8FB),
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: AppColors.border.withValues(alpha: 0.8)),
     ),
     blockquote: TextStyle(
       fontFamily: fontFamily,
@@ -234,8 +314,8 @@ MarkdownStyleSheet _markdownStyle(
     ),
     blockquotePadding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
     blockquoteDecoration: BoxDecoration(
-      color: AppColors.inputBg,
-      borderRadius: BorderRadius.circular(10),
+      color: AppColors.primary.withValues(alpha: 0.055),
+      borderRadius: BorderRadius.circular(14),
       border: Border(
         left: BorderSide(
           color: AppColors.primary.withValues(alpha: 0.35),
@@ -257,10 +337,12 @@ MarkdownStyleSheet _markdownStyle(
       height: 1.45,
       color: textColor,
     ),
-    tableBorder: TableBorder.all(color: AppColors.border),
-    tableCellsPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-    blockSpacing: 10,
-    listIndent: 26,
+    tableBorder: TableBorder.all(
+      color: AppColors.border.withValues(alpha: 0.8),
+    ),
+    tableCellsPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+    blockSpacing: 12,
+    listIndent: 22,
     horizontalRuleDecoration: const BoxDecoration(
       border: Border(top: BorderSide(color: AppColors.border)),
     ),
@@ -279,20 +361,24 @@ class _UserMessage extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
-            color: AppColors.primary,
+            gradient: const LinearGradient(
+              colors: [Color(0xFF0875E1), Color(0xFF2F88FF)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
             borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(18),
-              topRight: Radius.circular(18),
-              bottomLeft: Radius.circular(18),
+              topLeft: Radius.circular(22),
+              topRight: Radius.circular(8),
+              bottomLeft: Radius.circular(22),
               bottomRight: Radius.circular(6),
             ),
             boxShadow: [
               BoxShadow(
                 color: AppColors.primary.withValues(alpha: 0.16),
-                blurRadius: 16,
-                offset: const Offset(0, 8),
+                blurRadius: 18,
+                offset: const Offset(0, 9),
               ),
             ],
           ),
@@ -302,13 +388,13 @@ class _UserMessage extends StatelessWidget {
               fontFamily: 'PingFang SC',
               fontFamilyFallback: ['.SF Pro Text', 'system-ui', 'sans-serif'],
               fontSize: 15,
-              height: 1.42,
-              fontWeight: FontWeight.w500,
+              height: 1.45,
+              fontWeight: FontWeight.w800,
               color: Colors.white,
             ),
           ),
         ),
-        const SizedBox(height: 5),
+        const SizedBox(height: 6),
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [

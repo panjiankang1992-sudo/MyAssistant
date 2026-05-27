@@ -329,18 +329,30 @@ class _ChatListState extends State<_ChatList> {
 
   @override
   Widget build(BuildContext context) {
-    return ListView.builder(
-      controller: _controller,
-      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-      padding: const EdgeInsets.fromLTRB(24, 18, 24, 28),
-      itemCount: widget.messages.length + (widget.isRunning ? 1 : 0),
-      itemBuilder: (context, index) {
-        if (index == widget.messages.length) {
-          return const _TypingIndicator();
-        }
-        final message = widget.messages[index];
-        return ChatBubble(message: message);
-      },
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            AppColors.scaffoldBg,
+            AppColors.primary.withValues(alpha: 0.025),
+          ],
+        ),
+      ),
+      child: ListView.builder(
+        controller: _controller,
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        padding: const EdgeInsets.fromLTRB(24, 18, 24, 28),
+        itemCount: widget.messages.length + (widget.isRunning ? 1 : 0),
+        itemBuilder: (context, index) {
+          if (index == widget.messages.length) {
+            return const _TypingIndicator();
+          }
+          final message = widget.messages[index];
+          return ChatBubble(message: message);
+        },
+      ),
     );
   }
 }
