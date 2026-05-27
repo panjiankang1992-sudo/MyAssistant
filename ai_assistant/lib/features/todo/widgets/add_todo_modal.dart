@@ -855,83 +855,21 @@ class _AddTodoModalContentState extends ConsumerState<_AddTodoModalContent>
           left: 0,
           right: 0,
           bottom: 0,
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 18),
-            decoration: BoxDecoration(
-              color: AppColors.surface.withValues(alpha: 0.96),
-              border: const Border(top: BorderSide(color: AppColors.border)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.06),
-                  blurRadius: 18,
-                  offset: const Offset(0, -8),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: SizedBox(
-                    height: 46,
-                    child: ElevatedButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.inputBg,
-                        foregroundColor: AppColors.text,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(24),
-                          side: const BorderSide(color: AppColors.border),
-                        ),
-                      ),
-                      child: const Text(
-                        '取消',
-                        style: TextStyle(
-                          fontFamily: 'PingFang SC',
-                          fontFamilyFallback: [
-                            '.SF Pro Text',
-                            'system-ui',
-                            'sans-serif',
-                          ],
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: SizedBox(
-                    height: 46,
-                    child: ElevatedButton(
-                      onPressed: _saveManual,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(24),
-                        ),
-                      ),
-                      child: const Text(
-                        '保存',
-                        style: TextStyle(
-                          fontFamily: 'PingFang SC',
-                          fontFamilyFallback: [
-                            '.SF Pro Text',
-                            'system-ui',
-                            'sans-serif',
-                          ],
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+          child: AppFloatingActionBar(
+            actions: [
+              AppBottomAction(
+                label: '取消',
+                icon: Icons.close_rounded,
+                onPressed: () => Navigator.of(context).pop(),
+                tone: AppActionButtonTone.neutral,
+              ),
+              AppBottomAction(
+                label: '保存',
+                icon: Icons.check_rounded,
+                onPressed: _saveManual,
+                tone: AppActionButtonTone.primary,
+              ),
+            ],
           ),
         );
       },

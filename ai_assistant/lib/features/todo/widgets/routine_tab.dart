@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../../domain/models/routine.dart';
 import '../../../domain/models/tag.dart';
+import '../../../shared/widgets/app_controls.dart';
 import '../../../shared/widgets/edge_swipe_pop.dart';
 import '../../../core/providers/core_providers.dart';
 import '../providers/routine_provider.dart';
@@ -629,75 +630,21 @@ class _RoutineEditorPageState extends State<_RoutineEditorPage> {
                       left: 0,
                       right: 0,
                       bottom: 0,
-                      child: Container(
-                        padding: const EdgeInsets.fromLTRB(20, 12, 20, 18),
-                        decoration: BoxDecoration(
-                          color: AppColors.surface.withValues(alpha: 0.96),
-                          border: const Border(
-                            top: BorderSide(color: AppColors.border),
+                      child: AppFloatingActionBar(
+                        actions: [
+                          AppBottomAction(
+                            label: '取消',
+                            icon: Icons.close_rounded,
+                            onPressed: () => Navigator.of(context).pop(),
+                            tone: AppActionButtonTone.neutral,
                           ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.06),
-                              blurRadius: 18,
-                              offset: const Offset(0, -8),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: SizedBox(
-                                height: 46,
-                                child: ElevatedButton(
-                                  onPressed: () => Navigator.of(context).pop(),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppColors.inputBg,
-                                    foregroundColor: AppColors.text,
-                                    elevation: 0,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(24),
-                                      side: const BorderSide(
-                                        color: AppColors.border,
-                                      ),
-                                    ),
-                                  ),
-                                  child: const Text(
-                                    '取消',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: SizedBox(
-                                height: 46,
-                                child: ElevatedButton(
-                                  onPressed: _save,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppColors.primary,
-                                    foregroundColor: Colors.white,
-                                    elevation: 0,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(24),
-                                    ),
-                                  ),
-                                  child: Text(
-                                    widget.saveLabel,
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
+                          AppBottomAction(
+                            label: widget.saveLabel,
+                            icon: Icons.check_rounded,
+                            onPressed: _save,
+                            tone: AppActionButtonTone.primary,
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -954,42 +901,16 @@ class _RoutineTabState extends ConsumerState<RoutineTab> {
           left: 20,
           right: 20,
           bottom: 12,
-          child: Container(
-            padding: const EdgeInsets.only(top: 10),
-            decoration: BoxDecoration(
-              color: AppColors.surface.withValues(alpha: 0.96),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.surface.withValues(alpha: 0.96),
-                  blurRadius: 18,
-                  spreadRadius: 12,
-                  offset: const Offset(0, -8),
-                ),
-              ],
-            ),
-            child: SizedBox(
-              width: double.infinity,
-              height: 44,
-              child: ElevatedButton(
+          child: AppFloatingActionBar(
+            padding: EdgeInsets.zero,
+            actions: [
+              AppBottomAction(
+                label: '新增例行',
+                icon: Icons.add_rounded,
                 onPressed: _showAddDialog,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(25),
-                  ),
-                ),
-                child: const Text(
-                  '新增例行',
-                  style: TextStyle(
-                    fontFamily: 'PingFang SC',
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
+                tone: AppActionButtonTone.primary,
               ),
-            ),
+            ],
           ),
         ),
       ],

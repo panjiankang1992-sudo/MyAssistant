@@ -17,6 +17,7 @@ import '../../core/providers/core_providers.dart';
 import '../../data/datasources/webdav_datasource.dart';
 import '../../domain/models/tag.dart';
 import '../../shared/widgets/app_controls.dart';
+import '../../shared/widgets/edge_swipe_pop.dart';
 import '../../shared/widgets/profile_avatar_button.dart';
 import '../../shared/widgets/tag_chip.dart';
 import '../ai_settings/ai_model_provider.dart';
@@ -804,7 +805,7 @@ class _BookkeepingPageState extends ConsumerState<BookkeepingPage> {
                 selectedDate: _selectedDate,
                 expense: expense,
                 income: income,
-                onEntryTap: _editEntry,
+                onEntryTap: _showEntryDetail,
                 onEntryDelete: _deleteEntry,
               ),
             ),
@@ -822,6 +823,15 @@ class _BookkeepingPageState extends ConsumerState<BookkeepingPage> {
           onCategoriesChanged: _markBillCategoriesDirty,
         ),
       ),
+    );
+  }
+
+  void _showEntryDetail(LedgerEntry entry) {
+    showLedgerDetailPage(
+      context,
+      entry: entry,
+      onEdit: _editEntry,
+      onDelete: _deleteEntry,
     );
   }
 
@@ -1071,6 +1081,426 @@ class _SummaryCard extends StatelessWidget {
                 style: const TextStyle(color: AppColors.primary),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+void showLedgerDetailPage(
+  BuildContext context, {
+  required LedgerEntry entry,
+  required ValueChanged<LedgerEntry> onEdit,
+  required ValueChanged<LedgerEntry> onDelete,
+}) {
+  showGeneralDialog(
+    context: context,
+    barrierDismissible: true,
+    barrierLabel: '关闭账单详情',
+    barrierColor: Colors.black.withValues(alpha: 0.12),
+    transitionDuration: const Duration(milliseconds: 260),
+    pageBuilder: (context, animation, secondaryAnimation) {
+      return _LedgerDetailPage(
+        entry: entry,
+        onEdit: onEdit,
+        onDelete: onDelete,
+      );
+    },
+    transitionBuilder: (context, animation, secondaryAnimation, child) {
+      return SlideTransition(
+        position: Tween<Offset>(begin: const Offset(1, 0), end: Offset.zero)
+            .animate(
+              CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+            ),
+        child: child,
+      );
+    },
+  );
+}
+
+class _LedgerDetailPage extends StatelessWidget {
+  final LedgerEntry entry;
+  final ValueChanged<LedgerEntry> onEdit;
+  final ValueChanged<LedgerEntry> onDelete;
+
+  const _LedgerDetailPage({
+    required this.entry,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  Future<void> _confirmDelete(BuildContext context) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('删除账单'),
+        content: Text(
+          '确定删除「${entry.categoryName} ${_money(entry.cnyAmount)}」吗？',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('删除', style: TextStyle(color: AppColors.danger)),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+    Navigator.of(context).pop();
+    onDelete(entry);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final category = _findCategory(entry.categoryName);
+    final sign = entry.kind == LedgerKind.expense ? '-' : '+';
+    final amountColor = entry.kind == LedgerKind.expense
+        ? AppColors.danger
+        : AppColors.success;
+    final kindLabel = entry.kind == LedgerKind.expense ? '支出' : '收入';
+    return EdgeSwipePop(
+      child: Material(
+        color: AppColors.scaffoldBg,
+        child: SafeArea(
+          child: Stack(
+            children: [
+              ListView(
+                padding: const EdgeInsets.fromLTRB(24, 24, 24, 128),
+                children: [
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          '详细信息',
+                          style: TextStyle(
+                            fontSize: 26,
+                            fontWeight: FontWeight.w900,
+                            color: AppColors.text,
+                          ),
+                        ),
+                      ),
+                      AppRoundIconButton(
+                        tooltip: '关闭',
+                        icon: Icons.close_rounded,
+                        onPressed: () => Navigator.of(context).pop(),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 44),
+                  Center(
+                    child: _CategoryIcon(
+                      category: category,
+                      size: 150,
+                      emoji: entry.categoryEmoji,
+                    ),
+                  ),
+                  const SizedBox(height: 40),
+                  _LedgerDetailMainCard(
+                    entry: entry,
+                    category: category,
+                    sign: sign,
+                    amountColor: amountColor,
+                    kindLabel: kindLabel,
+                  ),
+                  const SizedBox(height: 18),
+                  _LedgerDetailInfoCard(entry: entry),
+                ],
+              ),
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: AppFloatingActionBar(
+                  actions: [
+                    AppBottomAction(
+                      label: '删除',
+                      icon: Icons.delete_outline_rounded,
+                      onPressed: () => _confirmDelete(context),
+                      tone: AppActionButtonTone.danger,
+                    ),
+                    AppBottomAction(
+                      label: '编辑账单',
+                      icon: Icons.edit_rounded,
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        onEdit(entry);
+                      },
+                      tone: AppActionButtonTone.primary,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LedgerDetailMainCard extends StatelessWidget {
+  final LedgerEntry entry;
+  final LedgerCategory category;
+  final String sign;
+  final Color amountColor;
+  final String kindLabel;
+
+  const _LedgerDetailMainCard({
+    required this.entry,
+    required this.category,
+    required this.sign,
+    required this.amountColor,
+    required this.kindLabel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(22, 22, 22, 24),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: AppAnimations.elevatedShadow(),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              _CategoryIcon(
+                category: category,
+                size: 42,
+                emoji: entry.categoryEmoji,
+              ),
+              const SizedBox(width: 12),
+              Text(
+                entry.categoryName,
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const Spacer(),
+              _LedgerKindPill(label: kindLabel, color: amountColor),
+            ],
+          ),
+          const SizedBox(height: 26),
+          Text(
+            '$sign${entry.amount.toStringAsFixed(2)}',
+            style: TextStyle(
+              fontSize: 46,
+              fontWeight: FontWeight.w900,
+              color: amountColor,
+            ),
+          ),
+          const SizedBox(height: 18),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: AppColors.inputBg,
+              borderRadius: BorderRadius.circular(22),
+            ),
+            child: Text(
+              entry.note.isEmpty ? '这笔账单暂时没有备注，当前重点展示金额、时间和分类信息。' : entry.note,
+              style: const TextStyle(
+                fontSize: 15,
+                height: 1.6,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+          const SizedBox(height: 18),
+          Row(
+            children: [
+              Expanded(
+                child: _LedgerDetailInfoTile(
+                  title: '账单时间',
+                  value: _formatLedgerDateTime(entry.date),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _LedgerDetailInfoTile(
+                  title: '商品概览',
+                  value: entry.note.isEmpty ? '无商品明细' : entry.note,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LedgerDetailInfoCard extends StatelessWidget {
+  final LedgerEntry entry;
+
+  const _LedgerDetailInfoCard({required this.entry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(22, 22, 22, 24),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: AppAnimations.elevatedShadow(),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  '详细信息',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 7,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.inputBg,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: const Text(
+                  '账单档案',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          const _LedgerDetailLine(label: '记账人', value: '禹宇天'),
+          _LedgerDetailLine(label: '账单分类', value: entry.categoryName),
+          _LedgerDetailLine(
+            label: '金额',
+            value: '${entry.currency} ${entry.amount.toStringAsFixed(2)}',
+          ),
+          if (entry.tags.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: entry.tags
+                  .map(
+                    (tag) => TagChip.fromTag(
+                      label: tag.name,
+                      colorKey: tag.colorKey,
+                    ),
+                  )
+                  .toList(),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _LedgerKindPill extends StatelessWidget {
+  final String label;
+  final Color color;
+
+  const _LedgerKindPill({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(fontWeight: FontWeight.w900, color: color),
+      ),
+    );
+  }
+}
+
+class _LedgerDetailInfoTile extends StatelessWidget {
+  final String title;
+  final String value;
+
+  const _LedgerDetailInfoTile({required this.title, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.inputBg,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LedgerDetailLine extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _LedgerDetailLine({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 13),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 92,
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontWeight: FontWeight.w800,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
+            ),
           ),
         ],
       ),
@@ -3482,3 +3912,9 @@ String _currencyName(String code) {
 }
 
 String _money(double value) => '¥ ${value.toStringAsFixed(2)}';
+
+String _formatLedgerDateTime(DateTime date) {
+  String two(int value) => value.toString().padLeft(2, '0');
+  return '${date.year}-${two(date.month)}-${two(date.day)} '
+      '${two(date.hour)}:${two(date.minute)}:${two(date.second)}';
+}
