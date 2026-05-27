@@ -270,6 +270,173 @@ class AppDateMarker {
 
 typedef AppDateMarkerBuilder = AppDateMarker? Function(DateTime date);
 
+enum AppActionButtonTone { primary, danger, neutral }
+
+class AppRoundIconButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback? onPressed;
+  final String? tooltip;
+  final Color? foregroundColor;
+
+  const AppRoundIconButton({
+    super.key,
+    required this.icon,
+    this.onPressed,
+    this.tooltip,
+    this.foregroundColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      tooltip: tooltip,
+      onPressed: onPressed,
+      icon: Icon(icon, size: 28),
+      style: IconButton.styleFrom(
+        fixedSize: const Size(58, 58),
+        minimumSize: const Size(58, 58),
+        maximumSize: const Size(58, 58),
+        backgroundColor: AppColors.inputBg.withValues(alpha: 0.95),
+        foregroundColor: foregroundColor ?? AppColors.text,
+        disabledForegroundColor: AppColors.textTertiary.withValues(alpha: 0.45),
+        shape: const CircleBorder(),
+        elevation: 0,
+      ),
+    );
+  }
+}
+
+class AppBottomAction {
+  final String label;
+  final IconData? icon;
+  final VoidCallback onPressed;
+  final AppActionButtonTone tone;
+
+  const AppBottomAction({
+    required this.label,
+    required this.onPressed,
+    this.icon,
+    this.tone = AppActionButtonTone.primary,
+  });
+}
+
+class AppFloatingActionBar extends StatelessWidget {
+  final List<AppBottomAction> actions;
+  final EdgeInsets padding;
+
+  const AppFloatingActionBar({
+    super.key,
+    required this.actions,
+    this.padding = const EdgeInsets.fromLTRB(22, 10, 22, 18),
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: padding,
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.96),
+          borderRadius: BorderRadius.circular(34),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.85)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.12),
+              blurRadius: 24,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            for (var i = 0; i < actions.length; i++) ...[
+              if (i > 0) const SizedBox(width: 10),
+              Expanded(child: AppPillActionButton(action: actions[i])),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class AppPillActionButton extends StatelessWidget {
+  final AppBottomAction action;
+  final double height;
+
+  const AppPillActionButton({
+    super.key,
+    required this.action,
+    this.height = 58,
+  });
+
+  Color get _background {
+    switch (action.tone) {
+      case AppActionButtonTone.primary:
+        return const Color(0xFF5B5CF6);
+      case AppActionButtonTone.danger:
+        return const Color(0xFFE62D27);
+      case AppActionButtonTone.neutral:
+        return AppColors.inputBg;
+    }
+  }
+
+  Color get _foreground {
+    switch (action.tone) {
+      case AppActionButtonTone.primary:
+      case AppActionButtonTone.danger:
+        return Colors.white;
+      case AppActionButtonTone.neutral:
+        return AppColors.text;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: height,
+      child: ElevatedButton(
+        onPressed: action.onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: _background,
+          foregroundColor: _foreground,
+          elevation: 0,
+          shadowColor: Colors.transparent,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(28),
+            side: action.tone == AppActionButtonTone.neutral
+                ? BorderSide(color: AppColors.border.withValues(alpha: 0.8))
+                : BorderSide.none,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (action.icon != null) ...[
+              Icon(action.icon, size: 22),
+              const SizedBox(width: 8),
+            ],
+            Flexible(
+              child: Text(
+                action.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 Future<DateTime?> showAppDatePicker({
   required BuildContext context,
   required DateTime initialDate,

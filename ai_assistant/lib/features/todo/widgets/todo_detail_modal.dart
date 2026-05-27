@@ -114,6 +114,29 @@ class _TodoDetailSheetState extends ConsumerState<_TodoDetailSheet> {
     if (mounted) Navigator.of(context).pop();
   }
 
+  Future<void> _delete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('删除待办'),
+        content: Text('确定删除「${widget.todo.title}」吗？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('删除', style: TextStyle(color: AppColors.danger)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    await ref.read(todoNotifierProvider.notifier).deleteTodo(widget.todo.id);
+    if (mounted) Navigator.of(context).pop();
+  }
+
   @override
   Widget build(BuildContext context) {
     return EdgeSwipePop(
@@ -130,10 +153,10 @@ class _TodoDetailSheetState extends ConsumerState<_TodoDetailSheet> {
                   padding: const EdgeInsets.fromLTRB(10, 14, 16, 10),
                   child: Row(
                     children: [
-                      IconButton(
+                      AppRoundIconButton(
                         tooltip: '返回',
                         onPressed: () => Navigator.of(context).pop(),
-                        icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                        icon: Icons.arrow_back_ios_new_rounded,
                       ),
                       Expanded(
                         child: Text(
@@ -145,10 +168,10 @@ class _TodoDetailSheetState extends ConsumerState<_TodoDetailSheet> {
                           ),
                         ),
                       ),
-                      IconButton(
+                      AppRoundIconButton(
                         tooltip: '关闭',
                         onPressed: () => Navigator.of(context).pop(),
-                        icon: const Icon(Icons.close_rounded),
+                        icon: Icons.close_rounded,
                       ),
                     ],
                   ),
@@ -353,8 +376,8 @@ class _TodoDetailSheetState extends ConsumerState<_TodoDetailSheet> {
             rightOnPressed: _save,
           )
         : _buildButtons(
-            leftLabel: '关闭',
-            leftOnPressed: () => Navigator.of(context).pop(),
+            leftLabel: '删除',
+            leftOnPressed: _delete,
             rightLabel: '编辑',
             rightOnPressed: () => setState(() => _editing = true),
           );
@@ -488,31 +511,25 @@ class _TodoDetailSheetState extends ConsumerState<_TodoDetailSheet> {
     required String rightLabel,
     required VoidCallback rightOnPressed,
   }) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(0, 14, 0, 0),
-      decoration: BoxDecoration(
-        color: AppColors.surface.withValues(alpha: 0.98),
-        border: const Border(top: BorderSide(color: AppColors.border)),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: _DetailBottomButton(
-              label: leftLabel,
-              onPressed: leftOnPressed,
-              primary: false,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: _DetailBottomButton(
-              label: rightLabel,
-              onPressed: rightOnPressed,
-              primary: true,
-            ),
-          ),
-        ],
-      ),
+    return AppFloatingActionBar(
+      actions: [
+        AppBottomAction(
+          label: leftLabel,
+          icon: leftLabel == '删除'
+              ? Icons.delete_outline_rounded
+              : Icons.close_rounded,
+          onPressed: leftOnPressed,
+          tone: leftLabel == '删除'
+              ? AppActionButtonTone.danger
+              : AppActionButtonTone.neutral,
+        ),
+        AppBottomAction(
+          label: rightLabel,
+          icon: rightLabel == '编辑' ? Icons.edit_rounded : Icons.check_rounded,
+          onPressed: rightOnPressed,
+          tone: AppActionButtonTone.primary,
+        ),
+      ],
     );
   }
 }
@@ -615,51 +632,6 @@ class _DetailInfoRow extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _DetailBottomButton extends StatelessWidget {
-  final String label;
-  final VoidCallback onPressed;
-  final bool primary;
-
-  const _DetailBottomButton({
-    required this.label,
-    required this.onPressed,
-    required this.primary,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 46,
-      child: ElevatedButton(
-        onPressed: onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: primary ? AppColors.primary : AppColors.inputBg,
-          foregroundColor: primary ? Colors.white : AppColors.text,
-          elevation: 0,
-          shadowColor: Colors.transparent,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
-            side: BorderSide(
-              color: primary
-                  ? AppColors.primary
-                  : AppColors.border.withValues(alpha: 0.9),
-            ),
-          ),
-        ),
-        child: Text(
-          label,
-          style: const TextStyle(
-            fontFamily: 'PingFang SC',
-            fontFamilyFallback: ['.SF Pro Text', 'system-ui', 'sans-serif'],
-            fontSize: 14,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ),
     );
   }
 }

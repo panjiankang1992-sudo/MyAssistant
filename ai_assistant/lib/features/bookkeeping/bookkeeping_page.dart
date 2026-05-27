@@ -1375,9 +1375,9 @@ class _StatsPageState extends State<_StatsPage> {
                             ),
                           ),
                           const Spacer(),
-                          IconButton(
+                          AppRoundIconButton(
                             onPressed: () => Navigator.of(context).pop(),
-                            icon: const Icon(Icons.close_rounded),
+                            icon: Icons.close_rounded,
                           ),
                         ],
                       ),
@@ -2643,9 +2643,9 @@ class _AddLedgerPageState extends State<_AddLedgerPage>
                       ],
                     ),
                   ),
-                  IconButton(
+                  AppRoundIconButton(
                     onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close_rounded),
+                    icon: Icons.close_rounded,
                   ),
                 ],
               ),
@@ -2754,29 +2754,16 @@ class _AddLedgerPageState extends State<_AddLedgerPage>
                 ],
               ),
             ),
-            Padding(
+            AppFloatingActionBar(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 18),
-              child: SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: ElevatedButton(
+              actions: [
+                AppBottomAction(
+                  label: widget.initialEntry == null ? '完成记账' : '保存修改',
+                  icon: Icons.check_rounded,
                   onPressed: _save,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF6558F5),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  child: Text(
-                    widget.initialEntry == null ? '完成记账' : '保存修改',
-                    style: const TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
+                  tone: AppActionButtonTone.primary,
                 ),
-              ),
+              ],
             ),
           ],
         ),

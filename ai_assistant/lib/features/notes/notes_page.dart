@@ -1780,13 +1780,6 @@ class _CircleTool extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppColors.inputBg.withValues(alpha: faded ? 0.45 : 0.95),
           shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: faded ? 0.02 : 0.05),
-              blurRadius: 16,
-              offset: const Offset(0, 8),
-            ),
-          ],
         ),
         child: Icon(
           icon,

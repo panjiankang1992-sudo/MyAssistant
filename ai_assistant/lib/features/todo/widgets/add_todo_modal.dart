@@ -13,6 +13,7 @@ import '../../../domain/models/tag.dart';
 import '../../../domain/models/todo.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/edge_swipe_pop.dart';
+import '../../../shared/widgets/app_controls.dart';
 import '../../ai_settings/ai_model_provider.dart';
 import '../../copilot/services/openai_compatible_client.dart';
 import '../providers/todo_provider.dart';
@@ -110,10 +111,10 @@ class _AddTodoHeader extends StatelessWidget {
               ),
             ),
           ),
-          IconButton(
+          AppRoundIconButton(
             tooltip: '关闭',
             onPressed: () => Navigator.of(context).pop(),
-            icon: const Icon(Icons.close_rounded, color: AppColors.text),
+            icon: Icons.close_rounded,
           ),
         ],
       ),
