@@ -22,7 +22,11 @@ import 'routine_tab.dart';
 import '../../tags/tag_selector.dart';
 import 'form_controls.dart';
 
-void showAddTodoModal(BuildContext context, {DateTime? initialDate}) {
+void showAddTodoModal(
+  BuildContext context, {
+  DateTime? initialDate,
+  bool startVoiceInput = false,
+}) {
   showGeneralDialog(
     context: context,
     barrierDismissible: true,
@@ -30,7 +34,10 @@ void showAddTodoModal(BuildContext context, {DateTime? initialDate}) {
     barrierColor: Colors.black.withValues(alpha: 0.12),
     transitionDuration: const Duration(milliseconds: 280),
     pageBuilder: (context, animation, secondaryAnimation) {
-      return _AddTodoModalContent(initialDate: initialDate);
+      return _AddTodoModalContent(
+        initialDate: initialDate,
+        startVoiceInput: startVoiceInput,
+      );
     },
     transitionBuilder: (context, animation, secondaryAnimation, child) {
       final curved = CurvedAnimation(
@@ -51,8 +58,9 @@ void showAddTodoModal(BuildContext context, {DateTime? initialDate}) {
 
 class _AddTodoModalContent extends ConsumerStatefulWidget {
   final DateTime? initialDate;
+  final bool startVoiceInput;
 
-  const _AddTodoModalContent({this.initialDate});
+  const _AddTodoModalContent({this.initialDate, this.startVoiceInput = false});
 
   @override
   ConsumerState<_AddTodoModalContent> createState() =>
@@ -190,7 +198,12 @@ class _AddTodoModalContentState extends ConsumerState<_AddTodoModalContent>
     final now = DateTime.now();
     _time =
         '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
-    Future.microtask(_initSpeech);
+    Future.microtask(() async {
+      await _initSpeech();
+      if (widget.startVoiceInput && mounted) {
+        await _toggleVoiceInput();
+      }
+    });
   }
 
   @override

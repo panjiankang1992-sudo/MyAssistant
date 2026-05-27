@@ -40,8 +40,6 @@ class _TodoPageState extends ConsumerState<TodoPage>
   bool _bookkeepingFeedbackSuccess = false;
   int _bookkeepingFeedbackTick = 0;
 
-  Offset _fabOffset = Offset.zero;
-
   @override
   void initState() {
     super.initState();
@@ -305,10 +303,13 @@ class _TodoPageState extends ConsumerState<TodoPage>
             ),
         ],
       ),
-      floatingActionButton: _DraggableFAB(
-        offset: _fabOffset == Offset.zero ? const Offset(0, -14) : _fabOffset,
-        onOffsetChanged: (o) => setState(() => _fabOffset = o),
+      floatingActionButton: _AiInputFab(
         onPressed: () => showAddTodoModal(context, initialDate: selectedDate),
+        onLongPress: () => showAddTodoModal(
+          context,
+          initialDate: selectedDate,
+          startVoiceInput: true,
+        ),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
@@ -568,60 +569,39 @@ class _BookkeepingLinePainter extends CustomPainter {
   }
 }
 
-class _DraggableFAB extends StatefulWidget {
-  final Offset offset;
-  final ValueChanged<Offset> onOffsetChanged;
+class _AiInputFab extends StatefulWidget {
   final VoidCallback onPressed;
+  final VoidCallback onLongPress;
 
-  const _DraggableFAB({
-    required this.offset,
-    required this.onOffsetChanged,
-    required this.onPressed,
-  });
+  const _AiInputFab({required this.onPressed, required this.onLongPress});
 
   @override
-  State<_DraggableFAB> createState() => _DraggableFABState();
+  State<_AiInputFab> createState() => _AiInputFabState();
 }
 
-class _DraggableFABState extends State<_DraggableFAB> {
-  Offset _offset = Offset.zero;
-  bool _isDragging = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _offset = widget.offset;
-  }
-
-  @override
-  void didUpdateWidget(covariant _DraggableFAB oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.offset != oldWidget.offset) {
-      _offset = widget.offset;
-    }
-  }
+class _AiInputFabState extends State<_AiInputFab> {
+  bool _armed = false;
 
   @override
   Widget build(BuildContext context) {
     return Transform.translate(
-      offset: _offset,
+      offset: const Offset(0, -14),
       child: GestureDetector(
-        onPanStart: (_) => setState(() => _isDragging = true),
-        onPanUpdate: (details) {
-          setState(() => _offset += details.delta);
-          widget.onOffsetChanged(_offset);
+        onLongPressStart: (_) {
+          setState(() => _armed = true);
+          widget.onLongPress();
         },
-        onPanEnd: (_) {
-          Future.microtask(() => setState(() => _isDragging = false));
+        onLongPressEnd: (_) {
+          if (mounted) setState(() => _armed = false);
         },
         child: Material(
           color: Colors.transparent,
           child: InkWell(
-            onTap: _isDragging ? null : widget.onPressed,
+            onTap: widget.onPressed,
             borderRadius: BorderRadius.circular(30),
             child: AnimatedScale(
               duration: const Duration(milliseconds: 140),
-              scale: _isDragging ? 1.04 : 1,
+              scale: _armed ? 1.08 : 1,
               child: Container(
                 width: 58,
                 height: 58,
@@ -645,8 +625,8 @@ class _DraggableFABState extends State<_DraggableFAB> {
                     ),
                   ],
                 ),
-                child: const Icon(
-                  Icons.add_rounded,
+                child: Icon(
+                  _armed ? Icons.mic_rounded : Icons.add_rounded,
                   size: 28,
                   color: Colors.white,
                 ),
