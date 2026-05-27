@@ -427,9 +427,9 @@ class _SwipeActionsState extends State<_SwipeActions>
 
   // 左滑阈值
   static const double _deferThreshold = 60.0;
-  static const double _deleteThreshold = 140.0;
-  static const double _deferSnap = 80.0;
-  static const double _deleteSnap = 160.0;
+  static const double _deleteThreshold = 118.0;
+  static const double _deferSnap = 68.0;
+  static const double _deleteSnap = 132.0;
 
   // 右滑阈值
   static const double _completeThreshold = 50.0;
@@ -453,7 +453,7 @@ class _SwipeActionsState extends State<_SwipeActions>
     _completeController =
         AnimationController(
           vsync: this,
-          duration: const Duration(milliseconds: 1500),
+          duration: const Duration(milliseconds: 750),
         )..addStatusListener((status) {
           if (status == AnimationStatus.completed &&
               mounted &&
@@ -585,7 +585,7 @@ class _SwipeActionsState extends State<_SwipeActions>
                         widget.onDefer();
                       },
                       child: Container(
-                        width: 80,
+                        width: 66,
                         height: double.infinity,
                         color: Colors.transparent,
                         child: Center(
@@ -617,7 +617,7 @@ class _SwipeActionsState extends State<_SwipeActions>
                           widget.onDelete();
                         },
                         child: Container(
-                          width: 80,
+                          width: 66,
                           height: double.infinity,
                           color: Colors.transparent,
                           child: Center(
