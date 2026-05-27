@@ -355,8 +355,9 @@ class _TodoPageState extends ConsumerState<TodoPage>
             ),
         ],
       ),
-      floatingActionButton: _AiInputFab(
+      floatingActionButton: AppVoiceInputFab(
         listening: _fabListening,
+        transcript: _fabVoiceText,
         onPressed: () => showAddTodoModal(context, initialDate: selectedDate),
         onLongPressStart: _startFabVoiceInput,
         onLongPressEnd: () => _finishFabVoiceInput(selectedDate),
@@ -616,85 +617,5 @@ class _BookkeepingLinePainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _BookkeepingLinePainter oldDelegate) {
     return oldDelegate.progress != progress;
-  }
-}
-
-class _AiInputFab extends StatefulWidget {
-  final bool listening;
-  final VoidCallback onPressed;
-  final VoidCallback onLongPressStart;
-  final VoidCallback onLongPressEnd;
-
-  const _AiInputFab({
-    required this.listening,
-    required this.onPressed,
-    required this.onLongPressStart,
-    required this.onLongPressEnd,
-  });
-
-  @override
-  State<_AiInputFab> createState() => _AiInputFabState();
-}
-
-class _AiInputFabState extends State<_AiInputFab> {
-  bool _armed = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return Transform.translate(
-      offset: const Offset(0, -14),
-      child: GestureDetector(
-        onLongPressStart: (_) {
-          setState(() => _armed = true);
-          widget.onLongPressStart();
-        },
-        onLongPressEnd: (_) {
-          if (mounted) setState(() => _armed = false);
-          widget.onLongPressEnd();
-        },
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: widget.onPressed,
-            borderRadius: BorderRadius.circular(30),
-            child: AnimatedScale(
-              duration: const Duration(milliseconds: 140),
-              scale: _armed ? 1.08 : 1,
-              child: Container(
-                width: 58,
-                height: 58,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF8B5CF6), Color(0xFF0A84FF)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF0A84FF).withValues(alpha: 0.26),
-                      blurRadius: 18,
-                      offset: const Offset(0, 8),
-                    ),
-                    BoxShadow(
-                      color: const Color(0xFF8B5CF6).withValues(alpha: 0.18),
-                      blurRadius: 10,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
-                ),
-                child: Icon(
-                  widget.listening || _armed
-                      ? Icons.mic_rounded
-                      : Icons.add_rounded,
-                  size: 28,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
   }
 }

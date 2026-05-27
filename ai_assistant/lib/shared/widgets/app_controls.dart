@@ -361,6 +361,213 @@ class AppFloatingActionBar extends StatelessWidget {
   }
 }
 
+class AppVoiceInputFab extends StatefulWidget {
+  final bool listening;
+  final String transcript;
+  final VoidCallback onPressed;
+  final VoidCallback onLongPressStart;
+  final VoidCallback onLongPressEnd;
+  final List<Color> gradientColors;
+
+  const AppVoiceInputFab({
+    super.key,
+    required this.listening,
+    required this.transcript,
+    required this.onPressed,
+    required this.onLongPressStart,
+    required this.onLongPressEnd,
+    this.gradientColors = const [Color(0xFF8B5CF6), Color(0xFF0A84FF)],
+  });
+
+  @override
+  State<AppVoiceInputFab> createState() => _AppVoiceInputFabState();
+}
+
+class _AppVoiceInputFabState extends State<AppVoiceInputFab>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulseController;
+  var _armed = false;
+
+  bool get _hasVoiceText => widget.transcript.trim().isNotEmpty;
+  bool get _active => widget.listening || _armed;
+  bool get _shouldPulse => _active && _hasVoiceText;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 920),
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant AppVoiceInputFab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _syncPulse();
+  }
+
+  void _syncPulse() {
+    if (_shouldPulse) {
+      if (!_pulseController.isAnimating) {
+        _pulseController.repeat(reverse: true);
+      }
+    } else {
+      _pulseController.stop();
+      _pulseController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 160),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final text = widget.transcript.trim();
+    return Transform.translate(
+      offset: const Offset(0, -12),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          GestureDetector(
+            onTap: widget.onPressed,
+            onLongPressStart: (_) {
+              setState(() => _armed = true);
+              _syncPulse();
+              widget.onLongPressStart();
+            },
+            onLongPressEnd: (_) {
+              if (mounted) setState(() => _armed = false);
+              _syncPulse();
+              widget.onLongPressEnd();
+            },
+            child: AnimatedBuilder(
+              animation: _pulseController,
+              builder: (context, child) {
+                final pulse = _pulseController.value;
+                final scale = (_armed ? 1.06 : 1.0) + pulse * 0.08;
+                return Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    AnimatedOpacity(
+                      opacity: _shouldPulse ? 1 : 0,
+                      duration: const Duration(milliseconds: 160),
+                      child: Transform.scale(
+                        scale: 1.05 + pulse * 0.38,
+                        child: Container(
+                          width: 58,
+                          height: 58,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: widget.gradientColors.last.withValues(
+                              alpha: 0.12 * (1 - pulse * 0.45),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Transform.scale(scale: scale, child: child),
+                  ],
+                );
+              },
+              child: Container(
+                width: 58,
+                height: 58,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: widget.gradientColors,
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: widget.gradientColors.last.withValues(alpha: 0.26),
+                      blurRadius: 18,
+                      offset: const Offset(0, 8),
+                    ),
+                    BoxShadow(
+                      color: widget.gradientColors.first.withValues(
+                        alpha: 0.16,
+                      ),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  widget.listening || _armed
+                      ? Icons.mic_rounded
+                      : Icons.add_rounded,
+                  size: 29,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 180),
+            switchInCurve: Curves.easeOut,
+            switchOutCurve: Curves.easeIn,
+            child: _active
+                ? Padding(
+                    key: ValueKey(text.isEmpty ? 'empty' : text),
+                    padding: const EdgeInsets.only(top: 10),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 280),
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.94),
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(
+                            color: AppColors.border.withValues(alpha: 0.78),
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.08),
+                              blurRadius: 18,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 8,
+                          ),
+                          child: Text(
+                            text.isEmpty ? '正在听...' : text,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 13,
+                              height: 1.28,
+                              color: text.isEmpty
+                                  ? AppColors.textTertiary
+                                  : AppColors.text,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  )
+                : const SizedBox.shrink(key: ValueKey('hidden')),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class AppPillActionButton extends StatelessWidget {
   final AppBottomAction action;
   final double height;

@@ -872,8 +872,9 @@ class _BookkeepingPageState extends ConsumerState<BookkeepingPage> {
         ),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: _GradientAddButton(
+      floatingActionButton: AppVoiceInputFab(
         listening: _fabListening,
+        transcript: _fabVoiceText,
         onPressed: () => showAddLedgerPage(
           context,
           ref: ref,
@@ -2596,56 +2597,6 @@ class _CategoryIcon extends StatelessWidget {
         child: Text(
           emoji ?? category.emoji,
           style: TextStyle(fontSize: size * 0.45),
-        ),
-      ),
-    );
-  }
-}
-
-class _GradientAddButton extends StatelessWidget {
-  final bool listening;
-  final VoidCallback onPressed;
-  final VoidCallback onLongPressStart;
-  final VoidCallback onLongPressEnd;
-
-  const _GradientAddButton({
-    required this.listening,
-    required this.onPressed,
-    required this.onLongPressStart,
-    required this.onLongPressEnd,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: GestureDetector(
-        onTap: onPressed,
-        onLongPressStart: (_) => onLongPressStart(),
-        onLongPressEnd: (_) => onLongPressEnd(),
-        child: Container(
-          width: 58,
-          height: 58,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: const LinearGradient(
-              colors: [Color(0xFF8B5CF6), Color(0xFF0A84FF)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.primary.withValues(alpha: 0.28),
-                blurRadius: 18,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: Icon(
-            listening ? Icons.mic_rounded : Icons.add_rounded,
-            color: Colors.white,
-            size: 30,
-          ),
         ),
       ),
     );

@@ -484,11 +484,16 @@ class _NotesPageState extends ConsumerState<NotesPage> {
                 right: 0,
                 bottom: 14,
                 child: Center(
-                  child: _NotesFab(
+                  child: AppVoiceInputFab(
                     listening: _fabListening,
+                    transcript: _fabVoiceText,
                     onPressed: () => _openEditor(),
                     onLongPressStart: _startFabVoiceInput,
                     onLongPressEnd: _finishFabVoiceInput,
+                    gradientColors: const [
+                      Color(0xFF6C63FF),
+                      Color(0xFF0A84FF),
+                    ],
                   ),
                 ),
               )
@@ -1378,55 +1383,6 @@ class _AnalyzeFab extends StatelessWidget {
                 size: 30,
                 color: AppColors.primary,
               ),
-      ),
-    );
-  }
-}
-
-class _NotesFab extends StatelessWidget {
-  final bool listening;
-  final VoidCallback onPressed;
-  final VoidCallback onLongPressStart;
-  final VoidCallback onLongPressEnd;
-
-  const _NotesFab({
-    required this.listening,
-    required this.onPressed,
-    required this.onLongPressStart,
-    required this.onLongPressEnd,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: const LinearGradient(
-          colors: [Color(0xFF6C63FF), Color(0xFF0A84FF)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.28),
-            blurRadius: 22,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: GestureDetector(
-        onLongPressStart: (_) => onLongPressStart(),
-        onLongPressEnd: (_) => onLongPressEnd(),
-        child: FloatingActionButton(
-          onPressed: onPressed,
-          elevation: 0,
-          backgroundColor: Colors.transparent,
-          child: Icon(
-            listening ? Icons.mic_rounded : Icons.add_rounded,
-            size: 34,
-            color: Colors.white,
-          ),
-        ),
       ),
     );
   }
