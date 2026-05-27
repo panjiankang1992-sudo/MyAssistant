@@ -7,7 +7,9 @@ import 'widgets/add_todo_modal.dart';
 import 'widgets/todo_detail_modal.dart';
 import 'widgets/todo_list.dart';
 import 'widgets/week_calendar_strip.dart';
+import '../../core/providers/core_providers.dart';
 import '../../core/theme/app_theme.dart';
+import '../../domain/models/todo.dart';
 import '../../shared/widgets/app_controls.dart';
 import '../../shared/widgets/profile_avatar_button.dart';
 
@@ -89,6 +91,19 @@ class _TodoPageState extends ConsumerState<TodoPage>
     return '${date.month}月${date.day}日 待办';
   }
 
+  DateTime _dateOnly(DateTime date) =>
+      DateTime(date.year, date.month, date.day);
+
+  Map<DateTime, int> _todoCountsByDate(List<Todo> todos) {
+    final counts = <DateTime, int>{};
+    for (final todo in todos) {
+      if (todo.deleted) continue;
+      final day = _dateOnly(todo.date);
+      counts[day] = (counts[day] ?? 0) + 1;
+    }
+    return counts;
+  }
+
   void _displayBookkeepingFeedback({required bool success}) {
     _bookkeepingFeedbackTimer?.cancel();
     setState(() {
@@ -152,11 +167,26 @@ class _TodoPageState extends ConsumerState<TodoPage>
                                 const SizedBox(width: 6),
                                 GestureDetector(
                                   onTap: () async {
+                                    final allTodos = await ref
+                                        .read(datasourceProvider)
+                                        .getAllTodos();
+                                    if (!context.mounted) return;
+                                    final counts = _todoCountsByDate(allTodos);
                                     final picked = await showAppDatePicker(
                                       context: context,
                                       initialDate: selectedDate,
                                       firstDate: DateTime(2020),
                                       lastDate: DateTime(2030),
+                                      markerBuilder: (date) {
+                                        final count = counts[_dateOnly(date)];
+                                        if (count == null || count <= 0) {
+                                          return null;
+                                        }
+                                        return AppDateMarker(
+                                          label: '$count',
+                                          color: AppColors.primary,
+                                        );
+                                      },
                                     );
                                     if (picked != null) {
                                       ref

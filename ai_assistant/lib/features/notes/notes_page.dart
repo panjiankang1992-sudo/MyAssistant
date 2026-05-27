@@ -15,6 +15,7 @@ import '../../core/theme/app_theme.dart';
 import '../../domain/models/quick_note.dart';
 import '../../domain/models/tag.dart';
 import '../../shared/widgets/edge_swipe_pop.dart';
+import '../../shared/widgets/app_controls.dart';
 import '../../shared/widgets/profile_avatar_button.dart';
 import '../tags/tag_selector.dart';
 import 'notes_provider.dart';
@@ -178,6 +179,7 @@ class _NotesPageState extends ConsumerState<NotesPage> {
         return !n.date.isBefore(start);
       }
       if (_mode == _NotesViewMode.document) {
+        if (_filterDate != null) return _isSameDay(n.date, _filterDate!);
         return n.noteType == QuickNoteType.document;
       }
       return false;
@@ -189,14 +191,18 @@ class _NotesPageState extends ConsumerState<NotesPage> {
     return result;
   }
 
+  QuickNoteType? get _activeNoteType {
+    if (_mode == _NotesViewMode.diary) return QuickNoteType.diary;
+    if (_mode == _NotesViewMode.document) return QuickNoteType.document;
+    return null;
+  }
+
   Map<DateTime, int> _counts(List<QuickNote> notes) {
+    final type = _activeNoteType;
+    if (type == null) return const {};
     final result = <DateTime, int>{};
     for (final note in notes.where(
-      (n) =>
-          !n.deleted &&
-          !n.archived &&
-          !n.isAnalysis &&
-          n.noteType == QuickNoteType.diary,
+      (n) => !n.deleted && !n.archived && !n.isAnalysis && n.noteType == type,
     )) {
       final day = DateTime(note.date.year, note.date.month, note.date.day);
       result[day] = (result[day] ?? 0) + 1;
@@ -205,23 +211,20 @@ class _NotesPageState extends ConsumerState<NotesPage> {
   }
 
   Future<void> _pickDate(List<QuickNote> notes) async {
-    final picked = await showGeneralDialog<DateTime?>(
+    final counts = _counts(notes);
+    final picked = await showAppDatePicker(
       context: context,
-      barrierDismissible: true,
-      barrierLabel: '关闭日期筛选',
-      barrierColor: Colors.black.withValues(alpha: 0.12),
-      pageBuilder: (context, animation, secondaryAnimation) => _NotesDatePicker(
-        selected: _filterDate ?? DateTime.now(),
-        counts: _counts(notes),
-      ),
-      transitionBuilder: (context, animation, _, child) {
-        return FadeTransition(
-          opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
-          child: child,
-        );
+      initialDate: _filterDate ?? DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2035),
+      markerBuilder: (date) {
+        final day = DateTime(date.year, date.month, date.day);
+        final count = counts[day];
+        if (count == null || count <= 0) return null;
+        return AppDateMarker(label: '$count', color: AppColors.primary);
       },
     );
-    if (!mounted) return;
+    if (!mounted || picked == null) return;
     setState(() => _filterDate = picked);
   }
 
@@ -319,7 +322,7 @@ class _NotesPageState extends ConsumerState<NotesPage> {
                         value: _mode,
                         onChanged: (mode) => setState(() => _mode = mode),
                       ),
-                      if (_mode == _NotesViewMode.diary) ...[
+                      if (_mode != _NotesViewMode.analysis) ...[
                         const SizedBox(width: 10),
                         InkWell(
                           onTap: () => _pickDate(notes),
@@ -348,7 +351,9 @@ class _NotesPageState extends ConsumerState<NotesPage> {
                                 const SizedBox(width: 5),
                                 Text(
                                   _filterDate == null
-                                      ? '最近30天'
+                                      ? (_mode == _NotesViewMode.diary
+                                            ? '最近30天'
+                                            : '全部文档')
                                       : DateFormat(
                                           'MM月dd日',
                                         ).format(_filterDate!),
@@ -368,20 +373,13 @@ class _NotesPageState extends ConsumerState<NotesPage> {
                           onChanged: (value) =>
                               setState(() => _layoutMode = value),
                         ),
-                      ] else if (_mode == _NotesViewMode.document) ...[
-                        const SizedBox(width: 10),
-                        _LayoutToggleButton(
-                          value: _layoutMode,
-                          onChanged: (value) =>
-                              setState(() => _layoutMode = value),
-                        ),
                       ],
                       const Spacer(),
                       ProfileAvatarButton(onTap: widget.onAvatarTap),
                     ],
                   ),
                 ),
-                if (_filterDate != null && _mode == _NotesViewMode.diary)
+                if (_filterDate != null && _mode != _NotesViewMode.analysis)
                   Align(
                     alignment: Alignment.centerLeft,
                     child: Padding(
@@ -1364,118 +1362,6 @@ class _NotesEmpty extends StatelessWidget {
       child: Text(
         '还没有随手记',
         style: TextStyle(color: AppColors.textTertiary, fontSize: 15),
-      ),
-    );
-  }
-}
-
-class _NotesDatePicker extends StatefulWidget {
-  final DateTime selected;
-  final Map<DateTime, int> counts;
-  const _NotesDatePicker({required this.selected, required this.counts});
-  @override
-  State<_NotesDatePicker> createState() => _NotesDatePickerState();
-}
-
-class _NotesDatePickerState extends State<_NotesDatePicker> {
-  late DateTime _month = DateTime(widget.selected.year, widget.selected.month);
-
-  @override
-  Widget build(BuildContext context) {
-    final first = DateTime(_month.year, _month.month, 1);
-    final leading = first.weekday % 7;
-    final days = DateUtils.getDaysInMonth(_month.year, _month.month);
-    final maxCount = widget.counts.values.fold<int>(1, (a, b) => a > b ? a : b);
-    return Center(
-      child: Material(
-        color: Colors.transparent,
-        child: Container(
-          width: 360,
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(26),
-            boxShadow: AppAnimations.elevatedShadow(),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                children: [
-                  IconButton(
-                    onPressed: () => setState(
-                      () => _month = DateTime(_month.year, _month.month - 1),
-                    ),
-                    icon: const Icon(Icons.chevron_left_rounded),
-                  ),
-                  Expanded(
-                    child: Center(
-                      child: Text(
-                        DateFormat('yyyy年MM月').format(_month),
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => setState(
-                      () => _month = DateTime(_month.year, _month.month + 1),
-                    ),
-                    icon: const Icon(Icons.chevron_right_rounded),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 7,
-                  mainAxisSpacing: 8,
-                  crossAxisSpacing: 8,
-                ),
-                itemCount: leading + days,
-                itemBuilder: (context, index) {
-                  if (index < leading) return const SizedBox.shrink();
-                  final day = index - leading + 1;
-                  final date = DateTime(_month.year, _month.month, day);
-                  final count = widget.counts[date] ?? 0;
-                  final alpha = count == 0
-                      ? 0.04
-                      : 0.12 + 0.5 * (count / maxCount);
-                  return InkWell(
-                    onTap: () => Navigator.of(context).pop(date),
-                    borderRadius: BorderRadius.circular(14),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: alpha),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Center(
-                        child: Text(
-                          '$day',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            color: count == 0
-                                ? AppColors.textTertiary
-                                : AppColors.primary,
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-              const SizedBox(height: 12),
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(null),
-                child: const Text('显示最近30天'),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

@@ -261,11 +261,21 @@ class _DropdownOverlay<T> extends StatelessWidget {
   }
 }
 
+class AppDateMarker {
+  final String label;
+  final Color color;
+
+  const AppDateMarker({required this.label, required this.color});
+}
+
+typedef AppDateMarkerBuilder = AppDateMarker? Function(DateTime date);
+
 Future<DateTime?> showAppDatePicker({
   required BuildContext context,
   required DateTime initialDate,
   required DateTime firstDate,
   required DateTime lastDate,
+  AppDateMarkerBuilder? markerBuilder,
 }) {
   return showDialog<DateTime>(
     context: context,
@@ -273,6 +283,7 @@ Future<DateTime?> showAppDatePicker({
       initialDate: initialDate,
       firstDate: firstDate,
       lastDate: lastDate,
+      markerBuilder: markerBuilder,
     ),
   );
 }
@@ -281,11 +292,13 @@ class _AppDatePickerDialog extends StatefulWidget {
   final DateTime initialDate;
   final DateTime firstDate;
   final DateTime lastDate;
+  final AppDateMarkerBuilder? markerBuilder;
 
   const _AppDatePickerDialog({
     required this.initialDate,
     required this.firstDate,
     required this.lastDate,
+    this.markerBuilder,
   });
 
   @override
@@ -404,6 +417,7 @@ class _AppDatePickerDialogState extends State<_AppDatePickerDialog> {
                 selected: _selected,
                 firstDate: widget.firstDate,
                 lastDate: widget.lastDate,
+                markerBuilder: widget.markerBuilder,
                 onSelected: (date) => setState(() {
                   _selected = date;
                   _visibleMonth = DateTime(date.year, date.month);
@@ -468,6 +482,7 @@ class _CalendarGrid extends StatelessWidget {
   final DateTime selected;
   final DateTime firstDate;
   final DateTime lastDate;
+  final AppDateMarkerBuilder? markerBuilder;
   final ValueChanged<DateTime> onSelected;
 
   const _CalendarGrid({
@@ -475,6 +490,7 @@ class _CalendarGrid extends StatelessWidget {
     required this.selected,
     required this.firstDate,
     required this.lastDate,
+    required this.markerBuilder,
     required this.onSelected,
   });
 
@@ -513,30 +529,63 @@ class _CalendarGrid extends StatelessWidget {
             final disabled =
                 date.isBefore(_dateOnly(firstDate)) ||
                 date.isAfter(_dateOnly(lastDate));
+            final marker = disabled ? null : markerBuilder?.call(date);
             return InkWell(
               onTap: disabled ? null : () => onSelected(date),
               borderRadius: BorderRadius.circular(18),
-              child: AnimatedContainer(
-                duration: AppAnimations.shortDuration,
-                decoration: BoxDecoration(
-                  color: isSelected ? AppColors.primary : Colors.transparent,
-                  shape: BoxShape.circle,
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  '${date.day}',
-                  style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: isSelected ? FontWeight.w900 : FontWeight.w700,
-                    color: disabled
-                        ? AppColors.textTertiary.withValues(alpha: 0.35)
-                        : isSelected
-                        ? Colors.white
-                        : inMonth
-                        ? AppColors.text
-                        : AppColors.textTertiary.withValues(alpha: 0.45),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Center(
+                    child: AnimatedContainer(
+                      duration: AppAnimations.shortDuration,
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? AppColors.primary
+                            : Colors.transparent,
+                        shape: BoxShape.circle,
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        '${date.day}',
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: isSelected
+                              ? FontWeight.w900
+                              : FontWeight.w700,
+                          color: disabled
+                              ? AppColors.textTertiary.withValues(alpha: 0.35)
+                              : isSelected
+                              ? Colors.white
+                              : inMonth
+                              ? AppColors.text
+                              : AppColors.textTertiary.withValues(alpha: 0.45),
+                        ),
+                      ),
+                    ),
                   ),
-                ),
+                  if (marker != null && marker.label.isNotEmpty)
+                    Positioned(
+                      right: 2,
+                      bottom: 1,
+                      child: Text(
+                        marker.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.fade,
+                        softWrap: false,
+                        style: TextStyle(
+                          fontSize: 9,
+                          height: 1,
+                          fontWeight: FontWeight.w900,
+                          color: inMonth
+                              ? marker.color
+                              : marker.color.withValues(alpha: 0.42),
+                        ),
+                      ),
+                    ),
+                ],
               ),
             );
           },

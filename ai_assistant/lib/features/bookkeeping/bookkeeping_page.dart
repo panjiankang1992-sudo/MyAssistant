@@ -744,6 +744,34 @@ class _BookkeepingPageState extends ConsumerState<BookkeepingPage> {
       .where((item) => item.kind == kind)
       .fold(0.0, (sum, item) => sum + item.cnyAmount);
 
+  double _dailyNet(DateTime date) {
+    final day = _dateOnly(date);
+    var income = 0.0;
+    var expense = 0.0;
+    for (final entry in _entries) {
+      if (_dateOnly(entry.date) != day) continue;
+      if (entry.kind == LedgerKind.income) {
+        income += entry.cnyAmount;
+      } else {
+        expense += entry.cnyAmount;
+      }
+    }
+    return income - expense;
+  }
+
+  String _compactAmount(double value) {
+    final abs = value.abs();
+    final prefix = value > 0 ? '+' : '-';
+    if (abs >= 10000) {
+      return '$prefix${(abs / 10000).toStringAsFixed(1)}w';
+    }
+    if (abs >= 1000) {
+      return '$prefix${abs.toStringAsFixed(0)}';
+    }
+    final rounded = abs.toStringAsFixed(abs < 100 ? 1 : 0);
+    return '$prefix$rounded';
+  }
+
   @override
   Widget build(BuildContext context) {
     final visible = _filtered;
@@ -815,6 +843,14 @@ class _BookkeepingPageState extends ConsumerState<BookkeepingPage> {
       initialDate: _selectedDate,
       firstDate: DateTime(2020),
       lastDate: DateTime(2035),
+      markerBuilder: (date) {
+        final net = _dailyNet(date);
+        if (net.abs() < 0.005) return null;
+        return AppDateMarker(
+          label: _compactAmount(net),
+          color: net < 0 ? AppColors.danger : AppColors.success,
+        );
+      },
     );
     if (picked != null && mounted) {
       setState(() => _selectedDate = picked);
