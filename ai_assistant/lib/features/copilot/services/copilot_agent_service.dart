@@ -3,6 +3,7 @@ import '../../../domain/models/ai_model_config.dart';
 import '../../profile/profile_provider.dart';
 import '../../skills/app_data_skill_service.dart';
 import '../../skills/builtin_skill_registry.dart';
+import '../copilot_memory.dart';
 import '../copilot_settings.dart';
 import '../providers/copilot_provider.dart';
 import 'openai_compatible_client.dart';
@@ -12,6 +13,7 @@ class CopilotAgentService {
   final UserProfile profile;
   final List<AiModelConfig> aiModels;
   final CopilotSettings settings;
+  final CopilotMemoryState memory;
   final OpenAiCompatibleClient llmClient;
 
   CopilotAgentService({
@@ -19,6 +21,7 @@ class CopilotAgentService {
     required this.profile,
     required this.aiModels,
     required this.settings,
+    required this.memory,
     OpenAiCompatibleClient? llmClient,
   }) : llmClient = llmClient ?? OpenAiCompatibleClient();
 
@@ -63,6 +66,7 @@ class CopilotAgentService {
             '对用户称呼=${settings.displayUserCallName.isEmpty ? "按用户昵称自然称呼" : settings.displayUserCallName}；'
             '性格与聊天风格：${settings.displayPersona}',
       ),
+      LlmChatMessage(role: 'system', content: memory.promptContext()),
       LlmChatMessage(
         role: 'system',
         content:

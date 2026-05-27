@@ -6,6 +6,7 @@ import '../../shared/widgets/app_controls.dart';
 import '../ai_settings/ai_model_page.dart';
 import '../ai_settings/ai_model_provider.dart';
 import '../skills/builtin_skill_registry.dart';
+import 'copilot_memory.dart';
 import 'copilot_settings.dart';
 
 class CopilotSettingsPage extends ConsumerStatefulWidget {
@@ -71,6 +72,7 @@ class _CopilotSettingsPageState extends ConsumerState<CopilotSettingsPage> {
   Widget build(BuildContext context) {
     final settings = ref.watch(copilotSettingsProvider);
     final modelState = ref.watch(aiModelProvider);
+    final memoryState = ref.watch(copilotMemoryProvider);
 
     return Scaffold(
       backgroundColor: AppColors.scaffoldBg,
@@ -181,6 +183,64 @@ class _CopilotSettingsPageState extends ConsumerState<CopilotSettingsPage> {
                         ),
                     ],
                   ),
+          ),
+          const SizedBox(height: 14),
+          _SectionCard(
+            title: '记忆',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const _MemoryIntro(),
+                const SizedBox(height: 12),
+                _MemoryList(
+                  title: '长期记忆',
+                  subtitle: '跨会话保留。适合你的偏好、称呼、长期目标、稳定事实。',
+                  items: memoryState.longTerm,
+                  emptyText: '暂无长期记忆。可以手动添加，或在聊天中说“记住……”。',
+                  onAdd: () => _showMemoryDialog(
+                    context,
+                    ref,
+                    type: CopilotMemoryType.longTerm,
+                  ),
+                  onEdit: (item) => _showMemoryDialog(
+                    context,
+                    ref,
+                    type: item.type,
+                    item: item,
+                  ),
+                  onDelete: (item) =>
+                      ref.read(copilotMemoryProvider.notifier).delete(item.id),
+                ),
+                const SizedBox(height: 12),
+                _MemoryList(
+                  title: '短期记忆',
+                  subtitle: '自动记录最近对话摘要，最多保留 30 条，用于当前阶段连续性。',
+                  items: memoryState.shortTerm,
+                  emptyText: '暂无短期记忆。和 Copilot 对话后会自动生成。',
+                  trailing: TextButton(
+                    onPressed: memoryState.shortTerm.isEmpty
+                        ? null
+                        : () => ref
+                              .read(copilotMemoryProvider.notifier)
+                              .clearShortTerm(),
+                    child: const Text('清空'),
+                  ),
+                  onAdd: () => _showMemoryDialog(
+                    context,
+                    ref,
+                    type: CopilotMemoryType.shortTerm,
+                  ),
+                  onEdit: (item) => _showMemoryDialog(
+                    context,
+                    ref,
+                    type: item.type,
+                    item: item,
+                  ),
+                  onDelete: (item) =>
+                      ref.read(copilotMemoryProvider.notifier).delete(item.id),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 14),
           _SectionCard(
@@ -434,6 +494,248 @@ class _ModelTile extends StatelessWidget {
   }
 }
 
+class _MemoryIntro extends StatelessWidget {
+  const _MemoryIntro();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.055),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.12)),
+      ),
+      child: const Text(
+        '轻量记忆方案：短期记忆保存近期对话摘要，用完会衰减；长期记忆保存稳定偏好和事实。'
+        'Copilot 每次回复前只读取少量高价值记忆，避免上下文变重。',
+        style: TextStyle(
+          fontSize: 12.5,
+          height: 1.42,
+          color: AppColors.textSecondary,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+}
+
+class _MemoryList extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final String emptyText;
+  final List<CopilotMemoryItem> items;
+  final Widget? trailing;
+  final VoidCallback onAdd;
+  final ValueChanged<CopilotMemoryItem> onEdit;
+  final ValueChanged<CopilotMemoryItem> onDelete;
+
+  const _MemoryList({
+    required this.title,
+    required this.subtitle,
+    required this.emptyText,
+    required this.items,
+    required this.onAdd,
+    required this.onEdit,
+    required this.onDelete,
+    this.trailing,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.inputBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.text,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        height: 1.32,
+                        color: AppColors.textTertiary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              ?trailing,
+              IconButton(
+                tooltip: '添加记忆',
+                onPressed: onAdd,
+                icon: const Icon(Icons.add_rounded),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (items.isEmpty)
+            Text(
+              emptyText,
+              style: const TextStyle(
+                fontSize: 12.5,
+                color: AppColors.textSecondary,
+              ),
+            )
+          else
+            ...items.map(
+              (item) => _MemoryTile(
+                item: item,
+                onEdit: () => onEdit(item),
+                onDelete: () => onDelete(item),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MemoryTile extends StatelessWidget {
+  final CopilotMemoryItem item;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  const _MemoryTile({
+    required this.item,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.fromLTRB(11, 10, 7, 10),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.65)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              color: item.type == CopilotMemoryType.longTerm
+                  ? AppColors.primary.withValues(alpha: 0.09)
+                  : AppColors.warning.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              item.type == CopilotMemoryType.longTerm
+                  ? Icons.psychology_alt_rounded
+                  : Icons.history_rounded,
+              size: 16,
+              color: item.type == CopilotMemoryType.longTerm
+                  ? AppColors.primary
+                  : AppColors.warning,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.text,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  item.content,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    height: 1.34,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: [
+                    _MiniBadge('重要 ${item.importance}/5'),
+                    for (final tag in item.tags.take(4)) _MiniBadge(tag),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            tooltip: '编辑',
+            onPressed: onEdit,
+            icon: const Icon(Icons.edit_rounded, size: 17),
+          ),
+          IconButton(
+            tooltip: '删除',
+            onPressed: onDelete,
+            icon: const Icon(
+              Icons.delete_outline_rounded,
+              size: 17,
+              color: AppColors.danger,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MiniBadge extends StatelessWidget {
+  final String text;
+
+  const _MiniBadge(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        text,
+        style: const TextStyle(
+          fontSize: 11,
+          color: AppColors.primary,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+}
+
 class _InfoTile extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
@@ -533,4 +835,142 @@ class _EmptyHint extends StatelessWidget {
       ),
     );
   }
+}
+
+Future<void> _showMemoryDialog(
+  BuildContext context,
+  WidgetRef ref, {
+  required CopilotMemoryType type,
+  CopilotMemoryItem? item,
+}) async {
+  var memoryType = item?.type ?? type;
+  var importance =
+      item?.importance ?? (type == CopilotMemoryType.longTerm ? 4 : 2);
+  final titleController = TextEditingController(text: item?.title ?? '');
+  final contentController = TextEditingController(text: item?.content ?? '');
+  final tagsController = TextEditingController(
+    text: item?.tags.join('、') ?? '',
+  );
+  await showDialog<void>(
+    context: context,
+    builder: (dialogContext) {
+      return StatefulBuilder(
+        builder: (dialogContext, setState) {
+          return AlertDialog(
+            title: Text(item == null ? '添加记忆' : '编辑记忆'),
+            content: SizedBox(
+              width: 480,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AppDropdownField<CopilotMemoryType>(
+                      label: '记忆类型',
+                      value: memoryType,
+                      options: const [
+                        AppDropdownOption(
+                          value: CopilotMemoryType.longTerm,
+                          label: '长期记忆',
+                        ),
+                        AppDropdownOption(
+                          value: CopilotMemoryType.shortTerm,
+                          label: '短期记忆',
+                        ),
+                      ],
+                      onChanged: (value) => setState(() => memoryType = value),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: titleController,
+                      decoration: appInputDecoration(label: '标题'),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: contentController,
+                      minLines: 4,
+                      maxLines: 7,
+                      decoration: appInputDecoration(label: '内容'),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: tagsController,
+                      decoration: appInputDecoration(
+                        label: '标签',
+                        hintText: '用逗号或顿号分隔',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        const Text(
+                          '重要度',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Slider(
+                            value: importance.toDouble(),
+                            min: 1,
+                            max: 5,
+                            divisions: 4,
+                            label: '$importance',
+                            onChanged: (value) =>
+                                setState(() => importance = value.round()),
+                          ),
+                        ),
+                        Text(
+                          '$importance/5',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text('取消'),
+              ),
+              TextButton(
+                onPressed: () async {
+                  final content = contentController.text.trim();
+                  if (content.isEmpty) return;
+                  final tags = tagsController.text
+                      .split(RegExp(r'[、,\s]+'))
+                      .map((item) => item.trim())
+                      .where((item) => item.isNotEmpty)
+                      .toSet()
+                      .toList();
+                  await ref
+                      .read(copilotMemoryProvider.notifier)
+                      .upsert(
+                        id: item?.id,
+                        type: memoryType,
+                        title: titleController.text.trim(),
+                        content: content,
+                        tags: tags,
+                        importance: importance,
+                      );
+                  if (dialogContext.mounted) Navigator.of(dialogContext).pop();
+                },
+                child: const Text('保存'),
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
+  titleController.dispose();
+  contentController.dispose();
+  tagsController.dispose();
 }
