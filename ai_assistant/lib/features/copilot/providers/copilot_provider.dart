@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/providers/core_providers.dart';
 import '../../ai_settings/ai_model_provider.dart';
+import '../copilot_settings.dart';
 import '../../profile/profile_provider.dart';
 import '../services/copilot_agent_service.dart';
 
@@ -210,6 +211,7 @@ class CopilotNotifier extends Notifier<CopilotState> {
         datasource: ref.read(datasourceProvider),
         profile: ref.read(profileProvider),
         aiModels: ref.read(aiModelProvider).configs,
+        settings: ref.read(copilotSettingsProvider),
       );
       final reply = await agent.run(
         input: text,

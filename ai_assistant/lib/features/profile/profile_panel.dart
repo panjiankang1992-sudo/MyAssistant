@@ -3,8 +3,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
-import '../ai_settings/ai_model_page.dart';
 import '../auth/auth_provider.dart';
+import '../copilot/copilot_settings_page.dart';
 import '../settings/settings_page.dart';
 import '../tags/tag_manage_page.dart';
 import 'edit_profile_modal.dart';
@@ -329,12 +329,12 @@ class _ProfilePanelState extends State<ProfilePanel>
                                           ),
                                         ),
                                         _MenuItemCard(
-                                          icon: Icons.memory_rounded,
-                                          label: 'AI 模型',
+                                          icon: Icons.auto_awesome_rounded,
+                                          label: 'Copilot 设置',
                                           onTap: () => _afterClose(() {
                                             Navigator.of(context).push(
                                               profileSidePageRoute(
-                                                const AiModelPage(),
+                                                const CopilotSettingsPage(),
                                               ),
                                             );
                                           }),

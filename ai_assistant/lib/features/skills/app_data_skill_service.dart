@@ -285,7 +285,9 @@ class AppDataSkillService {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     if (input.contains('昨天')) return today.subtract(const Duration(days: 1));
-    if (input.contains('明天')) return today.add(const Duration(days: 1));
+    if (input.contains('明天') || input.contains('明日')) {
+      return today.add(const Duration(days: 1));
+    }
     if (input.contains('后天')) return today.add(const Duration(days: 2));
     final match = RegExp(
       r'(\d{4})[-年/\.](\d{1,2})[-月/\.](\d{1,2})',
@@ -303,7 +305,7 @@ class AppDataSkillService {
 
   String _targetTitle(String input) {
     if (input.contains('昨天')) return '昨天';
-    if (input.contains('明天')) return '明天';
+    if (input.contains('明天') || input.contains('明日')) return '明天';
     if (input.contains('后天')) return '后天';
     return '今天';
   }

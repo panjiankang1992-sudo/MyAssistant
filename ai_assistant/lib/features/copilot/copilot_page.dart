@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../ai_settings/ai_model_provider.dart';
+import 'copilot_settings.dart';
 import 'providers/copilot_provider.dart';
 import 'widgets/chat_bubble.dart';
 import 'widgets/copilot_hero.dart';
@@ -389,21 +390,32 @@ class _TypingIndicatorState extends State<_TypingIndicator>
       padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(
         children: [
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.09),
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: AppColors.primary.withValues(alpha: 0.14),
-              ),
-            ),
-            child: const Icon(
-              Icons.auto_awesome_rounded,
-              size: 16,
-              color: AppColors.primary,
-            ),
+          Consumer(
+            builder: (context, ref, _) {
+              final settings = ref.watch(copilotSettingsProvider);
+              return Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.09),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: AppColors.primary.withValues(alpha: 0.14),
+                  ),
+                ),
+                child: Center(
+                  child: Text(
+                    settings.displayAvatar,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.primary,
+                      height: 1,
+                    ),
+                  ),
+                ),
+              );
+            },
           ),
           const SizedBox(width: 10),
           Container(

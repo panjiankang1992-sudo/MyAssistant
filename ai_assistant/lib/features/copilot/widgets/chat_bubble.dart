@@ -1,19 +1,27 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../profile/profile_provider.dart';
+import '../copilot_settings.dart';
 import '../providers/copilot_provider.dart';
 
-class ChatBubble extends StatelessWidget {
+class ChatBubble extends ConsumerWidget {
   final ChatMessage message;
 
   const ChatBubble({super.key, required this.message});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final isUser = message.role == ChatRole.user;
+    final settings = ref.watch(copilotSettingsProvider);
+    final profile = ref.watch(profileProvider);
     final screenWidth = MediaQuery.of(context).size.width;
     final maxWidth = isUser
         ? (screenWidth > 1100 ? 620.0 : screenWidth * 0.72)
@@ -27,8 +35,8 @@ class ChatBubble extends StatelessWidget {
         child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: maxWidth),
           child: isUser
-              ? _UserMessage(message: message, time: time)
-              : _AgentMessage(message: message, time: time),
+              ? _UserMessage(message: message, time: time, profile: profile)
+              : _AgentMessage(message: message, time: time, settings: settings),
         ),
       ),
     );
@@ -38,8 +46,13 @@ class ChatBubble extends StatelessWidget {
 class _AgentMessage extends StatelessWidget {
   final ChatMessage message;
   final String time;
+  final CopilotSettings settings;
 
-  const _AgentMessage({required this.message, required this.time});
+  const _AgentMessage({
+    required this.message,
+    required this.time,
+    required this.settings,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -56,12 +69,16 @@ class _AgentMessage extends StatelessWidget {
         ? '处理异常'
         : isTool
         ? '执行结果'
-        : 'MyAssistant';
+        : settings.displayName;
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _AssistantAvatar(color: toneColor, isError: isError),
+        _AssistantAvatar(
+          color: toneColor,
+          isError: isError,
+          label: settings.displayAvatar,
+        ),
         const SizedBox(width: 12),
         Expanded(
           child: Container(
@@ -188,8 +205,13 @@ class _AgentMessage extends StatelessWidget {
 class _AssistantAvatar extends StatelessWidget {
   final Color color;
   final bool isError;
+  final String label;
 
-  const _AssistantAvatar({required this.color, required this.isError});
+  const _AssistantAvatar({
+    required this.color,
+    required this.isError,
+    required this.label,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -217,10 +239,24 @@ class _AssistantAvatar extends StatelessWidget {
           ),
         ],
       ),
-      child: Icon(
-        isError ? Icons.priority_high_rounded : Icons.auto_awesome_rounded,
-        size: 19,
-        color: Colors.white,
+      child: Center(
+        child: isError
+            ? const Icon(
+                Icons.priority_high_rounded,
+                size: 19,
+                color: Colors.white,
+              )
+            : Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.clip,
+                style: const TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w900,
+                  height: 1,
+                  color: Colors.white,
+                ),
+              ),
       ),
     );
   }
@@ -352,67 +388,170 @@ MarkdownStyleSheet _markdownStyle(
 class _UserMessage extends StatelessWidget {
   final ChatMessage message;
   final String time;
+  final UserProfile profile;
 
-  const _UserMessage({required this.message, required this.time});
+  const _UserMessage({
+    required this.message,
+    required this.time,
+    required this.profile,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF0875E1), Color(0xFF2F88FF)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(22),
-              topRight: Radius.circular(8),
-              bottomLeft: Radius.circular(22),
-              bottomRight: Radius.circular(6),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.primary.withValues(alpha: 0.16),
-                blurRadius: 18,
-                offset: const Offset(0, 9),
+        Flexible(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF0875E1), Color(0xFF2F88FF)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(22),
+                    topRight: Radius.circular(8),
+                    bottomLeft: Radius.circular(22),
+                    bottomRight: Radius.circular(6),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withValues(alpha: 0.16),
+                      blurRadius: 18,
+                      offset: const Offset(0, 9),
+                    ),
+                  ],
+                ),
+                child: SelectableText(
+                  message.content,
+                  style: const TextStyle(
+                    fontFamily: 'PingFang SC',
+                    fontFamilyFallback: [
+                      '.SF Pro Text',
+                      'system-ui',
+                      'sans-serif',
+                    ],
+                    fontSize: 15,
+                    height: 1.45,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    time,
+                    style: const TextStyle(
+                      fontFamily: 'PingFang SC',
+                      fontFamilyFallback: [
+                        '.SF Pro Text',
+                        'system-ui',
+                        'sans-serif',
+                      ],
+                      fontSize: 11,
+                      fontWeight: FontWeight.w400,
+                      color: AppColors.textTertiary,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  _CopyMessageButton(content: message.content),
+                ],
               ),
             ],
           ),
-          child: SelectableText(
-            message.content,
-            style: const TextStyle(
-              fontFamily: 'PingFang SC',
-              fontFamilyFallback: ['.SF Pro Text', 'system-ui', 'sans-serif'],
-              fontSize: 15,
-              height: 1.45,
-              fontWeight: FontWeight.w800,
-              color: Colors.white,
+        ),
+        const SizedBox(width: 10),
+        _UserAvatar(profile: profile),
+      ],
+    );
+  }
+}
+
+class _UserAvatar extends StatelessWidget {
+  final UserProfile profile;
+
+  const _UserAvatar({required this.profile});
+
+  @override
+  Widget build(BuildContext context) {
+    final fallback = _gradientAvatar(profile.avatarLetter);
+    if (profile.hasServerAvatar) {
+      final url = profile.serverAvatarUrl!;
+      if (url.startsWith('data:')) {
+        try {
+          final bytes = base64Decode(url.split(',').last);
+          return ClipOval(
+            child: Image.memory(
+              bytes,
+              width: 36,
+              height: 36,
+              fit: BoxFit.cover,
+              errorBuilder: (_, _, _) => fallback,
             ),
+          );
+        } catch (_) {
+          return fallback;
+        }
+      }
+      return ClipOval(
+        child: Image.network(
+          url,
+          width: 36,
+          height: 36,
+          fit: BoxFit.cover,
+          errorBuilder: (_, _, _) => fallback,
+        ),
+      );
+    }
+    if (profile.hasCustomAvatar) {
+      return ClipOval(
+        child: Image.file(
+          File(profile.avatarPath!),
+          width: 36,
+          height: 36,
+          fit: BoxFit.cover,
+          errorBuilder: (_, _, _) => fallback,
+        ),
+      );
+    }
+    return fallback;
+  }
+
+  Widget _gradientAvatar(String text) {
+    return Container(
+      width: 36,
+      height: 36,
+      margin: const EdgeInsets.only(top: 2),
+      decoration: const BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(
+          colors: [Color(0xFFFF9500), Color(0xFFFF5E3A)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Center(
+        child: Text(
+          text.isEmpty ? '?' : text,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w900,
+            color: Colors.white,
           ),
         ),
-        const SizedBox(height: 6),
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              time,
-              style: const TextStyle(
-                fontFamily: 'PingFang SC',
-                fontFamilyFallback: ['.SF Pro Text', 'system-ui', 'sans-serif'],
-                fontSize: 11,
-                fontWeight: FontWeight.w400,
-                color: AppColors.textTertiary,
-              ),
-            ),
-            const SizedBox(width: 4),
-            _CopyMessageButton(content: message.content),
-          ],
-        ),
-      ],
+      ),
     );
   }
 }

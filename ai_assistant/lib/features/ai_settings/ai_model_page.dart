@@ -50,7 +50,7 @@ class AiModelPage extends ConsumerWidget {
           SizedBox(
             height: appControlHeight,
             child: ElevatedButton.icon(
-              onPressed: () => _showModelDialog(context, ref),
+              onPressed: () => showAiModelDialog(context, ref),
               icon: const Icon(Icons.add_rounded, size: 18),
               label: const Text('添加模型'),
               style: appControlButtonStyle(),
@@ -136,7 +136,7 @@ class _ModelConfigCard extends ConsumerWidget {
           ),
           IconButton(
             tooltip: '编辑',
-            onPressed: () => _showModelDialog(context, ref, config: config),
+            onPressed: () => showAiModelDialog(context, ref, config: config),
             icon: const Icon(Icons.edit_outlined, size: 18),
           ),
           IconButton(
@@ -181,7 +181,7 @@ class _CapabilityCard extends StatelessWidget {
   }
 }
 
-Future<void> _showModelDialog(
+Future<void> showAiModelDialog(
   BuildContext context,
   WidgetRef ref, {
   AiModelConfig? config,

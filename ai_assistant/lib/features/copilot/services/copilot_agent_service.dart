@@ -3,6 +3,7 @@ import '../../../domain/models/ai_model_config.dart';
 import '../../profile/profile_provider.dart';
 import '../../skills/app_data_skill_service.dart';
 import '../../skills/builtin_skill_registry.dart';
+import '../copilot_settings.dart';
 import '../providers/copilot_provider.dart';
 import 'openai_compatible_client.dart';
 
@@ -10,12 +11,14 @@ class CopilotAgentService {
   final LocalDatasource datasource;
   final UserProfile profile;
   final List<AiModelConfig> aiModels;
+  final CopilotSettings settings;
   final OpenAiCompatibleClient llmClient;
 
   CopilotAgentService({
     required this.datasource,
     required this.profile,
     required this.aiModels,
+    required this.settings,
     OpenAiCompatibleClient? llmClient,
   }) : llmClient = llmClient ?? OpenAiCompatibleClient();
 
@@ -29,7 +32,7 @@ class CopilotAgentService {
       return localContext.directAnswer!;
     }
     if (config == null) {
-      return '还没有配置大模型。请从头像菜单进入「AI 模型」，添加 DeepSeek、MiniMax 或 OpenAI 兼容模型后再试。';
+      return '还没有配置大模型。请从头像菜单进入「Copilot 设置」，在模型维护里添加 DeepSeek、MiniMax 或 OpenAI 兼容模型后再试。';
     }
     if (config.apiKey.trim().isEmpty ||
         config.baseUrl.trim().isEmpty ||
@@ -42,13 +45,23 @@ class CopilotAgentService {
         role: 'system',
         content:
             '你是 MyAssistant 的轻量化 Agent。你可以使用内置 skill。'
+            '你在聊天界面里的名字由用户设置决定。'
             'MCP 当前处于配置预留阶段，不要假装已连接外部 MCP。'
             '回答要简洁、中文、可执行。'
             '查询、统计、分析本应用数据时，优先使用应用数据 skill 的结构化结果；'
             '代办列表必须使用红黄绿灯和表格，不要暴露内部枚举值。'
+            '表格中的来源和动作字段必须翻译成中文，例如 routine=例行，manual=手动，bookkeeping=记账。'
             '如果 system 上下文包含「app_data skill 已授权并已读取」，'
             '你必须承认已经读取到本应用本地数据，并基于其中数据回答；'
             '禁止回答“无法访问本地数据”“请提供应用数据”。',
+      ),
+      LlmChatMessage(
+        role: 'system',
+        content:
+            '当前 Copilot 设置：助手名称=${settings.displayName}；'
+            '助手头像=${settings.displayAvatar}；'
+            '对用户称呼=${settings.displayUserCallName.isEmpty ? "按用户昵称自然称呼" : settings.displayUserCallName}；'
+            '性格与聊天风格：${settings.displayPersona}',
       ),
       LlmChatMessage(
         role: 'system',
@@ -89,6 +102,7 @@ class CopilotAgentService {
         input.contains('待办') ||
         input.contains('日程') ||
         input.contains('明天') ||
+        input.contains('明日') ||
         input.contains('今天') ||
         input.contains('例行') ||
         input.contains('账单') ||
