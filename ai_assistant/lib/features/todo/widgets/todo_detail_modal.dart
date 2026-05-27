@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../domain/models/tag.dart';
 import '../../../domain/models/todo.dart';
-import '../../../shared/widgets/tag_chip.dart';
 import '../../../shared/widgets/edge_swipe_pop.dart';
 import '../../../shared/widgets/app_controls.dart';
 import '../../../core/theme/app_theme.dart';
@@ -198,22 +197,20 @@ class _TodoDetailSheetState extends ConsumerState<_TodoDetailSheet> {
         ),
         const SizedBox(height: 12),
         _buildSectionLabel('来源 & 标签'),
-        const SizedBox(height: 4),
-        Row(
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 7,
+          runSpacing: 7,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             _buildSourceBadge(widget.todo.source),
-            const SizedBox(width: 8),
-            Wrap(
-              spacing: 4,
-              runSpacing: 4,
-              children: widget.todo.tags
-                  .map(
-                    (tag) => TagChip.fromTag(
-                      label: tag.name,
-                      colorKey: tag.colorKey,
-                    ),
-                  )
-                  .toList(),
+            ...widget.todo.tags.map(
+              (tag) => _DetailChip(
+                label: tag.name,
+                icon: null,
+                color: TagPalette.textColor(tag.colorKey),
+                background: TagPalette.bgColor(tag.colorKey),
+              ),
             ),
           ],
         ),
@@ -235,39 +232,21 @@ class _TodoDetailSheetState extends ConsumerState<_TodoDetailSheet> {
           ),
         ],
         const SizedBox(height: 16),
-        _buildSectionLabel('日期'),
-        const SizedBox(height: 4),
-        Text(
-          DateFormat('yyyy-MM-dd').format(widget.todo.date),
-          style: const TextStyle(
-            fontFamily: 'PingFang SC',
-            fontFamilyFallback: ['.SF Pro Text', 'system-ui', 'sans-serif'],
-            fontSize: 14,
-            fontWeight: FontWeight.w400,
-            color: AppColors.textSecondary,
-          ),
+        _DetailInfoRow(
+          label: '时间',
+          icon: Icons.schedule_rounded,
+          value:
+              '${DateFormat('yyyy-MM-dd').format(widget.todo.date)}  ${widget.todo.time}',
         ),
-        const SizedBox(height: 4),
-        _buildSectionLabel('时间'),
-        const SizedBox(height: 4),
-        Text(
-          widget.todo.time,
-          style: const TextStyle(
-            fontFamily: 'PingFang SC',
-            fontFamilyFallback: ['.SF Pro Text', 'system-ui', 'sans-serif'],
-            fontSize: 14,
-            fontWeight: FontWeight.w400,
-            color: AppColors.textSecondary,
-          ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _buildActionBadge(widget.todo.action),
+            _buildPriorityBadge(),
+          ],
         ),
-        const SizedBox(height: 4),
-        _buildSectionLabel('动作'),
-        const SizedBox(height: 4),
-        _buildActionBadge(widget.todo.action),
-        const SizedBox(height: 4),
-        _buildSectionLabel('优先级'),
-        const SizedBox(height: 4),
-        _buildPriorityBadge(),
       ],
     );
   }
@@ -283,7 +262,7 @@ class _TodoDetailSheetState extends ConsumerState<_TodoDetailSheet> {
           controller: _titleController,
           decoration: _inputDecoration('输入待办事项…'),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 14),
         _buildSectionLabel('详情'),
         const SizedBox(height: 6),
         TextFormField(
@@ -292,45 +271,64 @@ class _TodoDetailSheetState extends ConsumerState<_TodoDetailSheet> {
           maxLines: 3,
           minLines: 2,
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 14),
         _buildSectionLabel('标签'),
         const SizedBox(height: 6),
         TagSelector(
           selectedTags: _tags,
           onChanged: (tags) => setState(() => _tags = tags),
         ),
-        const SizedBox(height: 16),
-        _buildSectionLabel('日期'),
-        const SizedBox(height: 6),
-        InkWell(
-          onTap: _pickDate,
-          child: InputDecorator(
-            decoration: _inputDecoration(''),
-            child: Text(DateFormat('yyyy-MM-dd').format(_date)),
-          ),
+        const SizedBox(height: 14),
+        Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildSectionLabel('日期'),
+                  const SizedBox(height: 6),
+                  InkWell(
+                    onTap: _pickDate,
+                    borderRadius: BorderRadius.circular(14),
+                    child: InputDecorator(
+                      decoration: _inputDecoration(''),
+                      child: Text(DateFormat('yyyy-MM-dd').format(_date)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildSectionLabel('时间'),
+                  const SizedBox(height: 6),
+                  TimeInputField(
+                    value: _time,
+                    onChanged: (value) => setState(() => _time = value),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
-        const SizedBox(height: 16),
-        _buildSectionLabel('时间'),
-        const SizedBox(height: 6),
-        TimeInputField(
-          value: _time,
-          onChanged: (value) => setState(() => _time = value),
-        ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 14),
         _buildSectionLabel('动作'),
         const SizedBox(height: 6),
         ActionSelector(
           value: _action,
           onChanged: (value) => setState(() => _action = value),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 14),
         _buildSectionLabel('来源'),
         const SizedBox(height: 6),
         SourceSelector(
           value: _source,
           onChanged: (value) => setState(() => _source = value),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 14),
         _buildSectionLabel('优先级'),
         const SizedBox(height: 6),
         Row(
@@ -411,76 +409,31 @@ class _TodoDetailSheetState extends ConsumerState<_TodoDetailSheet> {
       label = '普通';
       color = AppColors.textTertiary;
     }
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontFamily: 'PingFang SC',
-          fontFamilyFallback: const ['.SF Pro Text', 'system-ui', 'sans-serif'],
-          fontSize: 13,
-          fontWeight: FontWeight.w500,
-          color: color,
-        ),
-      ),
+    return _DetailChip(
+      label: label,
+      icon: Icons.flag_rounded,
+      color: color,
+      background: color,
     );
   }
 
   Widget _buildActionBadge(String value) {
     final action = TodoActions.byValue(value);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
-      decoration: BoxDecoration(
-        color: action.color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: action.color.withValues(alpha: 0.2)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(action.icon, size: 14, color: action.color),
-          const SizedBox(width: 5),
-          Text(
-            action.label,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: action.color,
-            ),
-          ),
-        ],
-      ),
+    return _DetailChip(
+      label: action.label,
+      icon: action.icon,
+      color: action.color,
+      background: action.color,
     );
   }
 
   Widget _buildSourceBadge(String value) {
     final source = TodoSources.byValue(value);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
-      decoration: BoxDecoration(
-        color: source.color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: source.color.withValues(alpha: 0.2)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(source.icon, size: 14, color: source.color),
-          const SizedBox(width: 5),
-          Text(
-            _getSourceLabel(value),
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: source.color,
-            ),
-          ),
-        ],
-      ),
+    return _DetailChip(
+      label: _getSourceLabel(value),
+      icon: source.icon,
+      color: source.color,
+      background: source.color,
     );
   }
 
@@ -501,10 +454,12 @@ class _TodoDetailSheetState extends ConsumerState<_TodoDetailSheet> {
     return GestureDetector(
       onTap: () => setState(() => _priority = priority),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        height: 34,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        alignment: Alignment.center,
         decoration: BoxDecoration(
           color: isSelected ? bg : bg.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(17),
           border: Border.all(
             color: isSelected ? bg : bg.withValues(alpha: 0.3),
           ),
@@ -534,72 +489,176 @@ class _TodoDetailSheetState extends ConsumerState<_TodoDetailSheet> {
     required VoidCallback rightOnPressed,
   }) {
     return Container(
-      padding: const EdgeInsets.only(top: 16),
-      decoration: const BoxDecoration(
-        border: Border(top: BorderSide(color: AppColors.border)),
+      padding: const EdgeInsets.fromLTRB(0, 14, 0, 0),
+      decoration: BoxDecoration(
+        color: AppColors.surface.withValues(alpha: 0.98),
+        border: const Border(top: BorderSide(color: AppColors.border)),
       ),
       child: Row(
         children: [
           Expanded(
-            child: SizedBox(
-              height: 44,
-              child: ElevatedButton(
-                onPressed: leftOnPressed,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFF0F0F5),
-                  foregroundColor: AppColors.text,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(25),
-                  ),
-                ),
-                child: Text(
-                  leftLabel,
-                  style: const TextStyle(
-                    fontFamily: 'PingFang SC',
-                    fontFamilyFallback: [
-                      '.SF Pro Text',
-                      'system-ui',
-                      'sans-serif',
-                    ],
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
+            child: _DetailBottomButton(
+              label: leftLabel,
+              onPressed: leftOnPressed,
+              primary: false,
             ),
           ),
           const SizedBox(width: 10),
           Expanded(
-            child: SizedBox(
-              height: 44,
-              child: ElevatedButton(
-                onPressed: rightOnPressed,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(25),
-                  ),
-                ),
-                child: Text(
-                  rightLabel,
-                  style: const TextStyle(
-                    fontFamily: 'PingFang SC',
-                    fontFamilyFallback: [
-                      '.SF Pro Text',
-                      'system-ui',
-                      'sans-serif',
-                    ],
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
+            child: _DetailBottomButton(
+              label: rightLabel,
+              onPressed: rightOnPressed,
+              primary: true,
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _DetailChip extends StatelessWidget {
+  final String label;
+  final IconData? icon;
+  final Color color;
+  final Color background;
+
+  const _DetailChip({
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.background,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 32,
+      padding: EdgeInsets.only(left: icon == null ? 12 : 10, right: 12),
+      decoration: BoxDecoration(
+        color: background.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.22)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 14, color: color),
+            const SizedBox(width: 5),
+          ],
+          Text(
+            label,
+            style: TextStyle(
+              fontFamily: 'PingFang SC',
+              fontFamilyFallback: const [
+                '.SF Pro Text',
+                'system-ui',
+                'sans-serif',
+              ],
+              fontSize: 13,
+              height: 1,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DetailInfoRow extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final String value;
+
+  const _DetailInfoRow({
+    required this.label,
+    required this.icon,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        SizedBox(
+          width: 70,
+          child: Row(
+            children: [
+              Icon(icon, size: 15, color: AppColors.textTertiary),
+              const SizedBox(width: 5),
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textTertiary,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(
+              fontFamily: 'PingFang SC',
+              fontFamilyFallback: ['.SF Pro Text', 'system-ui', 'sans-serif'],
+              fontSize: 14,
+              height: 1.2,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DetailBottomButton extends StatelessWidget {
+  final String label;
+  final VoidCallback onPressed;
+  final bool primary;
+
+  const _DetailBottomButton({
+    required this.label,
+    required this.onPressed,
+    required this.primary,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 46,
+      child: ElevatedButton(
+        onPressed: onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: primary ? AppColors.primary : AppColors.inputBg,
+          foregroundColor: primary ? Colors.white : AppColors.text,
+          elevation: 0,
+          shadowColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+            side: BorderSide(
+              color: primary
+                  ? AppColors.primary
+                  : AppColors.border.withValues(alpha: 0.9),
+            ),
+          ),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(
+            fontFamily: 'PingFang SC',
+            fontFamilyFallback: ['.SF Pro Text', 'system-ui', 'sans-serif'],
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
       ),
     );
   }
