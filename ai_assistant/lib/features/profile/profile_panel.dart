@@ -8,6 +8,7 @@ import '../copilot/copilot_settings_page.dart';
 import '../settings/settings_page.dart';
 import '../settings/theme_settings_page.dart';
 import '../tags/tag_manage_page.dart';
+import '../help/help_feedback_page.dart';
 import 'edit_profile_modal.dart';
 import 'password_change_modal.dart';
 import 'profile_provider.dart';
@@ -172,12 +173,6 @@ class _ProfilePanelState extends State<ProfilePanel>
           ),
         ),
       ),
-    );
-  }
-
-  void _showToast(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg), duration: const Duration(seconds: 1)),
     );
   }
 
@@ -369,9 +364,13 @@ class _ProfilePanelState extends State<ProfilePanel>
                                         _MenuItemCard(
                                           icon: Icons.help_outline_rounded,
                                           label: '帮助与反馈',
-                                          onTap: () => _afterClose(
-                                            () => _showToast('功能开发中'),
-                                          ),
+                                          onTap: () => _afterClose(() {
+                                            Navigator.of(context).push(
+                                              profileSidePageRoute(
+                                                const HelpFeedbackPage(),
+                                              ),
+                                            );
+                                          }),
                                         ),
                                       ],
                                     ),
