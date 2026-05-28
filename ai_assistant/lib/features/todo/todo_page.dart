@@ -208,9 +208,10 @@ class _TodoPageState extends ConsumerState<TodoPage>
     final selectedDate = ref.watch(selectedDateProvider);
     final todos = ref.watch(todoNotifierProvider);
     final isToday = _isToday(selectedDate);
+    final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: scheme.appPage,
       body: Stack(
         children: [
           SafeArea(
@@ -232,9 +233,9 @@ class _TodoPageState extends ConsumerState<TodoPage>
                                   child: Text(
                                     _titleForDate(selectedDate),
                                     key: ValueKey(selectedDate),
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontFamily: 'PingFang SC',
-                                      fontFamilyFallback: [
+                                      fontFamilyFallback: const [
                                         '.SF Pro Text',
                                         'system-ui',
                                         'sans-serif',
@@ -242,7 +243,7 @@ class _TodoPageState extends ConsumerState<TodoPage>
                                       fontSize: 30,
                                       fontWeight: FontWeight.w700,
                                       letterSpacing: -0.3,
-                                      color: AppColors.text,
+                                      color: scheme.appText,
                                     ),
                                   ),
                                 ),
@@ -279,10 +280,10 @@ class _TodoPageState extends ConsumerState<TodoPage>
                                           picked;
                                     }
                                   },
-                                  child: const Icon(
+                                  child: Icon(
                                     Icons.calendar_month_outlined,
                                     size: 24,
-                                    color: AppColors.textSecondary,
+                                    color: scheme.appMutedText,
                                   ),
                                 ),
                                 const SizedBox(width: 2),
@@ -299,10 +300,10 @@ class _TodoPageState extends ConsumerState<TodoPage>
                                             strokeWidth: 2,
                                           ),
                                         )
-                                      : const Icon(
+                                      : Icon(
                                           Icons.event_available_rounded,
                                           size: 22,
-                                          color: AppColors.textSecondary,
+                                          color: scheme.appMutedText,
                                         ),
                                 ),
                               ],
@@ -313,9 +314,9 @@ class _TodoPageState extends ConsumerState<TodoPage>
                               duration: const Duration(milliseconds: 300),
                               child: Text(
                                 _poetryLines[_poetryIndex],
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontFamily: 'PingFang SC',
-                                  fontFamilyFallback: [
+                                  fontFamilyFallback: const [
                                     '.SF Pro Text',
                                     'system-ui',
                                     'sans-serif',
@@ -323,7 +324,7 @@ class _TodoPageState extends ConsumerState<TodoPage>
                                   fontSize: 12,
                                   fontWeight: FontWeight.w400,
                                   fontStyle: FontStyle.italic,
-                                  color: AppColors.textTertiary,
+                                  color: scheme.appMutedText,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,

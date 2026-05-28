@@ -185,24 +185,25 @@ class _TimeInputFieldState extends State<TimeInputField> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       height: 48,
       decoration: BoxDecoration(
-        color: AppColors.inputBg,
+        color: scheme.appInput,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: scheme.appBorder),
       ),
       child: Row(
         children: [
           InkResponse(
             onTap: _pickTime,
             radius: 22,
-            child: const Padding(
-              padding: EdgeInsets.only(left: 14, right: 10),
+            child: Padding(
+              padding: const EdgeInsets.only(left: 14, right: 10),
               child: Icon(
                 Icons.schedule_rounded,
                 size: 18,
-                color: AppColors.textTertiary,
+                color: scheme.appSubtleText,
               ),
             ),
           ),
@@ -210,16 +211,16 @@ class _TimeInputFieldState extends State<TimeInputField> {
             child: TextField(
               controller: _controller,
               keyboardType: TextInputType.datetime,
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: 'Menlo',
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
-                color: AppColors.text,
+                color: scheme.appText,
               ),
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 border: InputBorder.none,
                 hintText: '09:00',
-                hintStyle: TextStyle(color: AppColors.textTertiary),
+                hintStyle: TextStyle(color: scheme.appSubtleText),
               ),
               onEditingComplete: () {
                 _controller.text = _normalize(_controller.text);
@@ -442,6 +443,7 @@ class ActionSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Wrap(
       spacing: 8,
       runSpacing: 8,
@@ -455,12 +457,12 @@ class ActionSelector extends StatelessWidget {
             decoration: BoxDecoration(
               color: selected
                   ? action.color.withValues(alpha: 0.12)
-                  : AppColors.inputBg,
+                  : scheme.appInput,
               borderRadius: BorderRadius.circular(18),
               border: Border.all(
                 color: selected
                     ? action.color.withValues(alpha: 0.38)
-                    : AppColors.border,
+                    : scheme.appBorder,
                 width: 1,
               ),
             ),
@@ -470,7 +472,7 @@ class ActionSelector extends StatelessWidget {
                 Icon(
                   action.icon,
                   size: 15,
-                  color: selected ? action.color : AppColors.textTertiary,
+                  color: selected ? action.color : scheme.appSubtleText,
                 ),
                 const SizedBox(width: 5),
                 Text(
@@ -478,7 +480,7 @@ class ActionSelector extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-                    color: selected ? action.color : AppColors.textSecondary,
+                    color: selected ? action.color : scheme.appMutedText,
                   ),
                 ),
               ],
@@ -502,6 +504,7 @@ class SourceSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Wrap(
       spacing: 8,
       runSpacing: 8,
@@ -515,12 +518,12 @@ class SourceSelector extends StatelessWidget {
             decoration: BoxDecoration(
               color: selected
                   ? source.color.withValues(alpha: 0.12)
-                  : AppColors.inputBg,
+                  : scheme.appInput,
               borderRadius: BorderRadius.circular(18),
               border: Border.all(
                 color: selected
                     ? source.color.withValues(alpha: 0.38)
-                    : AppColors.border,
+                    : scheme.appBorder,
               ),
             ),
             child: Row(
@@ -529,7 +532,7 @@ class SourceSelector extends StatelessWidget {
                 Icon(
                   source.icon,
                   size: 15,
-                  color: selected ? source.color : AppColors.textTertiary,
+                  color: selected ? source.color : scheme.appSubtleText,
                 ),
                 const SizedBox(width: 5),
                 Text(
@@ -537,7 +540,7 @@ class SourceSelector extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-                    color: selected ? source.color : AppColors.textSecondary,
+                    color: selected ? source.color : scheme.appMutedText,
                   ),
                 ),
               ],

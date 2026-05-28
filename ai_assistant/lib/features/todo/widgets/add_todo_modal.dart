@@ -82,7 +82,10 @@ class _AddTodoPageShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return EdgeSwipePop(
-      child: Material(color: AppColors.surface, child: child),
+      child: Material(
+        color: Theme.of(context).colorScheme.appPage,
+        child: child,
+      ),
     );
   }
 }
@@ -92,6 +95,7 @@ class _AddTodoHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 14, 16, 10),
       child: Row(
@@ -114,15 +118,19 @@ class _AddTodoHeader extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 10),
-          const Expanded(
+          Expanded(
             child: Text(
               '新增',
               style: TextStyle(
                 fontFamily: 'PingFang SC',
-                fontFamilyFallback: ['.SF Pro Text', 'system-ui', 'sans-serif'],
+                fontFamilyFallback: const [
+                  '.SF Pro Text',
+                  'system-ui',
+                  'sans-serif',
+                ],
                 fontSize: 22,
                 fontWeight: FontWeight.w700,
-                color: AppColors.text,
+                color: scheme.appText,
               ),
             ),
           ),
@@ -145,14 +153,16 @@ class _AddTodoTabBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Container(
         height: 48,
         padding: const EdgeInsets.all(3),
         decoration: BoxDecoration(
-          color: const Color(0xFFF1F3F8),
+          color: scheme.appControlSurface,
           borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: scheme.appBorder.withValues(alpha: 0.55)),
         ),
         child: Row(
           children: [
@@ -553,7 +563,9 @@ class _AddTodoModalContentState extends ConsumerState<_AddTodoModalContent>
                                   label: '标题',
                                   child: TextFormField(
                                     controller: _titleController,
-                                    decoration: InputDecoration(
+                                    decoration: appInputDecoration(
+                                      context: context,
+                                      label: '',
                                       hintText: '输入待办事项…',
                                       suffixIcon: IconButton(
                                         tooltip: '使用当前 AI 分析',
@@ -575,31 +587,6 @@ class _AddTodoModalContentState extends ConsumerState<_AddTodoModalContent>
                                                 color: AppColors.primary,
                                               ),
                                       ),
-                                      filled: true,
-                                      fillColor: AppColors.inputBg,
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(8),
-                                        borderSide: const BorderSide(
-                                          color: AppColors.border,
-                                        ),
-                                      ),
-                                      enabledBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(8),
-                                        borderSide: const BorderSide(
-                                          color: AppColors.border,
-                                        ),
-                                      ),
-                                      focusedBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(8),
-                                        borderSide: const BorderSide(
-                                          color: AppColors.primary,
-                                        ),
-                                      ),
-                                      contentPadding:
-                                          const EdgeInsets.symmetric(
-                                            horizontal: 14,
-                                            vertical: 12,
-                                          ),
                                     ),
                                     validator: (value) {
                                       if (value == null ||
@@ -615,51 +602,30 @@ class _AddTodoModalContentState extends ConsumerState<_AddTodoModalContent>
                                   label: '详情',
                                   child: TextFormField(
                                     controller: _descriptionController,
-                                    decoration: InputDecoration(
+                                    decoration: appInputDecoration(
+                                      context: context,
+                                      label: '',
                                       hintText: '添加详细描述…',
-                                      filled: true,
-                                      fillColor: AppColors.inputBg,
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(8),
-                                        borderSide: const BorderSide(
-                                          color: AppColors.border,
-                                        ),
-                                      ),
-                                      enabledBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(8),
-                                        borderSide: const BorderSide(
-                                          color: AppColors.border,
-                                        ),
-                                      ),
-                                      focusedBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(8),
-                                        borderSide: const BorderSide(
-                                          color: AppColors.primary,
-                                        ),
-                                      ),
-                                      contentPadding:
-                                          const EdgeInsets.symmetric(
-                                            horizontal: 14,
-                                            vertical: 12,
-                                          ),
                                     ),
                                     maxLines: 3,
                                     minLines: 2,
                                   ),
                                 ),
                                 const SizedBox(height: 16),
-                                const Text(
+                                Text(
                                   '标签',
                                   style: TextStyle(
                                     fontFamily: 'PingFang SC',
-                                    fontFamilyFallback: [
+                                    fontFamilyFallback: const [
                                       '.SF Pro Text',
                                       'system-ui',
                                       'sans-serif',
                                     ],
                                     fontSize: 12,
                                     fontWeight: FontWeight.w600,
-                                    color: AppColors.textSecondary,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.appMutedText,
                                     letterSpacing: 0.5,
                                   ),
                                 ),
@@ -761,17 +727,22 @@ class _AddTodoModalContentState extends ConsumerState<_AddTodoModalContent>
   }
 
   Widget _buildFormField({required String label, required Widget child}) {
+    final scheme = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label.toUpperCase(),
-          style: const TextStyle(
+          style: TextStyle(
             fontFamily: 'PingFang SC',
-            fontFamilyFallback: ['.SF Pro Text', 'system-ui', 'sans-serif'],
+            fontFamilyFallback: const [
+              '.SF Pro Text',
+              'system-ui',
+              'sans-serif',
+            ],
             fontSize: 12,
             fontWeight: FontWeight.w600,
-            color: AppColors.textSecondary,
+            color: scheme.appMutedText,
             letterSpacing: 0.5,
           ),
         ),
@@ -783,6 +754,7 @@ class _AddTodoModalContentState extends ConsumerState<_AddTodoModalContent>
 
   Widget _buildPriorityChip(int priority, String label) {
     final isSelected = _priority == priority;
+    final scheme = Theme.of(context).colorScheme;
     final Color bg;
     final Color fg;
     if (priority == 2) {
@@ -792,8 +764,8 @@ class _AddTodoModalContentState extends ConsumerState<_AddTodoModalContent>
       bg = AppColors.warning;
       fg = Colors.white;
     } else {
-      bg = AppColors.inputBg;
-      fg = AppColors.textSecondary;
+      bg = scheme.appInput;
+      fg = scheme.appMutedText;
     }
     return GestureDetector(
       onTap: () => setState(() => _priority = priority),
@@ -817,7 +789,7 @@ class _AddTodoModalContentState extends ConsumerState<_AddTodoModalContent>
             ],
             fontSize: 13,
             fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-            color: isSelected ? fg : bg.withValues(alpha: 0.8),
+            color: isSelected ? fg : scheme.appMutedText,
           ),
         ),
       ),
@@ -855,6 +827,7 @@ class _AddTodoModalContentState extends ConsumerState<_AddTodoModalContent>
   }
 
   Widget _buildTabItem(int index, String label, IconData icon) {
+    final scheme = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: () => _tabController.animateTo(index),
       child: ListenableBuilder(
@@ -866,7 +839,7 @@ class _AddTodoModalContentState extends ConsumerState<_AddTodoModalContent>
             height: 42,
             padding: const EdgeInsets.symmetric(horizontal: 8),
             decoration: BoxDecoration(
-              color: isActive ? const Color(0xFFE0E5EF) : Colors.transparent,
+              color: isActive ? scheme.appSurface : Colors.transparent,
               borderRadius: BorderRadius.horizontal(
                 left: Radius.circular(index == 0 ? 13 : 4),
                 right: Radius.circular(index == 1 ? 13 : 4),
@@ -893,7 +866,7 @@ class _AddTodoModalContentState extends ConsumerState<_AddTodoModalContent>
                 Icon(
                   icon,
                   size: 17,
-                  color: isActive ? AppColors.primary : AppColors.textTertiary,
+                  color: isActive ? scheme.primary : scheme.appSubtleText,
                 ),
                 const SizedBox(width: 6),
                 Flexible(
@@ -910,9 +883,7 @@ class _AddTodoModalContentState extends ConsumerState<_AddTodoModalContent>
                       ],
                       fontSize: 14,
                       fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-                      color: isActive
-                          ? AppColors.text
-                          : AppColors.textSecondary,
+                      color: isActive ? scheme.appText : scheme.appMutedText,
                     ),
                   ),
                 ),
@@ -933,6 +904,7 @@ class _DateInputButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
@@ -940,28 +912,24 @@ class _DateInputButton extends StatelessWidget {
         height: 48,
         padding: const EdgeInsets.symmetric(horizontal: 14),
         decoration: BoxDecoration(
-          color: AppColors.inputBg,
+          color: scheme.appInput,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.border),
+          border: Border.all(color: scheme.appBorder),
         ),
         child: Row(
           children: [
-            const Icon(
-              Icons.event_rounded,
-              size: 18,
-              color: AppColors.textTertiary,
-            ),
+            Icon(Icons.event_rounded, size: 18, color: scheme.appSubtleText),
             const SizedBox(width: 10),
             Expanded(
               child: Text(
                 value,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   fontFamily: 'Menlo',
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.text,
+                  color: scheme.appText,
                 ),
               ),
             ),
@@ -1020,6 +988,7 @@ class _QuickTimeChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(14),
@@ -1028,15 +997,15 @@ class _QuickTimeChip extends StatelessWidget {
         height: 32,
         padding: const EdgeInsets.symmetric(horizontal: 2),
         decoration: BoxDecoration(
-          color: selected ? AppColors.primary : AppColors.inputBg,
+          color: selected ? scheme.primary : scheme.appInput,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: selected ? AppColors.primary : AppColors.border,
+            color: selected ? scheme.primary : scheme.appBorder,
           ),
           boxShadow: selected
               ? [
                   BoxShadow(
-                    color: AppColors.primary.withValues(alpha: 0.2),
+                    color: scheme.primary.withValues(alpha: 0.2),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
                   ),
@@ -1052,7 +1021,7 @@ class _QuickTimeChip extends StatelessWidget {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w800,
-                color: selected ? Colors.white : AppColors.textSecondary,
+                color: selected ? scheme.onPrimary : scheme.appMutedText,
               ),
             ),
           ),

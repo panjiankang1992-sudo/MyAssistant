@@ -92,6 +92,7 @@ class _WeekCalendarStripState extends State<WeekCalendarStrip> {
   Widget build(BuildContext context) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
+    final scheme = Theme.of(context).colorScheme;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -149,8 +150,8 @@ class _WeekCalendarStripState extends State<WeekCalendarStrip> {
                             fontSize: 10,
                             fontWeight: FontWeight.w400,
                             color: isSelected
-                                ? AppColors.primary
-                                : AppColors.textTertiary,
+                                ? scheme.primary
+                                : scheme.appSubtleText,
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -161,8 +162,8 @@ class _WeekCalendarStripState extends State<WeekCalendarStrip> {
                             shape: BoxShape.circle,
                             color: isSelected
                                 ? (isToday
-                                      ? AppColors.primary
-                                      : AppColors.primaryLight)
+                                      ? scheme.primary
+                                      : scheme.primary.withValues(alpha: 0.14))
                                 : Colors.transparent,
                           ),
                           child: Center(
@@ -181,11 +182,11 @@ class _WeekCalendarStripState extends State<WeekCalendarStrip> {
                                     : FontWeight.w400,
                                 color: isSelected
                                     ? (isToday
-                                          ? Colors.white
-                                          : AppColors.primary)
+                                          ? scheme.onPrimary
+                                          : scheme.primary)
                                     : (isToday
-                                          ? AppColors.primary
-                                          : AppColors.text),
+                                          ? scheme.primary
+                                          : scheme.appText),
                               ),
                             ),
                           ),

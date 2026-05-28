@@ -28,7 +28,7 @@ InputDecoration appInputDecoration({
       scheme?.outline.withValues(alpha: 0.58) ??
       AppColors.border.withValues(alpha: 0.8);
   return InputDecoration(
-    labelText: label,
+    labelText: label.isEmpty ? null : label,
     hintText: hintText,
     alignLabelWithHint: alignLabelWithHint,
     filled: true,
@@ -327,6 +327,7 @@ class AppRoundIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return IconButton(
       tooltip: tooltip,
       onPressed: onPressed,
@@ -335,9 +336,9 @@ class AppRoundIconButton extends StatelessWidget {
         fixedSize: const Size(58, 58),
         minimumSize: const Size(58, 58),
         maximumSize: const Size(58, 58),
-        backgroundColor: AppColors.inputBg.withValues(alpha: 0.95),
-        foregroundColor: foregroundColor ?? AppColors.text,
-        disabledForegroundColor: AppColors.textTertiary.withValues(alpha: 0.45),
+        backgroundColor: scheme.appInput.withValues(alpha: 0.95),
+        foregroundColor: foregroundColor ?? scheme.appText,
+        disabledForegroundColor: scheme.appDisabledText,
         shape: const CircleBorder(),
         elevation: 0,
       ),
@@ -371,14 +372,15 @@ class AppFloatingActionBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: padding,
       child: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.96),
+          color: scheme.appElevatedSurface.withValues(alpha: 0.96),
           borderRadius: BorderRadius.circular(28),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.85)),
+          border: Border.all(color: scheme.appBorder.withValues(alpha: 0.72)),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.12),
@@ -470,6 +472,7 @@ class _AppVoiceInputFabState extends State<AppVoiceInputFab>
   @override
   Widget build(BuildContext context) {
     final text = widget.transcript.trim();
+    final scheme = Theme.of(context).colorScheme;
     return Transform.translate(
       offset: const Offset(0, -12),
       child: Column(
@@ -563,10 +566,12 @@ class _AppVoiceInputFabState extends State<AppVoiceInputFab>
                       constraints: const BoxConstraints(maxWidth: 280),
                       child: DecoratedBox(
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.94),
+                          color: scheme.appElevatedSurface.withValues(
+                            alpha: 0.94,
+                          ),
                           borderRadius: BorderRadius.circular(18),
                           border: Border.all(
-                            color: AppColors.border.withValues(alpha: 0.78),
+                            color: scheme.appBorder.withValues(alpha: 0.78),
                           ),
                           boxShadow: [
                             BoxShadow(
@@ -590,8 +595,8 @@ class _AppVoiceInputFabState extends State<AppVoiceInputFab>
                               fontSize: 13,
                               height: 1.28,
                               color: text.isEmpty
-                                  ? AppColors.textTertiary
-                                  : AppColors.text,
+                                  ? scheme.appSubtleText
+                                  : scheme.appText,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
@@ -617,43 +622,44 @@ class AppPillActionButton extends StatelessWidget {
     this.height = 48,
   });
 
-  Color get _background {
+  Color _background(ColorScheme scheme) {
     switch (action.tone) {
       case AppActionButtonTone.primary:
-        return const Color(0xFF5B5CF6);
+        return scheme.primary;
       case AppActionButtonTone.danger:
         return const Color(0xFFE62D27);
       case AppActionButtonTone.neutral:
-        return AppColors.inputBg;
+        return scheme.appInput;
     }
   }
 
-  Color get _foreground {
+  Color _foreground(ColorScheme scheme) {
     switch (action.tone) {
       case AppActionButtonTone.primary:
       case AppActionButtonTone.danger:
-        return Colors.white;
+        return scheme.onPrimary;
       case AppActionButtonTone.neutral:
-        return AppColors.text;
+        return scheme.appText;
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return SizedBox(
       height: height,
       child: ElevatedButton(
         onPressed: action.onPressed,
         style: ElevatedButton.styleFrom(
-          backgroundColor: _background,
-          foregroundColor: _foreground,
+          backgroundColor: _background(scheme),
+          foregroundColor: _foreground(scheme),
           elevation: 0,
           shadowColor: Colors.transparent,
           padding: const EdgeInsets.symmetric(horizontal: 12),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(24),
             side: action.tone == AppActionButtonTone.neutral
-                ? BorderSide(color: AppColors.border.withValues(alpha: 0.8))
+                ? BorderSide(color: scheme.appBorder.withValues(alpha: 0.8))
                 : BorderSide.none,
           ),
         ),
@@ -731,7 +737,9 @@ class _AppDatePickerDialogState extends State<_AppDatePickerDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Dialog(
+      backgroundColor: scheme.appSurface,
       insetPadding: const EdgeInsets.symmetric(horizontal: 22, vertical: 24),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
       child: ConstrainedBox(
@@ -747,12 +755,12 @@ class _AppDatePickerDialogState extends State<_AppDatePickerDialog> {
                     width: 42,
                     height: 42,
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.1),
+                      color: scheme.primary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(16),
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.calendar_month_rounded,
-                      color: AppColors.primary,
+                      color: scheme.primary,
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -761,10 +769,10 @@ class _AppDatePickerDialogState extends State<_AppDatePickerDialog> {
                       '${DateFormat('yyyy年M月d日').format(_selected)} ${_weekdayLabel(_selected)}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.w900,
-                        color: AppColors.primary,
+                        color: scheme.primary,
                       ),
                     ),
                   ),
@@ -777,10 +785,10 @@ class _AppDatePickerDialogState extends State<_AppDatePickerDialog> {
                     height: 48,
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.08),
+                      color: scheme.primary.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: AppColors.primary.withValues(alpha: 0.16),
+                        color: scheme.primary.withValues(alpha: 0.16),
                       ),
                     ),
                     child: Row(
@@ -788,16 +796,16 @@ class _AppDatePickerDialogState extends State<_AppDatePickerDialog> {
                       children: [
                         Text(
                           DateFormat('yyyy年M月').format(_visibleMonth),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w900,
-                            color: AppColors.primary,
+                            color: scheme.primary,
                           ),
                         ),
                         const SizedBox(width: 6),
-                        const Icon(
+                        Icon(
                           Icons.arrow_drop_down_rounded,
-                          color: AppColors.primary,
+                          color: scheme.primary,
                         ),
                       ],
                     ),
@@ -873,6 +881,7 @@ class _MonthNavButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
@@ -880,11 +889,11 @@ class _MonthNavButton extends StatelessWidget {
         width: 48,
         height: 48,
         decoration: BoxDecoration(
-          color: AppColors.inputBg,
+          color: scheme.appInput,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.border),
+          border: Border.all(color: scheme.appBorder),
         ),
-        child: Icon(icon, size: 30, color: AppColors.textSecondary),
+        child: Icon(icon, size: 30, color: scheme.appMutedText),
       ),
     );
   }
@@ -909,6 +918,7 @@ class _CalendarGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final firstOfMonth = DateTime(visibleMonth.year, visibleMonth.month);
     final leading = firstOfMonth.weekday % 7;
     final firstCell = firstOfMonth.subtract(Duration(days: leading));
@@ -955,9 +965,7 @@ class _CalendarGrid extends StatelessWidget {
                       width: 42,
                       height: 42,
                       decoration: BoxDecoration(
-                        color: isSelected
-                            ? AppColors.primary
-                            : Colors.transparent,
+                        color: isSelected ? scheme.primary : Colors.transparent,
                         shape: BoxShape.circle,
                       ),
                       alignment: Alignment.center,
@@ -969,12 +977,12 @@ class _CalendarGrid extends StatelessWidget {
                               ? FontWeight.w900
                               : FontWeight.w700,
                           color: disabled
-                              ? AppColors.textTertiary.withValues(alpha: 0.35)
+                              ? scheme.appDisabledText
                               : isSelected
-                              ? Colors.white
+                              ? scheme.onPrimary
                               : inMonth
-                              ? AppColors.text
-                              : AppColors.textTertiary.withValues(alpha: 0.45),
+                              ? scheme.appText
+                              : scheme.appDisabledText,
                         ),
                       ),
                     ),
@@ -1015,14 +1023,15 @@ class _WeekdayCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Expanded(
       child: Center(
         child: Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w900,
-            color: AppColors.textSecondary,
+            color: scheme.appMutedText,
           ),
         ),
       ),

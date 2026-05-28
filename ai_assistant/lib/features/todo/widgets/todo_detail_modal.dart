@@ -139,9 +139,10 @@ class _TodoDetailSheetState extends ConsumerState<_TodoDetailSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return EdgeSwipePop(
       child: Material(
-        color: AppColors.surface,
+        color: scheme.appPage,
         child: SafeArea(
           child: Padding(
             padding: EdgeInsets.only(
@@ -161,10 +162,10 @@ class _TodoDetailSheetState extends ConsumerState<_TodoDetailSheet> {
                       Expanded(
                         child: Text(
                           _editing ? '编辑代办' : '代办详情',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.w800,
-                            color: AppColors.text,
+                            color: scheme.appText,
                           ),
                         ),
                       ),
@@ -204,18 +205,23 @@ class _TodoDetailSheetState extends ConsumerState<_TodoDetailSheet> {
   }
 
   Widget _buildViewMode() {
+    final scheme = Theme.of(context).colorScheme;
     return Column(
       key: const ValueKey('view'),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           widget.todo.title,
-          style: const TextStyle(
+          style: TextStyle(
             fontFamily: 'PingFang SC',
-            fontFamilyFallback: ['.SF Pro Text', 'system-ui', 'sans-serif'],
+            fontFamilyFallback: const [
+              '.SF Pro Text',
+              'system-ui',
+              'sans-serif',
+            ],
             fontSize: 20,
             fontWeight: FontWeight.w600,
-            color: AppColors.text,
+            color: scheme.appText,
           ),
         ),
         const SizedBox(height: 12),
@@ -244,12 +250,16 @@ class _TodoDetailSheetState extends ConsumerState<_TodoDetailSheet> {
           const SizedBox(height: 4),
           Text(
             widget.todo.description!,
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: 'PingFang SC',
-              fontFamilyFallback: ['.SF Pro Text', 'system-ui', 'sans-serif'],
+              fontFamilyFallback: const [
+                '.SF Pro Text',
+                'system-ui',
+                'sans-serif',
+              ],
               fontSize: 14,
               fontWeight: FontWeight.w400,
-              color: AppColors.textSecondary,
+              color: scheme.appMutedText,
               height: 1.6,
             ),
           ),
@@ -384,38 +394,22 @@ class _TodoDetailSheetState extends ConsumerState<_TodoDetailSheet> {
   }
 
   Widget _buildSectionLabel(String label) {
+    final scheme = Theme.of(context).colorScheme;
     return Text(
       label,
-      style: const TextStyle(
+      style: TextStyle(
         fontFamily: 'PingFang SC',
-        fontFamilyFallback: ['.SF Pro Text', 'system-ui', 'sans-serif'],
+        fontFamilyFallback: const ['.SF Pro Text', 'system-ui', 'sans-serif'],
         fontSize: 12,
         fontWeight: FontWeight.w600,
-        color: AppColors.textTertiary,
+        color: scheme.appSubtleText,
         letterSpacing: 0.5,
       ),
     );
   }
 
   InputDecoration _inputDecoration(String hint) {
-    return InputDecoration(
-      hintText: hint,
-      filled: true,
-      fillColor: AppColors.inputBg,
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: AppColors.border),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: AppColors.border),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: AppColors.primary),
-      ),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-    );
+    return appInputDecoration(context: context, label: '', hintText: hint);
   }
 
   Widget _buildPriorityBadge() {
@@ -462,6 +456,7 @@ class _TodoDetailSheetState extends ConsumerState<_TodoDetailSheet> {
 
   Widget _buildPriorityChip(int priority, String label) {
     final isSelected = _priority == priority;
+    final scheme = Theme.of(context).colorScheme;
     final Color bg;
     final Color fg;
     if (priority == 2) {
@@ -471,8 +466,8 @@ class _TodoDetailSheetState extends ConsumerState<_TodoDetailSheet> {
       bg = AppColors.warning;
       fg = Colors.white;
     } else {
-      bg = AppColors.inputBg;
-      fg = AppColors.textSecondary;
+      bg = scheme.appInput;
+      fg = scheme.appMutedText;
     }
     return GestureDetector(
       onTap: () => setState(() => _priority = priority),
@@ -498,7 +493,7 @@ class _TodoDetailSheetState extends ConsumerState<_TodoDetailSheet> {
             ],
             fontSize: 13,
             fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-            color: isSelected ? fg : bg.withValues(alpha: 0.8),
+            color: isSelected ? fg : scheme.appMutedText,
           ),
         ),
       ),
@@ -598,6 +593,7 @@ class _DetailInfoRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -605,14 +601,14 @@ class _DetailInfoRow extends StatelessWidget {
           width: 70,
           child: Row(
             children: [
-              Icon(icon, size: 15, color: AppColors.textTertiary),
+              Icon(icon, size: 15, color: scheme.appSubtleText),
               const SizedBox(width: 5),
               Text(
                 label,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.textTertiary,
+                  color: scheme.appSubtleText,
                 ),
               ),
             ],
@@ -621,13 +617,17 @@ class _DetailInfoRow extends StatelessWidget {
         Expanded(
           child: Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: 'PingFang SC',
-              fontFamilyFallback: ['.SF Pro Text', 'system-ui', 'sans-serif'],
+              fontFamilyFallback: const [
+                '.SF Pro Text',
+                'system-ui',
+                'sans-serif',
+              ],
               fontSize: 14,
               height: 1.2,
               fontWeight: FontWeight.w600,
-              color: AppColors.textSecondary,
+              color: scheme.appMutedText,
             ),
           ),
         ),

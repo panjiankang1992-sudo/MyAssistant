@@ -95,6 +95,41 @@ class AppAnimations {
   }
 }
 
+extension AppThemeSemanticColors on ColorScheme {
+  bool get isDarkTheme => brightness == Brightness.dark;
+
+  Color get appPage =>
+      isDarkTheme ? const Color(0xFF0F1014) : AppColors.scaffoldBg;
+
+  Color get appSurface =>
+      isDarkTheme ? const Color(0xFF1C1C21) : AppColors.surface;
+
+  Color get appElevatedSurface =>
+      isDarkTheme ? const Color(0xFF23242A) : AppColors.surface;
+
+  Color get appInput =>
+      isDarkTheme ? const Color(0xFF17181D) : AppColors.inputBg;
+
+  Color get appPressed =>
+      isDarkTheme ? const Color(0xFF2A2B31) : const Color(0xFFF9F9FB);
+
+  Color get appBorder =>
+      isDarkTheme ? const Color(0xFF343640) : AppColors.border;
+
+  Color get appText => onSurface;
+
+  Color get appMutedText => onSurfaceVariant;
+
+  Color get appSubtleText => onSurfaceVariant.withValues(alpha: 0.72);
+
+  Color get appDisabledText => onSurfaceVariant.withValues(alpha: 0.46);
+
+  Color get appControlSurface => Color.alphaBlend(
+    primary.withValues(alpha: isDarkTheme ? 0.08 : 0.035),
+    appSurface,
+  );
+}
+
 class AppTheme {
   static ThemeData lightThemeFor(ThemeSettings settings) {
     return _withSettings(lightTheme, settings, Brightness.light);

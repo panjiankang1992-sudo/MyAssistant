@@ -90,6 +90,9 @@ class _TodoItemState extends State<TodoItem>
   @override
   Widget build(BuildContext context) {
     final actionStyle = _getActionStyle();
+    final scheme = Theme.of(context).colorScheme;
+    final cardColor = _itemPressed ? scheme.appPressed : scheme.appSurface;
+    final mutedText = scheme.appMutedText;
 
     return GestureDetector(
       onTapDown: widget.readOnly
@@ -115,9 +118,9 @@ class _TodoItemState extends State<TodoItem>
             margin: const EdgeInsets.only(bottom: 8),
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: _itemPressed ? const Color(0xFFF9F9FB) : AppColors.surface,
+              color: cardColor,
               borderRadius: BorderRadius.circular(14),
-              boxShadow: AppAnimations.cardShadow(),
+              boxShadow: scheme.isDarkTheme ? null : AppAnimations.cardShadow(),
               border: widget.todo.priority > 0
                   ? Border(
                       left: BorderSide(
@@ -127,7 +130,7 @@ class _TodoItemState extends State<TodoItem>
                         width: 3,
                       ),
                     )
-                  : null,
+                  : Border.all(color: scheme.appBorder.withValues(alpha: 0.8)),
             ),
             child: Row(
               children: [
@@ -186,8 +189,8 @@ class _TodoItemState extends State<TodoItem>
                           fontSize: 15,
                           fontWeight: FontWeight.w500,
                           color: widget.todo.completed
-                              ? AppColors.textTertiary
-                              : AppColors.text,
+                              ? scheme.appDisabledText
+                              : scheme.appText,
                           decoration: widget.todo.completed
                               ? TextDecoration.lineThrough
                               : null,
@@ -213,8 +216,7 @@ class _TodoItemState extends State<TodoItem>
                               ],
                               fontSize: 12,
                               fontWeight: FontWeight.w400,
-                              color: AppColors.textTertiary,
-                            ),
+                            ).copyWith(color: mutedText),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -233,8 +235,7 @@ class _TodoItemState extends State<TodoItem>
                               ],
                               fontSize: 12,
                               fontWeight: FontWeight.w400,
-                              color: AppColors.textTertiary,
-                            ),
+                            ).copyWith(color: mutedText),
                           ),
                           const SizedBox(width: 8),
                           if (_shouldShowSourceChip(widget.todo.source))
@@ -253,13 +254,13 @@ class _TodoItemState extends State<TodoItem>
                                 ),
                               ),
                           if (widget.todo.tags.length > 3)
-                            const Padding(
-                              padding: EdgeInsets.only(right: 4),
+                            Padding(
+                              padding: const EdgeInsets.only(right: 4),
                               child: Text(
                                 '…',
                                 style: TextStyle(
                                   fontSize: 11,
-                                  color: AppColors.textTertiary,
+                                  color: scheme.appSubtleText,
                                 ),
                               ),
                             ),
