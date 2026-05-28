@@ -9,6 +9,7 @@ import '../../../core/theme/app_theme.dart';
 import '../providers/todo_provider.dart';
 import 'form_controls.dart';
 import '../../tags/tag_selector.dart';
+import 'todo_reminder_controls.dart';
 
 void showTodoDetail(BuildContext context, Todo todo, {bool readOnly = false}) {
   showGeneralDialog(
@@ -58,6 +59,9 @@ class _TodoDetailSheetState extends ConsumerState<_TodoDetailSheet> {
   late DateTime _date;
   late String _time;
   late int _priority;
+  late bool _reminderEnabled;
+  late int _reminderMinutesBefore;
+  bool _reminderCustomized = false;
 
   @override
   void initState() {
@@ -72,6 +76,8 @@ class _TodoDetailSheetState extends ConsumerState<_TodoDetailSheet> {
     _date = widget.todo.date;
     _time = widget.todo.time;
     _priority = widget.todo.priority;
+    _reminderEnabled = widget.todo.reminderEnabled;
+    _reminderMinutesBefore = widget.todo.reminderMinutesBefore;
   }
 
   @override
@@ -108,6 +114,8 @@ class _TodoDetailSheetState extends ConsumerState<_TodoDetailSheet> {
       action: _action,
       date: DateTime(_date.year, _date.month, _date.day),
       priority: _priority,
+      reminderEnabled: _reminderEnabled,
+      reminderMinutesBefore: _reminderMinutesBefore,
       time: _time,
     );
     await ref.read(todoNotifierProvider.notifier).updateTodo(updated);
@@ -272,6 +280,16 @@ class _TodoDetailSheetState extends ConsumerState<_TodoDetailSheet> {
               '${DateFormat('yyyy-MM-dd').format(widget.todo.date)}  ${widget.todo.time}',
         ),
         const SizedBox(height: 12),
+        _DetailInfoRow(
+          label: '提醒',
+          icon: widget.todo.reminderEnabled
+              ? Icons.notifications_active_rounded
+              : Icons.notifications_off_rounded,
+          value: widget.todo.reminderEnabled
+              ? Todo.formatReminderMinutes(widget.todo.reminderMinutesBefore)
+              : '不提醒',
+        ),
+        const SizedBox(height: 12),
         Wrap(
           spacing: 8,
           runSpacing: 8,
@@ -373,6 +391,25 @@ class _TodoDetailSheetState extends ConsumerState<_TodoDetailSheet> {
             _buildPriorityChip(2, '紧急'),
           ],
         ),
+        const SizedBox(height: 14),
+        _buildSectionLabel('提醒'),
+        const SizedBox(height: 6),
+        TodoReminderSelector(
+          enabled: _reminderEnabled,
+          minutesBefore: _reminderMinutesBefore,
+          onEnabledChanged: (value) {
+            setState(() {
+              _reminderEnabled = value;
+              _reminderCustomized = true;
+            });
+          },
+          onMinutesChanged: (value) {
+            setState(() {
+              _reminderMinutesBefore = value;
+              _reminderCustomized = true;
+            });
+          },
+        ),
       ],
     );
   }
@@ -470,7 +507,14 @@ class _TodoDetailSheetState extends ConsumerState<_TodoDetailSheet> {
       fg = scheme.appMutedText;
     }
     return GestureDetector(
-      onTap: () => setState(() => _priority = priority),
+      onTap: () => setState(() {
+        _priority = priority;
+        if (!_reminderCustomized) {
+          _reminderMinutesBefore = Todo.defaultReminderMinutesForPriority(
+            priority,
+          );
+        }
+      }),
       child: Container(
         height: 34,
         padding: const EdgeInsets.symmetric(horizontal: 14),

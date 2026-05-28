@@ -8,6 +8,7 @@ import '../../data/repositories/todo_repository.dart';
 import '../../data/repositories/routine_repository.dart';
 import '../../data/repositories/tag_repository.dart';
 import '../../domain/models/tag.dart';
+import '../../features/todo/services/todo_reminder_service.dart';
 import '../../features/sync/cloud_path_builder.dart';
 import '../../features/sync/data_sync_service.dart';
 import '../../features/sync/providers/sync_provider.dart';
@@ -72,6 +73,10 @@ final tagRepoProvider = Provider<TagRepository>((ref) {
     ref.watch(datasourceProvider),
     syncService: ref.watch(dataSyncServiceProvider),
   );
+});
+
+final todoReminderServiceProvider = Provider<TodoReminderService>((ref) {
+  return const TodoReminderService();
 });
 
 final allTagsProvider = FutureProvider<List<Tag>>((ref) async {

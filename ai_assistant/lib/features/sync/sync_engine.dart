@@ -157,6 +157,8 @@ class SyncEngine {
                 : DateTime.now(),
             version: cloudVersion,
             priority: envelope['priority'] as int? ?? 0,
+            reminderEnabled: envelope['reminderEnabled'] as bool? ?? true,
+            reminderMinutesBefore: envelope['reminderMinutesBefore'] as int?,
           ),
         );
       } else {
@@ -301,6 +303,8 @@ class SyncEngine {
         'date': dateStr,
         'completed': todo.completed,
         'priority': todo.priority,
+        'reminderEnabled': todo.reminderEnabled,
+        'reminderMinutesBefore': todo.reminderMinutesBefore,
         'createdAt': todo.createdAt.toIso8601String(),
       },
       'deleted': deleted,
@@ -563,6 +567,8 @@ class SyncEngine {
             : DateTime.now(),
         version: cloudVersion,
         priority: envelope['priority'] as int? ?? 0,
+        reminderEnabled: envelope['reminderEnabled'] as bool? ?? true,
+        reminderMinutesBefore: envelope['reminderMinutesBefore'] as int?,
       ),
     );
     await _localSyncDs.upsertSyncIndex(

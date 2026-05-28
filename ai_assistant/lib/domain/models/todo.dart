@@ -1,6 +1,9 @@
 import 'tag.dart';
 
 class Todo {
+  static const int normalReminderMinutes = 10;
+  static const int elevatedReminderMinutes = 24 * 60;
+
   final String id;
   final String title;
   final String? description;
@@ -17,6 +20,8 @@ class Todo {
   final int version;
   final bool deleted;
   final int priority;
+  final bool reminderEnabled;
+  final int reminderMinutesBefore;
 
   const Todo({
     required this.id,
@@ -35,7 +40,27 @@ class Todo {
     this.version = 1,
     this.deleted = false,
     this.priority = 0,
-  });
+    this.reminderEnabled = true,
+    int? reminderMinutesBefore,
+  }) : reminderMinutesBefore =
+           reminderMinutesBefore ??
+           (priority >= 1 ? elevatedReminderMinutes : normalReminderMinutes);
+
+  static int defaultReminderMinutesForPriority(int priority) {
+    return priority >= 1 ? elevatedReminderMinutes : normalReminderMinutes;
+  }
+
+  static String formatReminderMinutes(int minutes) {
+    if (minutes >= 24 * 60 && minutes % (24 * 60) == 0) {
+      final days = minutes ~/ (24 * 60);
+      return days == 1 ? '提前一天' : '提前$days天';
+    }
+    if (minutes >= 60 && minutes % 60 == 0) {
+      final hours = minutes ~/ 60;
+      return hours == 1 ? '提前1小时' : '提前$hours小时';
+    }
+    return '提前$minutes分钟';
+  }
 
   Todo copyWith({
     String? id,
@@ -54,6 +79,8 @@ class Todo {
     int? version,
     bool? deleted,
     int? priority,
+    bool? reminderEnabled,
+    int? reminderMinutesBefore,
   }) {
     return Todo(
       id: id ?? this.id,
@@ -72,6 +99,9 @@ class Todo {
       version: version ?? this.version,
       deleted: deleted ?? this.deleted,
       priority: priority ?? this.priority,
+      reminderEnabled: reminderEnabled ?? this.reminderEnabled,
+      reminderMinutesBefore:
+          reminderMinutesBefore ?? this.reminderMinutesBefore,
     );
   }
 

@@ -59,6 +59,8 @@ class LocalDatasource {
             version: Value(todo.version),
             deleted: Value(todo.deleted),
             priority: Value(todo.priority),
+            reminderEnabled: Value(todo.reminderEnabled),
+            reminderMinutesBefore: Value(todo.reminderMinutesBefore),
           ),
         );
   }
@@ -80,6 +82,8 @@ class LocalDatasource {
         version: Value(todo.version),
         deleted: Value(todo.deleted),
         priority: Value(todo.priority),
+        reminderEnabled: Value(todo.reminderEnabled),
+        reminderMinutesBefore: Value(todo.reminderMinutesBefore),
       ),
     );
   }
@@ -308,6 +312,8 @@ class LocalDatasource {
       version: row.version,
       deleted: row.deleted,
       priority: row.priority,
+      reminderEnabled: row.reminderEnabled,
+      reminderMinutesBefore: row.reminderMinutesBefore,
     );
   }
 

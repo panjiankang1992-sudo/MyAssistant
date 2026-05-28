@@ -21,6 +21,7 @@ import '../services/todo_text_parser.dart';
 import 'routine_tab.dart';
 import '../../tags/tag_selector.dart';
 import 'form_controls.dart';
+import 'todo_reminder_controls.dart';
 
 void showAddTodoModal(
   BuildContext context, {
@@ -192,6 +193,9 @@ class _AddTodoModalContentState extends ConsumerState<_AddTodoModalContent>
   late String _time;
   Duration? _quickTime;
   int _priority = 0;
+  bool _reminderEnabled = true;
+  int _reminderMinutesBefore = Todo.defaultReminderMinutesForPriority(0);
+  bool _reminderCustomized = false;
   bool _aiParsing = false;
   bool _speechReady = false;
   bool _isListening = false;
@@ -361,6 +365,8 @@ class _AddTodoModalContentState extends ConsumerState<_AddTodoModalContent>
       tags: _tags,
       action: _action,
       priority: _priority,
+      reminderEnabled: _reminderEnabled,
+      reminderMinutesBefore: _reminderMinutesBefore,
       time: _time,
       date: DateTime(_date.year, _date.month, _date.day),
       createdAt: now,
@@ -431,6 +437,11 @@ class _AddTodoModalContentState extends ConsumerState<_AddTodoModalContent>
         _source = _validSource(parsed['source'] as String?);
         _action = _validAction(parsed['action'] as String?);
         _priority = ((parsed['priority'] as num?)?.toInt() ?? 0).clamp(0, 2);
+        if (!_reminderCustomized) {
+          _reminderMinutesBefore = Todo.defaultReminderMinutesForPriority(
+            _priority,
+          );
+        }
         _time = _validTime(parsed['time'] as String?);
         _date = _validDate(parsed['date'] as String?) ?? _date;
       });
@@ -453,6 +464,11 @@ class _AddTodoModalContentState extends ConsumerState<_AddTodoModalContent>
       _date = result.date;
       _action = result.type == 'bill' ? 'bookkeeping' : 'none';
       _priority = result.date.difference(DateTime.now()).inHours <= 24 ? 1 : 0;
+      if (!_reminderCustomized) {
+        _reminderMinutesBefore = Todo.defaultReminderMinutesForPriority(
+          _priority,
+        );
+      }
     });
   }
 
@@ -707,6 +723,26 @@ class _AddTodoModalContentState extends ConsumerState<_AddTodoModalContent>
                                     ],
                                   ),
                                 ),
+                                const SizedBox(height: 16),
+                                _buildFormField(
+                                  label: '提醒',
+                                  child: TodoReminderSelector(
+                                    enabled: _reminderEnabled,
+                                    minutesBefore: _reminderMinutesBefore,
+                                    onEnabledChanged: (value) {
+                                      setState(() {
+                                        _reminderEnabled = value;
+                                        _reminderCustomized = true;
+                                      });
+                                    },
+                                    onMinutesChanged: (value) {
+                                      setState(() {
+                                        _reminderMinutesBefore = value;
+                                        _reminderCustomized = true;
+                                      });
+                                    },
+                                  ),
+                                ),
                                 const SizedBox(height: 32),
                               ],
                             ),
@@ -768,7 +804,14 @@ class _AddTodoModalContentState extends ConsumerState<_AddTodoModalContent>
       fg = scheme.appMutedText;
     }
     return GestureDetector(
-      onTap: () => setState(() => _priority = priority),
+      onTap: () => setState(() {
+        _priority = priority;
+        if (!_reminderCustomized) {
+          _reminderMinutesBefore = Todo.defaultReminderMinutesForPriority(
+            priority,
+          );
+        }
+      }),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(

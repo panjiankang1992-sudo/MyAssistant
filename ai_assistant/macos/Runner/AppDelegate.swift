@@ -1,6 +1,7 @@
 import Cocoa
 import EventKit
 import FlutterMacOS
+import UserNotifications
 
 @main
 class AppDelegate: FlutterAppDelegate {
@@ -13,6 +14,10 @@ class AppDelegate: FlutterAppDelegate {
     }
     let channel = FlutterMethodChannel(
       name: "my_assistant/calendar",
+      binaryMessenger: controller.engine.binaryMessenger
+    )
+    let reminderChannel = FlutterMethodChannel(
+      name: "my_assistant/todo_reminders",
       binaryMessenger: controller.engine.binaryMessenger
     )
     channel.setMethodCallHandler { [weak self] call, result in
@@ -33,6 +38,39 @@ class AppDelegate: FlutterAppDelegate {
         return
       }
       self?.fetchEvents(startMillis: startMillis, endMillis: endMillis, result: result)
+    }
+    reminderChannel.setMethodCallHandler { [weak self] call, result in
+      switch call.method {
+      case "schedule":
+        guard
+          let args = call.arguments as? [String: Any],
+          let id = args["id"] as? String,
+          let title = args["title"] as? String,
+          let body = args["body"] as? String,
+          let fireAtMillis = self?.int64Value(args["fireAtMillis"])
+        else {
+          result(FlutterError(code: "bad_args", message: "缺少提醒参数", details: nil))
+          return
+        }
+        self?.scheduleTodoReminder(
+          id: id,
+          title: title,
+          body: body,
+          fireAtMillis: fireAtMillis,
+          result: result
+        )
+      case "cancel":
+        guard
+          let args = call.arguments as? [String: Any],
+          let id = args["id"] as? String
+        else {
+          result(FlutterError(code: "bad_args", message: "缺少提醒 ID", details: nil))
+          return
+        }
+        self?.cancelTodoReminder(id: id, result: result)
+      default:
+        result(FlutterMethodNotImplemented)
+      }
     }
     super.applicationDidFinishLaunching(notification)
   }
@@ -140,6 +178,63 @@ class AppDelegate: FlutterAppDelegate {
       }
     }
     result(false)
+  }
+
+  private func scheduleTodoReminder(
+    id: String,
+    title: String,
+    body: String,
+    fireAtMillis: Int64,
+    result: @escaping FlutterResult
+  ) {
+    let center = UNUserNotificationCenter.current()
+    center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
+      if let error = error {
+        DispatchQueue.main.async {
+          result(FlutterError(code: "notification_error", message: error.localizedDescription, details: nil))
+        }
+        return
+      }
+      guard granted else {
+        DispatchQueue.main.async {
+          result(FlutterError(code: "notification_denied", message: "没有通知权限", details: nil))
+        }
+        return
+      }
+      let fireAt = Date(timeIntervalSince1970: TimeInterval(fireAtMillis) / 1000.0)
+      let interval = fireAt.timeIntervalSinceNow
+      guard interval > 0 else {
+        DispatchQueue.main.async { result(nil) }
+        return
+      }
+      let content = UNMutableNotificationContent()
+      content.title = title
+      content.body = body
+      content.sound = .default
+      let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(1, interval), repeats: false)
+      let request = UNNotificationRequest(
+        identifier: "todo-\(id)",
+        content: content,
+        trigger: trigger
+      )
+      center.removePendingNotificationRequests(withIdentifiers: ["todo-\(id)"])
+      center.add(request) { error in
+        DispatchQueue.main.async {
+          if let error = error {
+            result(FlutterError(code: "notification_error", message: error.localizedDescription, details: nil))
+          } else {
+            result(nil)
+          }
+        }
+      }
+    }
+  }
+
+  private func cancelTodoReminder(id: String, result: @escaping FlutterResult) {
+    UNUserNotificationCenter.current().removePendingNotificationRequests(
+      withIdentifiers: ["todo-\(id)"]
+    )
+    result(nil)
   }
 
   private func requestCalendarAccess(_ completion: @escaping (Bool) -> Void) {

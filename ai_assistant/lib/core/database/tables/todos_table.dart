@@ -17,6 +17,10 @@ class Todos extends Table {
   IntColumn get version => integer().withDefault(const Constant(1))();
   BoolColumn get deleted => boolean().withDefault(const Constant(false))();
   IntColumn get priority => integer().withDefault(const Constant(0))();
+  BoolColumn get reminderEnabled =>
+      boolean().withDefault(const Constant(true))();
+  IntColumn get reminderMinutesBefore =>
+      integer().withDefault(const Constant(10))();
 
   @override
   Set<Column> get primaryKey => {id};

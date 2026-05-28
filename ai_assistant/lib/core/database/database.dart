@@ -27,7 +27,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 9;
+  int get schemaVersion => 10;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -168,6 +168,21 @@ class AppDatabase extends _$AppDatabase {
           '  LIMIT 1'
           ') '
           'WHERE source = \'routine\' AND deleted = 0 AND routine_id IS NULL',
+        );
+      }
+      if (from < 10) {
+        await _addColumnIfMissing(
+          'todos',
+          'reminder_enabled',
+          'INTEGER NOT NULL DEFAULT 1',
+        );
+        await _addColumnIfMissing(
+          'todos',
+          'reminder_minutes_before',
+          'INTEGER NOT NULL DEFAULT 10',
+        );
+        await customStatement(
+          'UPDATE todos SET reminder_minutes_before = 1440 WHERE priority >= 1',
         );
       }
     },

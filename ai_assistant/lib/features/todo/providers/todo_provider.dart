@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/providers/core_providers.dart';
@@ -9,6 +11,7 @@ import 'selected_date_provider.dart';
 
 class TodoNotifier extends Notifier<List<Todo>> {
   DateTime? _lastCalendarImportAt;
+  bool _remindersInitialized = false;
 
   @override
   List<Todo> build() {
@@ -31,6 +34,7 @@ class TodoNotifier extends Notifier<List<Todo>> {
     }
 
     state = await repo.getTodosByDate(normalizedDate);
+    await _rescheduleUpcomingRemindersIfNeeded();
   }
 
   Future<CalendarImportResult> importCalendarTodos({bool force = false}) async {
@@ -107,8 +111,10 @@ class TodoNotifier extends Notifier<List<Todo>> {
           createdAt: now,
           updatedAt: now,
           priority: 0,
+          reminderMinutesBefore: Todo.defaultReminderMinutesForPriority(0),
         );
         await todoRepo.addTodo(todo);
+        unawaited(ref.read(todoReminderServiceProvider).schedule(todo));
       }
     }
 
@@ -130,6 +136,7 @@ class TodoNotifier extends Notifier<List<Todo>> {
   Future<void> addTodo(Todo todo) async {
     final repo = ref.read(todoRepoProvider);
     await repo.addTodo(todo);
+    unawaited(ref.read(todoReminderServiceProvider).schedule(todo));
     final selectedDate = ref.read(selectedDateProvider);
     await _loadTodosForDate(selectedDate);
   }
@@ -139,11 +146,13 @@ class TodoNotifier extends Notifier<List<Todo>> {
     await repo.toggleTodo(id);
     final selectedDate = ref.read(selectedDateProvider);
     await _loadTodosForDate(selectedDate);
+    await _syncReminderForTodoId(id);
   }
 
   Future<void> deleteTodo(String id) async {
     final repo = ref.read(todoRepoProvider);
     await repo.deleteTodo(id);
+    unawaited(ref.read(todoReminderServiceProvider).cancel(id));
     final selectedDate = ref.read(selectedDateProvider);
     await _loadTodosForDate(selectedDate);
   }
@@ -151,6 +160,7 @@ class TodoNotifier extends Notifier<List<Todo>> {
   Future<void> updateTodo(Todo todo) async {
     final repo = ref.read(todoRepoProvider);
     await repo.updateTodo(todo);
+    unawaited(ref.read(todoReminderServiceProvider).schedule(todo));
     final selectedDate = ref.read(selectedDateProvider);
     await _loadTodosForDate(selectedDate);
   }
@@ -221,9 +231,38 @@ class TodoNotifier extends Notifier<List<Todo>> {
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
       priority: 0,
+      reminderMinutesBefore: Todo.defaultReminderMinutesForPriority(0),
     );
     final repo = ref.read(todoRepoProvider);
     await repo.addTodo(todo);
+    unawaited(ref.read(todoReminderServiceProvider).schedule(todo));
+  }
+
+  Future<void> _rescheduleUpcomingRemindersIfNeeded() async {
+    if (_remindersInitialized) return;
+    _remindersInitialized = true;
+    final todos = await ref.read(datasourceProvider).getAllTodos();
+    final today = DateTime.now();
+    final start = DateTime(today.year, today.month, today.day);
+    final upcoming = todos.where(
+      (todo) =>
+          !todo.deleted &&
+          !todo.completed &&
+          !todo.date.isBefore(start) &&
+          todo.date.isBefore(start.add(const Duration(days: 31))),
+    );
+    unawaited(ref.read(todoReminderServiceProvider).rescheduleAll(upcoming));
+  }
+
+  Future<void> _syncReminderForTodoId(String id) async {
+    final todos = await ref.read(datasourceProvider).getAllTodos();
+    final todo = todos.where((item) => item.id == id).firstOrNull;
+    final service = ref.read(todoReminderServiceProvider);
+    if (todo == null || todo.completed || todo.deleted) {
+      await service.cancel(id);
+    } else {
+      await service.schedule(todo);
+    }
   }
 
   bool _routineTodoAlreadyExists(

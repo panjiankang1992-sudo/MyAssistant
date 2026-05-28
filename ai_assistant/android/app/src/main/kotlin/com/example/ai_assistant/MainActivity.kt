@@ -1,10 +1,14 @@
 package com.example.ai_assistant
 
 import android.Manifest
+import android.app.AlarmManager
+import android.app.PendingIntent
 import android.content.ContentUris
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.database.Cursor
+import android.os.Build
 import android.provider.CalendarContract
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -14,7 +18,9 @@ import io.flutter.plugin.common.MethodChannel
 
 class MainActivity: FlutterActivity() {
     private val channelName = "my_assistant/calendar"
+    private val reminderChannelName = "my_assistant/todo_reminders"
     private val calendarRequestCode = 4201
+    private val notificationRequestCode = 4202
     private var pendingRange: Pair<Long, Long>? = null
     private var pendingResult: MethodChannel.Result? = null
 
@@ -51,6 +57,34 @@ class MainActivity: FlutterActivity() {
                     return@setMethodCallHandler
                 }
                 result.success(queryCalendarEvents(startMillis, endMillis))
+            }
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, reminderChannelName)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "schedule" -> {
+                        val id = call.argument<String>("id")
+                        val title = call.argument<String>("title")
+                        val body = call.argument<String>("body")
+                        val fireAtMillis = call.argument<Long>("fireAtMillis")
+                        if (id == null || title == null || body == null || fireAtMillis == null) {
+                            result.error("bad_args", "缺少提醒参数", null)
+                            return@setMethodCallHandler
+                        }
+                        requestNotificationPermissionIfNeeded()
+                        scheduleTodoReminder(id, title, body, fireAtMillis)
+                        result.success(null)
+                    }
+                    "cancel" -> {
+                        val id = call.argument<String>("id")
+                        if (id == null) {
+                            result.error("bad_args", "缺少提醒 ID", null)
+                            return@setMethodCallHandler
+                        }
+                        cancelTodoReminder(id)
+                        result.success(null)
+                    }
+                    else -> result.notImplemented()
+                }
             }
     }
 
@@ -142,5 +176,64 @@ class MainActivity: FlutterActivity() {
                 false
             }
         }
+    }
+
+    private fun scheduleTodoReminder(
+        id: String,
+        title: String,
+        body: String,
+        fireAtMillis: Long
+    ) {
+        if (fireAtMillis <= System.currentTimeMillis()) return
+        val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        val pendingIntent = reminderPendingIntent(id, title, body)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms()) {
+            alarmManager.set(AlarmManager.RTC_WAKEUP, fireAtMillis, pendingIntent)
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            alarmManager.setExactAndAllowWhileIdle(
+                AlarmManager.RTC_WAKEUP,
+                fireAtMillis,
+                pendingIntent
+            )
+        } else {
+            alarmManager.setExact(AlarmManager.RTC_WAKEUP, fireAtMillis, pendingIntent)
+        }
+    }
+
+    private fun cancelTodoReminder(id: String) {
+        val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        alarmManager.cancel(reminderPendingIntent(id, "", ""))
+    }
+
+    private fun reminderPendingIntent(
+        id: String,
+        title: String,
+        body: String
+    ): PendingIntent {
+        val intent = Intent(this, TodoReminderReceiver::class.java).apply {
+            putExtra(TodoReminderReceiver.EXTRA_ID, id)
+            putExtra(TodoReminderReceiver.EXTRA_TITLE, title)
+            putExtra(TodoReminderReceiver.EXTRA_BODY, body)
+        }
+        return PendingIntent.getBroadcast(
+            this,
+            id.hashCode(),
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+    }
+
+    private fun requestNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        if (ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+        ) return
+        ActivityCompat.requestPermissions(
+            this,
+            arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+            notificationRequestCode
+        )
     }
 }

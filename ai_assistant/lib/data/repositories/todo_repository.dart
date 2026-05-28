@@ -95,6 +95,8 @@ class TodoRepository {
       payload: {
         'title': todo.title,
         'updatedAt': todo.updatedAt.toIso8601String(),
+        'reminderEnabled': todo.reminderEnabled,
+        'reminderMinutesBefore': todo.reminderMinutesBefore,
       },
     );
   }
