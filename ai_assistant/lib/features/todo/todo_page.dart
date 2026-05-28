@@ -362,6 +362,18 @@ class _TodoPageState extends ConsumerState<TodoPage>
                     },
                     onActionTap: (todo) async {
                       final messenger = ScaffoldMessenger.of(context);
+                      if (todo.source == 'calendar') {
+                        final opened = await ref
+                            .read(todoNotifierProvider.notifier)
+                            .executeTodoAction(todo);
+                        if (!mounted) return;
+                        if (!opened) {
+                          messenger.showSnackBar(
+                            const SnackBar(content: Text('未能打开系统日历')),
+                          );
+                        }
+                        return;
+                      }
                       if (todo.action == 'bookkeeping') {
                         _displayBookkeepingFeedback(success: false);
                       }

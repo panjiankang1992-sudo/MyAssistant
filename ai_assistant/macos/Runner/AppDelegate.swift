@@ -16,6 +16,10 @@ class AppDelegate: FlutterAppDelegate {
       binaryMessenger: controller.engine.binaryMessenger
     )
     channel.setMethodCallHandler { [weak self] call, result in
+      if call.method == "openCalendar" {
+        self?.openCalendarApp(result: result)
+        return
+      }
       guard call.method == "fetchEvents" else {
         result(FlutterMethodNotImplemented)
         return
@@ -68,6 +72,21 @@ class AppDelegate: FlutterAppDelegate {
         }
       result(payload)
     }
+  }
+
+  private func openCalendarApp(result: @escaping FlutterResult) {
+    let paths = [
+      "/System/Applications/Calendar.app",
+      "/Applications/Calendar.app"
+    ]
+    for path in paths {
+      let url = URL(fileURLWithPath: path)
+      if FileManager.default.fileExists(atPath: path) {
+        result(NSWorkspace.shared.open(url))
+        return
+      }
+    }
+    result(false)
   }
 
   private func requestCalendarAccess(_ completion: @escaping (Bool) -> Void) {

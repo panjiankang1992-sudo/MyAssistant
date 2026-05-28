@@ -2,6 +2,7 @@ package com.example.ai_assistant
 
 import android.Manifest
 import android.content.ContentUris
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.database.Cursor
 import android.provider.CalendarContract
@@ -21,6 +22,10 @@ class MainActivity: FlutterActivity() {
         super.configureFlutterEngine(flutterEngine)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, channelName)
             .setMethodCallHandler { call, result ->
+                if (call.method == "openCalendar") {
+                    result.success(openCalendarApp())
+                    return@setMethodCallHandler
+                }
                 if (call.method != "fetchEvents") {
                     result.notImplemented()
                     return@setMethodCallHandler
@@ -116,5 +121,25 @@ class MainActivity: FlutterActivity() {
             }
         }
         return events
+    }
+
+    private fun openCalendarApp(): Boolean {
+        return try {
+            val intent = Intent(Intent.ACTION_MAIN)
+                .addCategory(Intent.CATEGORY_APP_CALENDAR)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            startActivity(intent)
+            true
+        } catch (_: Exception) {
+            try {
+                val intent = Intent(Intent.ACTION_VIEW)
+                    .setData(CalendarContract.CONTENT_URI)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                startActivity(intent)
+                true
+            } catch (_: Exception) {
+                false
+            }
+        }
     }
 }

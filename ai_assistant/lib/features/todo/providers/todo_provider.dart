@@ -156,6 +156,13 @@ class TodoNotifier extends Notifier<List<Todo>> {
   }
 
   Future<bool> executeTodoAction(Todo todo) async {
+    if (todo.source == 'calendar') {
+      final service = CalendarTodoService(
+        datasource: ref.read(datasourceProvider),
+        todoRepository: ref.read(todoRepoProvider),
+      );
+      return service.openCalendarApp();
+    }
     if (todo.action == 'bookkeeping') {
       return BookkeepingActionService().createExpenseFromTodo(
         ref: ref,

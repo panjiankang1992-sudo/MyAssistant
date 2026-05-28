@@ -69,6 +69,17 @@ class CalendarTodoService {
     );
   }
 
+  Future<bool> openCalendarApp() async {
+    try {
+      final opened = await _channel.invokeMethod<bool>('openCalendar');
+      return opened ?? false;
+    } on MissingPluginException {
+      return false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
   Future<List<CalendarEvent>> _fetchEvents({
     required DateTime start,
     required DateTime end,

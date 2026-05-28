@@ -269,7 +269,12 @@ class _TodoItemState extends State<TodoItem>
                   ),
                 ),
                 const SizedBox(width: 8),
-                _SourceIcon(source: widget.todo.source),
+                _SourceIcon(
+                  source: widget.todo.source,
+                  onTap: widget.todo.source == 'calendar'
+                      ? widget.onActionTap
+                      : null,
+                ),
                 const SizedBox(width: 8),
                 Semantics(
                   button: true,
@@ -381,23 +386,31 @@ class _TodoMiniSourceChip extends StatelessWidget {
 
 class _SourceIcon extends StatelessWidget {
   final String source;
+  final VoidCallback? onTap;
 
-  const _SourceIcon({required this.source});
+  const _SourceIcon({required this.source, this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final item = TodoSources.byValue(source);
     return Tooltip(
       message: item.label,
-      child: Container(
-        width: 34,
-        height: 34,
-        decoration: BoxDecoration(
-          color: item.color.withValues(alpha: 0.08),
-          shape: BoxShape.circle,
-          border: Border.all(color: item.color.withValues(alpha: 0.18)),
+      child: Material(
+        color: Colors.transparent,
+        child: InkResponse(
+          onTap: onTap,
+          radius: 22,
+          child: Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: item.color.withValues(alpha: 0.08),
+              shape: BoxShape.circle,
+              border: Border.all(color: item.color.withValues(alpha: 0.18)),
+            ),
+            child: Icon(item.icon, size: 17, color: item.color),
+          ),
         ),
-        child: Icon(item.icon, size: 17, color: item.color),
       ),
     );
   }
