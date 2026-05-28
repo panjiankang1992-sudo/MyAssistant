@@ -81,10 +81,13 @@ class _CopilotSettingsPageState extends ConsumerState<CopilotSettingsPage> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
-          IconButton(
-            tooltip: '保存',
-            onPressed: _save,
-            icon: const Icon(Icons.check_rounded),
+          Padding(
+            padding: const EdgeInsets.only(right: 20),
+            child: IconButton(
+              tooltip: '保存',
+              onPressed: _save,
+              icon: const Icon(Icons.check_rounded),
+            ),
           ),
         ],
       ),

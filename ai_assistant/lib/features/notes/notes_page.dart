@@ -1668,6 +1668,7 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                             onTap: () => setState(() => _editing = true),
                           ),
                         ],
+                        const SizedBox(width: 10),
                       ],
                     ),
                     const SizedBox(height: 26),
@@ -1816,15 +1817,15 @@ class _CircleTool extends StatelessWidget {
       onTap: faded ? null : onTap,
       borderRadius: BorderRadius.circular(28),
       child: Container(
-        width: 58,
-        height: 58,
+        width: 52,
+        height: 52,
         decoration: BoxDecoration(
           color: AppColors.inputBg.withValues(alpha: faded ? 0.45 : 0.95),
           shape: BoxShape.circle,
         ),
         child: Icon(
           icon,
-          size: 29,
+          size: 26,
           color: faded
               ? AppColors.textTertiary.withValues(alpha: 0.45)
               : AppColors.text,
