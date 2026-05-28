@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:file_picker/file_picker.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../shared/widgets/app_controls.dart';
 import '../ai_settings/ai_model_page.dart';
 import '../ai_settings/ai_model_provider.dart';
 import '../skills/builtin_skill_registry.dart';
+import 'copilot_avatar.dart';
 import 'copilot_memory.dart';
 import 'copilot_settings.dart';
 
@@ -19,16 +21,16 @@ class CopilotSettingsPage extends ConsumerStatefulWidget {
 
 class _CopilotSettingsPageState extends ConsumerState<CopilotSettingsPage> {
   late final TextEditingController _nameController;
-  late final TextEditingController _avatarController;
   late final TextEditingController _callNameController;
   late final TextEditingController _personaController;
+  late String _avatarValue;
 
   @override
   void initState() {
     super.initState();
     final settings = ref.read(copilotSettingsProvider);
     _nameController = TextEditingController(text: settings.assistantName);
-    _avatarController = TextEditingController(text: settings.assistantAvatar);
+    _avatarValue = settings.displayAvatar;
     _callNameController = TextEditingController(text: settings.userCallName);
     _personaController = TextEditingController(text: settings.persona);
   }
@@ -36,10 +38,19 @@ class _CopilotSettingsPageState extends ConsumerState<CopilotSettingsPage> {
   @override
   void dispose() {
     _nameController.dispose();
-    _avatarController.dispose();
     _callNameController.dispose();
     _personaController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickCustomAvatar() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+      allowMultiple: false,
+    );
+    final path = result?.files.single.path;
+    if (path == null || path.trim().isEmpty) return;
+    setState(() => _avatarValue = CopilotAvatarCatalog.fileValue(path));
   }
 
   Future<void> _save() async {
@@ -50,7 +61,7 @@ class _CopilotSettingsPageState extends ConsumerState<CopilotSettingsPage> {
               .read(copilotSettingsProvider)
               .copyWith(
                 assistantName: _nameController.text.trim(),
-                assistantAvatar: _avatarController.text.trim(),
+                assistantAvatar: _avatarValue,
                 userCallName: _callNameController.text.trim(),
                 persona: _personaController.text.trim().isEmpty
                     ? CopilotSettings.defaultPersona
@@ -101,19 +112,7 @@ class _CopilotSettingsPageState extends ConsumerState<CopilotSettingsPage> {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    SizedBox(
-                      width: 78,
-                      child: TextField(
-                        controller: _avatarController,
-                        textAlign: TextAlign.center,
-                        maxLength: 2,
-                        decoration: appInputDecoration(
-                          label: '头像',
-                          hintText: '✦',
-                        ).copyWith(counterText: ''),
-                        onChanged: (_) => setState(() {}),
-                      ),
-                    ),
+                    CopilotAvatarView(value: _avatarValue, size: 58),
                     const SizedBox(width: 12),
                     Expanded(
                       child: TextField(
@@ -126,6 +125,12 @@ class _CopilotSettingsPageState extends ConsumerState<CopilotSettingsPage> {
                       ),
                     ),
                   ],
+                ),
+                const SizedBox(height: 12),
+                _AvatarPicker(
+                  value: _avatarValue,
+                  onChanged: (value) => setState(() => _avatarValue = value),
+                  onPickCustom: _pickCustomAvatar,
                 ),
                 const SizedBox(height: 12),
                 TextField(
@@ -150,9 +155,7 @@ class _CopilotSettingsPageState extends ConsumerState<CopilotSettingsPage> {
                   name: _nameController.text.trim().isEmpty
                       ? settings.displayName
                       : _nameController.text.trim(),
-                  avatar: _avatarController.text.trim().isEmpty
-                      ? settings.displayAvatar
-                      : _avatarController.text.trim(),
+                  avatar: _avatarValue,
                 ),
               ],
             ),
@@ -369,28 +372,7 @@ class _AssistantPreview extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: LinearGradient(
-                colors: [AppColors.primary, Color(0xFF60A5FA)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-            ),
-            child: Center(
-              child: Text(
-                avatar,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ),
-          ),
+          CopilotAvatarView(value: avatar, size: 38),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
@@ -404,6 +386,128 @@ class _AssistantPreview extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _AvatarPicker extends StatelessWidget {
+  final String value;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onPickCustom;
+
+  const _AvatarPicker({
+    required this.value,
+    required this.onChanged,
+    required this.onPickCustom,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final normalized = CopilotAvatarCatalog.normalize(value);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Text(
+              '默认头像',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textTertiary,
+              ),
+            ),
+            const Spacer(),
+            TextButton.icon(
+              onPressed: onPickCustom,
+              icon: const Icon(Icons.image_rounded, size: 16),
+              label: const Text('选择图片'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            for (final preset in CopilotAvatarCatalog.presets)
+              _AvatarChoice(
+                label: preset.label,
+                selected: normalized == preset.value,
+                child: CopilotAvatarView(
+                  value: preset.value,
+                  size: 44,
+                  selected: normalized == preset.value,
+                ),
+                onTap: () => onChanged(preset.value),
+              ),
+            if (normalized.startsWith('file:'))
+              _AvatarChoice(
+                label: '自选',
+                selected: true,
+                onTap: onPickCustom,
+                child: CopilotAvatarView(
+                  value: normalized,
+                  size: 44,
+                  selected: true,
+                ),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _AvatarChoice extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final Widget child;
+  final VoidCallback onTap;
+
+  const _AvatarChoice({
+    required this.label,
+    required this.selected,
+    required this.child,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: AnimatedContainer(
+        duration: AppAnimations.shortDuration,
+        width: 70,
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          color: selected
+              ? AppColors.primary.withValues(alpha: 0.08)
+              : AppColors.inputBg.withValues(alpha: 0.75),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: selected
+                ? AppColors.primary.withValues(alpha: 0.32)
+                : AppColors.border.withValues(alpha: 0.8),
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            child,
+            const SizedBox(height: 5),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                color: selected ? AppColors.primary : AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

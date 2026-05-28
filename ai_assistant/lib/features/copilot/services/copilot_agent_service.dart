@@ -62,7 +62,7 @@ class CopilotAgentService {
         role: 'system',
         content:
             '当前 Copilot 设置：助手名称=${settings.displayName}；'
-            '助手头像=${settings.displayAvatar}；'
+            '助手头像=${settings.displayAvatarDescription}；'
             '对用户称呼=${settings.displayUserCallName.isEmpty ? "按用户昵称自然称呼" : settings.displayUserCallName}；'
             '性格与聊天风格：${settings.displayPersona}',
       ),

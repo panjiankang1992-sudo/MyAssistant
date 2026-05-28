@@ -9,6 +9,7 @@ import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../profile/profile_provider.dart';
+import '../copilot_avatar.dart';
 import '../copilot_settings.dart';
 import '../providers/copilot_provider.dart';
 
@@ -77,7 +78,7 @@ class _AgentMessage extends StatelessWidget {
         _AssistantAvatar(
           color: toneColor,
           isError: isError,
-          label: settings.displayAvatar,
+          avatar: settings.displayAvatar,
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -205,32 +206,19 @@ class _AgentMessage extends StatelessWidget {
 class _AssistantAvatar extends StatelessWidget {
   final Color color;
   final bool isError;
-  final String label;
+  final String avatar;
 
   const _AssistantAvatar({
     required this.color,
     required this.isError,
-    required this.label,
+    required this.avatar,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 38,
-      height: 38,
-      margin: const EdgeInsets.only(top: 4),
+    return DecoratedBox(
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        gradient: LinearGradient(
-          colors: isError
-              ? [
-                  AppColors.danger.withValues(alpha: 0.95),
-                  const Color(0xFFFF9B8F),
-                ]
-              : [AppColors.primary, const Color(0xFF60A5FA)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
         boxShadow: [
           BoxShadow(
             color: color.withValues(alpha: 0.18),
@@ -239,24 +227,11 @@ class _AssistantAvatar extends StatelessWidget {
           ),
         ],
       ),
-      child: Center(
-        child: isError
-            ? const Icon(
-                Icons.priority_high_rounded,
-                size: 19,
-                color: Colors.white,
-              )
-            : Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.clip,
-                style: const TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w900,
-                  height: 1,
-                  color: Colors.white,
-                ),
-              ),
+      child: CopilotAvatarView(
+        value: avatar,
+        size: 38,
+        isError: isError,
+        margin: const EdgeInsets.only(top: 4),
       ),
     );
   }

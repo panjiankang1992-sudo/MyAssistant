@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/api/api_client.dart';
+import 'copilot_avatar.dart';
 
 class CopilotSettings {
   final String assistantName;
@@ -13,7 +14,7 @@ class CopilotSettings {
 
   const CopilotSettings({
     this.assistantName = 'MyAssistant',
-    this.assistantAvatar = '✦',
+    this.assistantAvatar = CopilotAvatarCatalog.defaultValue,
     this.userCallName = '',
     this.persona = defaultPersona,
     this.version = 1,
@@ -28,8 +29,10 @@ class CopilotSettings {
   String get displayName =>
       assistantName.trim().isEmpty ? 'MyAssistant' : assistantName.trim();
 
-  String get displayAvatar =>
-      assistantAvatar.trim().isEmpty ? '✦' : assistantAvatar.trim();
+  String get displayAvatar => CopilotAvatarCatalog.normalize(assistantAvatar);
+
+  String get displayAvatarDescription =>
+      CopilotAvatarCatalog.descriptionOf(displayAvatar);
 
   String get displayUserCallName => userCallName.trim();
 
@@ -62,7 +65,9 @@ class CopilotSettings {
   factory CopilotSettings.fromJson(Map<String, dynamic> json) {
     return CopilotSettings(
       assistantName: json['assistantName'] as String? ?? 'MyAssistant',
-      assistantAvatar: json['assistantAvatar'] as String? ?? '✦',
+      assistantAvatar: CopilotAvatarCatalog.normalize(
+        json['assistantAvatar'] as String?,
+      ),
       userCallName: json['userCallName'] as String? ?? '',
       persona: json['persona'] as String? ?? CopilotSettings.defaultPersona,
       version: json['version'] as int? ?? 1,
