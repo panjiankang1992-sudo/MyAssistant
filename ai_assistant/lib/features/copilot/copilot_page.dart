@@ -21,13 +21,14 @@ class CopilotPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final copilotState = ref.watch(copilotNotifierProvider);
     final modelState = ref.watch(aiModelProvider);
+    final scheme = Theme.of(context).colorScheme;
 
     void sendMessage(String text) {
       ref.read(copilotNotifierProvider.notifier).sendMessage(text);
     }
 
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: scheme.appPage,
       drawer: const _HistoryDrawer(),
       body: Row(
         children: [
@@ -74,9 +75,10 @@ class _HistoryDrawer extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(copilotNotifierProvider);
     final sessions = state.sessions;
+    final scheme = Theme.of(context).colorScheme;
 
     return Drawer(
-      backgroundColor: AppColors.surface,
+      backgroundColor: scheme.appSurface,
       width: 308,
       child: SafeArea(
         child: Padding(
@@ -86,19 +88,19 @@ class _HistoryDrawer extends ConsumerWidget {
             children: [
               Row(
                 children: [
-                  const Expanded(
+                  Expanded(
                     child: Text(
                       '历史会话',
                       style: TextStyle(
                         fontFamily: 'PingFang SC',
-                        fontFamilyFallback: [
+                        fontFamilyFallback: const [
                           '.SF Pro Text',
                           'system-ui',
                           'sans-serif',
                         ],
                         fontSize: 20,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.text,
+                        color: scheme.appText,
                       ),
                     ),
                   ),
@@ -119,13 +121,13 @@ class _HistoryDrawer extends ConsumerWidget {
                         width: double.infinity,
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
-                          color: AppColors.inputBg,
+                          color: scheme.appInput,
                           borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: AppColors.border),
+                          border: Border.all(color: scheme.appBorder),
                         ),
-                        child: const Text(
+                        child: Text(
                           '暂无历史会话',
-                          style: TextStyle(color: AppColors.textSecondary),
+                          style: TextStyle(color: scheme.appMutedText),
                         ),
                       )
                     : ListView.separated(
@@ -150,15 +152,15 @@ class _HistoryDrawer extends ConsumerWidget {
                               ),
                               decoration: BoxDecoration(
                                 color: selected
-                                    ? AppColors.primary.withValues(alpha: 0.08)
-                                    : AppColors.inputBg,
+                                    ? scheme.primary.withValues(alpha: 0.08)
+                                    : scheme.appInput,
                                 borderRadius: BorderRadius.circular(14),
                                 border: Border.all(
                                   color: selected
                                       ? AppColors.primary.withValues(
                                           alpha: 0.22,
                                         )
-                                      : AppColors.border,
+                                      : scheme.appBorder,
                                 ),
                               ),
                               child: Row(
@@ -169,8 +171,8 @@ class _HistoryDrawer extends ConsumerWidget {
                                         : Icons.chat_bubble_outline_rounded,
                                     size: 18,
                                     color: selected
-                                        ? AppColors.primary
-                                        : AppColors.textSecondary,
+                                        ? scheme.primary
+                                        : scheme.appMutedText,
                                   ),
                                   const SizedBox(width: 10),
                                   Expanded(
@@ -185,15 +187,14 @@ class _HistoryDrawer extends ConsumerWidget {
                                           style: const TextStyle(
                                             fontSize: 14,
                                             fontWeight: FontWeight.w700,
-                                            color: AppColors.text,
-                                          ),
+                                          ).copyWith(color: scheme.appText),
                                         ),
                                         const SizedBox(height: 2),
                                         Text(
                                           '${session.messages.length} 条消息 · ${DateFormat('MM-dd HH:mm').format(session.updatedAt)}',
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             fontSize: 12,
-                                            color: AppColors.textSecondary,
+                                            color: scheme.appMutedText,
                                           ),
                                         ),
                                       ],
@@ -232,12 +233,13 @@ class _CopilotTopBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       height: 54,
       padding: const EdgeInsets.symmetric(horizontal: 22),
-      decoration: const BoxDecoration(
-        color: AppColors.scaffoldBg,
-        border: Border(bottom: BorderSide(color: AppColors.border, width: 0.5)),
+      decoration: BoxDecoration(
+        color: scheme.appPage,
+        border: Border(bottom: BorderSide(color: scheme.appBorder, width: 0.5)),
       ),
       child: Row(
         children: [
@@ -246,11 +248,7 @@ class _CopilotTopBar extends ConsumerWidget {
               return IconButton(
                 tooltip: '历史会话',
                 onPressed: () => Scaffold.of(context).openDrawer(),
-                icon: const Icon(
-                  Icons.menu_rounded,
-                  size: 24,
-                  color: AppColors.text,
-                ),
+                icon: Icon(Icons.menu_rounded, size: 24, color: scheme.appText),
               );
             },
           ),
@@ -264,11 +262,15 @@ class _CopilotTopBar extends ConsumerWidget {
                 color: AppColors.success.withValues(alpha: 0.14),
               ),
             ),
-            child: const Row(
+            child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.storage_rounded, size: 13, color: AppColors.success),
-                SizedBox(width: 5),
+                const Icon(
+                  Icons.storage_rounded,
+                  size: 13,
+                  color: AppColors.success,
+                ),
+                const SizedBox(width: 5),
                 Text(
                   '应用数据已接入',
                   style: TextStyle(
@@ -280,7 +282,7 @@ class _CopilotTopBar extends ConsumerWidget {
                     ],
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.textSecondary,
+                    color: scheme.appMutedText,
                   ),
                 ),
               ],
@@ -331,14 +333,15 @@ class _ChatListState extends State<_ChatList> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return DecoratedBox(
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            AppColors.scaffoldBg,
-            AppColors.primary.withValues(alpha: 0.025),
+            scheme.appPage,
+            scheme.primary.withValues(alpha: scheme.isDarkTheme ? 0.06 : 0.025),
           ],
         ),
       ),
@@ -387,6 +390,7 @@ class _TypingIndicatorState extends State<_TypingIndicator>
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(
@@ -401,9 +405,9 @@ class _TypingIndicatorState extends State<_TypingIndicator>
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
-              color: AppColors.surface,
+              color: scheme.appSurface,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.border),
+              border: Border.all(color: scheme.appBorder),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,

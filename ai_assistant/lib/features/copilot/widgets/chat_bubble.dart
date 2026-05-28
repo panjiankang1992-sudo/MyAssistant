@@ -71,6 +71,7 @@ class _AgentMessage extends StatelessWidget {
         : isTool
         ? '执行结果'
         : settings.displayName;
+    final scheme = Theme.of(context).colorScheme;
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -85,7 +86,7 @@ class _AgentMessage extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 15),
             decoration: BoxDecoration(
-              color: AppColors.surface,
+              color: scheme.appSurface,
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(8),
                 topRight: Radius.circular(22),
@@ -93,15 +94,17 @@ class _AgentMessage extends StatelessWidget {
                 bottomRight: Radius.circular(22),
               ),
               border: Border.all(
-                color: AppColors.border.withValues(alpha: 0.7),
+                color: scheme.appBorder.withValues(alpha: 0.7),
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.045),
-                  blurRadius: 18,
-                  offset: const Offset(0, 8),
-                ),
-              ],
+              boxShadow: scheme.isDarkTheme
+                  ? null
+                  : [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.045),
+                        blurRadius: 18,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

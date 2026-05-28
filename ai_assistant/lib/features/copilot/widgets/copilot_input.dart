@@ -58,6 +58,7 @@ class _CopilotInputState extends ConsumerState<CopilotInput> {
     final modelName = widget.selectedModel?.name.isNotEmpty == true
         ? widget.selectedModel!.name
         : (widget.selectedModel?.model ?? '配置模型');
+    final scheme = Theme.of(context).colorScheme;
 
     return SafeArea(
       child: Align(
@@ -70,12 +71,12 @@ class _CopilotInputState extends ConsumerState<CopilotInput> {
               duration: const Duration(milliseconds: 180),
               padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
               decoration: BoxDecoration(
-                color: AppColors.surface,
+                color: scheme.appSurface,
                 borderRadius: BorderRadius.circular(24),
                 border: Border.all(
                   color: _focusNode.hasFocus
-                      ? AppColors.primary.withValues(alpha: 0.28)
-                      : AppColors.border,
+                      ? scheme.primary.withValues(alpha: 0.28)
+                      : scheme.appBorder,
                 ),
               ),
               child: Row(
@@ -93,7 +94,7 @@ class _CopilotInputState extends ConsumerState<CopilotInput> {
                       padding: const EdgeInsets.symmetric(horizontal: 14),
                       alignment: Alignment.centerLeft,
                       decoration: BoxDecoration(
-                        color: AppColors.inputBg.withValues(alpha: 0.72),
+                        color: scheme.appInput.withValues(alpha: 0.86),
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: CallbackShortcuts(
@@ -111,10 +112,10 @@ class _CopilotInputState extends ConsumerState<CopilotInput> {
                           textAlignVertical: TextAlignVertical.center,
                           onChanged: (_) => setState(() {}),
                           onTap: () => setState(() {}),
-                          cursorColor: AppColors.primary,
+                          cursorColor: scheme.primary,
                           cursorHeight: 21,
                           cursorWidth: 2,
-                          decoration: const InputDecoration(
+                          decoration: InputDecoration(
                             hintText: '输入你的问题...',
                             hintStyle: TextStyle(
                               fontFamily: 'PingFang SC',
@@ -126,7 +127,7 @@ class _CopilotInputState extends ConsumerState<CopilotInput> {
                               fontSize: 15,
                               height: 1.35,
                               fontWeight: FontWeight.w400,
-                              color: AppColors.textTertiary,
+                              color: scheme.appSubtleText,
                             ),
                             border: InputBorder.none,
                             enabledBorder: InputBorder.none,
@@ -136,11 +137,11 @@ class _CopilotInputState extends ConsumerState<CopilotInput> {
                             fillColor: Colors.transparent,
                             focusColor: Colors.transparent,
                             isCollapsed: true,
-                            contentPadding: EdgeInsets.only(bottom: 1),
+                            contentPadding: const EdgeInsets.only(bottom: 1),
                           ),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontFamily: 'PingFang SC',
-                            fontFamilyFallback: [
+                            fontFamilyFallback: const [
                               '.SF Pro Text',
                               'system-ui',
                               'sans-serif',
@@ -148,7 +149,7 @@ class _CopilotInputState extends ConsumerState<CopilotInput> {
                             fontSize: 15,
                             height: 1.35,
                             fontWeight: FontWeight.w400,
-                            color: AppColors.text,
+                            color: scheme.appText,
                           ),
                           onSubmitted: (_) => _handleSend(),
                         ),
@@ -162,8 +163,8 @@ class _CopilotInputState extends ConsumerState<CopilotInput> {
                     height: 44,
                     decoration: BoxDecoration(
                       color: hasText && !widget.isRunning
-                          ? AppColors.primary
-                          : AppColors.textTertiary.withValues(alpha: 0.48),
+                          ? scheme.primary
+                          : scheme.appSubtleText.withValues(alpha: 0.48),
                       shape: BoxShape.circle,
                     ),
                     child: IconButton(

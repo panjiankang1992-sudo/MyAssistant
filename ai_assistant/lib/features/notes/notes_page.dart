@@ -351,8 +351,9 @@ class _NotesPageState extends ConsumerState<NotesPage> {
     final analysisDocs = notes
         .where((n) => !n.deleted && !n.archived && n.isAnalysis)
         .toList();
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: scheme.appPage,
       body: SafeArea(
         child: Stack(
           children: [
@@ -362,12 +363,12 @@ class _NotesPageState extends ConsumerState<NotesPage> {
                   padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
                   child: Row(
                     children: [
-                      const Text(
+                      Text(
                         '随手记',
                         style: TextStyle(
                           fontSize: 28,
                           fontWeight: FontWeight.w900,
-                          color: AppColors.text,
+                          color: scheme.appText,
                         ),
                       ),
                       const SizedBox(width: 10),
@@ -385,13 +386,13 @@ class _NotesPageState extends ConsumerState<NotesPage> {
                             padding: const EdgeInsets.symmetric(horizontal: 12),
                             decoration: BoxDecoration(
                               color: _filterDate == null
-                                  ? AppColors.inputBg
-                                  : AppColors.primary.withValues(alpha: 0.1),
+                                  ? scheme.appInput
+                                  : scheme.primary.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(16),
                               border: Border.all(
                                 color: _filterDate == null
-                                    ? AppColors.border
-                                    : AppColors.primary.withValues(alpha: 0.25),
+                                    ? scheme.appBorder
+                                    : scheme.primary.withValues(alpha: 0.25),
                               ),
                             ),
                             child: Row(
@@ -653,6 +654,7 @@ class _NoteCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: InkWell(
@@ -662,10 +664,10 @@ class _NoteCard extends StatelessWidget {
           height: compact ? 188 : null,
           padding: const EdgeInsets.fromLTRB(16, 14, 12, 12),
           decoration: BoxDecoration(
-            color: AppColors.surface,
+            color: scheme.appSurface,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.border.withValues(alpha: 0.7)),
-            boxShadow: AppAnimations.cardShadow(),
+            border: Border.all(color: scheme.appBorder.withValues(alpha: 0.7)),
+            boxShadow: scheme.isDarkTheme ? null : AppAnimations.cardShadow(),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -685,10 +687,10 @@ class _NoteCard extends StatelessWidget {
                       note.title,
                       maxLines: compact ? 2 : 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.w800,
-                        color: AppColors.text,
+                        color: scheme.appText,
                       ),
                     ),
                   ),
@@ -706,9 +708,9 @@ class _NoteCard extends StatelessWidget {
                 children: [
                   Text(
                     DateFormat('MM-dd HH:mm').format(note.updatedAt),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
-                      color: AppColors.textTertiary,
+                      color: scheme.appSubtleText,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -1632,9 +1634,10 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return EdgeSwipePop(
       child: Material(
-        color: AppColors.surface,
+        color: scheme.appPage,
         child: SafeArea(
           child: Stack(
             children: [
@@ -1675,10 +1678,10 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                     if (_editing)
                       TextField(
                         controller: _title,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 30,
                           fontWeight: FontWeight.w800,
-                          color: AppColors.text,
+                          color: scheme.appText,
                         ),
                         decoration: const InputDecoration(
                           hintText: '标题',
@@ -1694,10 +1697,10 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                     else
                       Text(
                         _title.text.trim().isEmpty ? '未命名随手记' : _title.text,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 30,
                           fontWeight: FontWeight.w900,
-                          color: AppColors.text,
+                          color: scheme.appText,
                         ),
                       ),
                     if (!_editing) ...[

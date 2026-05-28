@@ -840,9 +840,10 @@ class _BookkeepingPageState extends ConsumerState<BookkeepingPage> {
         .toList();
     final expense = _sum(todayItems, LedgerKind.expense);
     final income = _sum(todayItems, LedgerKind.income);
+    final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: scheme.appPage,
       body: SafeArea(
         child: Column(
           children: [
@@ -946,6 +947,7 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
       child: Row(
@@ -961,9 +963,10 @@ class _Header extends StatelessWidget {
                         _titleForDate(selectedDate),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 30,
                           fontWeight: FontWeight.w800,
+                          color: scheme.appText,
                         ),
                       ),
                     ),
@@ -971,30 +974,30 @@ class _Header extends StatelessWidget {
                     IconButton(
                       tooltip: '选择日期',
                       onPressed: onDatePick,
-                      icon: const Icon(
+                      icon: Icon(
                         Icons.calendar_month_outlined,
                         size: 24,
-                        color: AppColors.textSecondary,
+                        color: scheme.appMutedText,
                       ),
                     ),
                     IconButton(
                       tooltip: '统计',
                       onPressed: onStats,
-                      icon: const Icon(
+                      icon: Icon(
                         Icons.pie_chart_rounded,
                         size: 24,
-                        color: AppColors.textSecondary,
+                        color: scheme.appMutedText,
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 2),
-                const Text(
+                Text(
                   '人生苦短，钱途漫漫，省钱是王道。',
                   style: TextStyle(
                     fontSize: 12,
                     fontStyle: FontStyle.italic,
-                    color: AppColors.textSecondary,
+                    color: scheme.appMutedText,
                   ),
                 ),
               ],
@@ -1119,23 +1122,38 @@ class _SummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final balance = income - expense;
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: const Color(0xFFEDEEFF),
+        color: Color.alphaBlend(
+          scheme.primary.withValues(alpha: scheme.isDarkTheme ? 0.16 : 0.10),
+          scheme.appSurface,
+        ),
         borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: scheme.appBorder.withValues(alpha: 0.55)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             '${selectedDate.month}月${selectedDate.day}日账单结余 ${_money(balance)}',
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: scheme.appText,
+            ),
           ),
           const Divider(height: 24),
           Row(
             children: [
-              const Text('收支数据', style: TextStyle(fontWeight: FontWeight.w700)),
+              Text(
+                '收支数据',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: scheme.appText,
+                ),
+              ),
               const Spacer(),
               Text('消费 ${_money(expense)}'),
               const SizedBox(width: 12),
@@ -1228,7 +1246,7 @@ class _LedgerDetailPage extends StatelessWidget {
     final kindLabel = entry.kind == LedgerKind.expense ? '支出' : '收入';
     return EdgeSwipePop(
       child: Material(
-        color: AppColors.scaffoldBg,
+        color: Theme.of(context).colorScheme.appPage,
         child: SafeArea(
           child: Stack(
             children: [
@@ -1237,13 +1255,13 @@ class _LedgerDetailPage extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      const Expanded(
+                      Expanded(
                         child: Text(
                           '详细信息',
                           style: TextStyle(
                             fontSize: 26,
                             fontWeight: FontWeight.w900,
-                            color: AppColors.text,
+                            color: Theme.of(context).colorScheme.appText,
                           ),
                         ),
                       ),
@@ -1323,12 +1341,14 @@ class _LedgerDetailMainCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.fromLTRB(22, 22, 22, 24),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: scheme.appSurface,
         borderRadius: BorderRadius.circular(30),
-        boxShadow: AppAnimations.elevatedShadow(),
+        border: Border.all(color: scheme.appBorder.withValues(alpha: 0.58)),
+        boxShadow: scheme.isDarkTheme ? null : AppAnimations.elevatedShadow(),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1343,9 +1363,10 @@ class _LedgerDetailMainCard extends StatelessWidget {
               const SizedBox(width: 12),
               Text(
                 entry.categoryName,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.w900,
+                  color: scheme.appText,
                 ),
               ),
               const Spacer(),
@@ -1366,16 +1387,16 @@ class _LedgerDetailMainCard extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
-              color: AppColors.inputBg,
+              color: scheme.appInput,
               borderRadius: BorderRadius.circular(22),
             ),
             child: Text(
               entry.note.isEmpty ? '这笔账单暂时没有备注，当前重点展示金额、时间和分类信息。' : entry.note,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 15,
                 height: 1.6,
                 fontWeight: FontWeight.w700,
-                color: AppColors.textSecondary,
+                color: scheme.appMutedText,
               ),
             ),
           ),
@@ -1410,12 +1431,14 @@ class _LedgerDetailInfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.fromLTRB(22, 22, 22, 24),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: scheme.appSurface,
         borderRadius: BorderRadius.circular(30),
-        boxShadow: AppAnimations.elevatedShadow(),
+        border: Border.all(color: scheme.appBorder.withValues(alpha: 0.58)),
+        boxShadow: scheme.isDarkTheme ? null : AppAnimations.elevatedShadow(),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2301,11 +2324,13 @@ class _SectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: scheme.appSurface,
         borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: scheme.appBorder.withValues(alpha: 0.6)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2314,9 +2339,10 @@ class _SectionCard extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w800,
+                  color: scheme.appText,
                 ),
               ),
               const Spacer(),
@@ -2487,6 +2513,7 @@ class _LedgerRow extends StatelessWidget {
     final color = entry.kind == LedgerKind.expense
         ? AppColors.danger
         : AppColors.success;
+    final scheme = Theme.of(context).colorScheme;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -2510,9 +2537,10 @@ class _LedgerRow extends StatelessWidget {
                       children: [
                         Text(
                           entry.categoryName,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 17,
                             fontWeight: FontWeight.w700,
+                            color: scheme.appText,
                           ),
                         ),
                         if (entry.aiGenerated) ...[
@@ -2532,8 +2560,7 @@ class _LedgerRow extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           fontSize: 12,
-                          color: AppColors.textSecondary,
-                        ),
+                        ).copyWith(color: scheme.appMutedText),
                       ),
                     if (entry.tags.isNotEmpty) ...[
                       const SizedBox(height: 4),
@@ -3012,8 +3039,9 @@ class _AddLedgerPageState extends State<_AddLedgerPage>
   @override
   Widget build(BuildContext context) {
     final cats = _categoriesFor(_kind);
+    final scheme = Theme.of(context).colorScheme;
     return Material(
-      color: AppColors.scaffoldBg,
+      color: scheme.appPage,
       child: SafeArea(
         child: Column(
           children: [
@@ -3022,11 +3050,12 @@ class _AddLedgerPageState extends State<_AddLedgerPage>
               child: Row(
                 children: [
                   if (widget.initialEntry != null) ...[
-                    const Text(
+                    Text(
                       '编辑账单',
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w800,
+                        color: scheme.appText,
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -3110,10 +3139,18 @@ class _AddLedgerPageState extends State<_AddLedgerPage>
                               decoration: InputDecoration(
                                 hintText: '备注，例如：地铁、午餐',
                                 filled: true,
-                                fillColor: AppColors.surface,
+                                fillColor: scheme.appSurface,
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(18),
-                                  borderSide: BorderSide.none,
+                                  borderSide: BorderSide(
+                                    color: scheme.appBorder,
+                                  ),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(18),
+                                  borderSide: BorderSide(
+                                    color: scheme.appBorder,
+                                  ),
                                 ),
                               ),
                             ),
@@ -3132,21 +3169,28 @@ class _AddLedgerPageState extends State<_AddLedgerPage>
                           vertical: 14,
                         ),
                         decoration: BoxDecoration(
-                          color: AppColors.surface,
+                          color: scheme.appSurface,
                           borderRadius: BorderRadius.circular(18),
+                          border: Border.all(
+                            color: scheme.appBorder.withValues(alpha: 0.58),
+                          ),
                         ),
                         child: Row(
                           children: [
-                            const Text(
+                            Text(
                               '金额',
-                              style: TextStyle(fontWeight: FontWeight.w700),
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: scheme.appText,
+                              ),
                             ),
                             const Spacer(),
                             Text(
                               '${_currency == "CNY" ? "¥" : _currency} ${_amountText.isEmpty ? "0.00" : _amountText}',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 28,
                                 fontWeight: FontWeight.w800,
+                                color: scheme.appText,
                               ),
                             ),
                           ],
@@ -3212,6 +3256,7 @@ class _CategoryPickTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
@@ -3219,10 +3264,17 @@ class _CategoryPickTile extends StatelessWidget {
         width: width,
         padding: EdgeInsets.symmetric(vertical: width < 72 ? 8 : 10),
         decoration: BoxDecoration(
-          color: selected ? category.color : AppColors.surface,
+          color: selected
+              ? Color.alphaBlend(
+                  category.color.withValues(
+                    alpha: scheme.isDarkTheme ? 0.28 : 0.72,
+                  ),
+                  scheme.appSurface,
+                )
+              : scheme.appSurface,
           borderRadius: BorderRadius.circular(width < 72 ? 15 : 18),
           border: Border.all(
-            color: selected ? AppColors.primary : AppColors.border,
+            color: selected ? scheme.primary : scheme.appBorder,
           ),
         ),
         child: Column(
@@ -3236,10 +3288,11 @@ class _CategoryPickTile extends StatelessWidget {
               category.name,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: 'PingFang SC',
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
+                color: scheme.appText,
               ),
             ),
           ],
@@ -3257,15 +3310,16 @@ class _AddCategoryTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: onTap,
       child: Container(
         width: width,
         padding: EdgeInsets.symmetric(vertical: width < 72 ? 8 : 10),
         decoration: BoxDecoration(
-          color: AppColors.surface,
+          color: scheme.appSurface,
           borderRadius: BorderRadius.circular(width < 72 ? 15 : 18),
-          border: Border.all(color: AppColors.border),
+          border: Border.all(color: scheme.appBorder),
         ),
         child: Column(
           children: [
@@ -3274,11 +3328,15 @@ class _AddCategoryTile extends StatelessWidget {
               size: (width * 0.34).clamp(22.0, 29.0),
             ),
             const SizedBox(height: 4),
-            const Text(
+            Text(
               '自定义',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: scheme.appText,
+              ),
             ),
           ],
         ),
@@ -3300,6 +3358,7 @@ class _KindTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: onTap,
       child: Padding(
@@ -3309,7 +3368,7 @@ class _KindTab extends StatelessWidget {
           style: TextStyle(
             fontSize: 19,
             fontWeight: FontWeight.w800,
-            color: selected ? AppColors.primary : AppColors.textSecondary,
+            color: selected ? scheme.primary : scheme.appMutedText,
             decoration: selected ? TextDecoration.underline : null,
             decorationThickness: 2,
           ),
@@ -3332,6 +3391,7 @@ class _NumberPad extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final keys = [
       '1',
       '2',
@@ -3372,8 +3432,11 @@ class _NumberPad extends StatelessWidget {
           },
           child: Container(
             decoration: BoxDecoration(
-              color: key == 'del' ? const Color(0xFFFF5B45) : AppColors.surface,
+              color: key == 'del' ? const Color(0xFFFF5B45) : scheme.appSurface,
               borderRadius: BorderRadius.circular(16),
+              border: key == 'del'
+                  ? null
+                  : Border.all(color: scheme.appBorder.withValues(alpha: 0.52)),
             ),
             child: Center(
               child: key == 'del'
@@ -3381,16 +3444,18 @@ class _NumberPad extends StatelessWidget {
                   : key == 'currency'
                   ? Text(
                       '${_currencyFlag(currency)} $currency',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w800,
+                        color: scheme.appText,
                       ),
                     )
                   : Text(
                       key,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w800,
+                        color: scheme.appText,
                       ),
                     ),
             ),

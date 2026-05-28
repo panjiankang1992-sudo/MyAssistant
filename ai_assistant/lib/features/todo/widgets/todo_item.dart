@@ -93,6 +93,11 @@ class _TodoItemState extends State<TodoItem>
     final scheme = Theme.of(context).colorScheme;
     final cardColor = _itemPressed ? scheme.appPressed : scheme.appSurface;
     final mutedText = scheme.appMutedText;
+    final actionColor = actionStyle.$2;
+    final actionBg = Color.alphaBlend(
+      actionColor.withValues(alpha: scheme.isDarkTheme ? 0.18 : 0.10),
+      scheme.appSurface,
+    );
 
     return GestureDetector(
       onTapDown: widget.readOnly
@@ -294,14 +299,19 @@ class _TodoItemState extends State<TodoItem>
                             width: 36,
                             height: 36,
                             decoration: BoxDecoration(
-                              color: actionStyle.$1,
+                              color: actionBg,
                               shape: BoxShape.circle,
+                              border: Border.all(
+                                color: actionColor.withValues(
+                                  alpha: scheme.isDarkTheme ? 0.36 : 0.18,
+                                ),
+                              ),
                             ),
                             child: Center(
                               child: Icon(
                                 actionStyle.$3,
                                 size: 19,
-                                color: actionStyle.$2,
+                                color: actionColor,
                               ),
                             ),
                           ),
