@@ -130,7 +130,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         .watch(localSyncDsProvider)
         .getPendingCountsByType();
     return Scaffold(
-      backgroundColor: AppColors.scaffoldBg,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text('设置'),
         backgroundColor: Colors.transparent,

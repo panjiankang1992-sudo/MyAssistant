@@ -185,6 +185,7 @@ class _ProfilePanelState extends State<ProfilePanel>
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: _closePanel,
       child: Container(
@@ -204,7 +205,7 @@ class _ProfilePanelState extends State<ProfilePanel>
                     child: Container(
                       width: 320,
                       decoration: BoxDecoration(
-                        color: AppColors.surface,
+                        color: scheme.surface,
                         boxShadow: [
                           BoxShadow(
                             color: Colors.black.withValues(alpha: 0.15),
@@ -239,16 +240,22 @@ class _ProfilePanelState extends State<ProfilePanel>
                                             width: 30,
                                             height: 30,
                                             decoration: BoxDecoration(
-                                              color: AppColors.inputBg,
+                                              color: Color.alphaBlend(
+                                                scheme.primary.withValues(
+                                                  alpha: 0.025,
+                                                ),
+                                                scheme.surface,
+                                              ),
                                               shape: BoxShape.circle,
                                               border: Border.all(
-                                                color: AppColors.border,
+                                                color: scheme.outline
+                                                    .withValues(alpha: 0.42),
                                               ),
                                             ),
-                                            child: const Icon(
+                                            child: Icon(
                                               Icons.close_rounded,
                                               size: 17,
-                                              color: AppColors.textSecondary,
+                                              color: scheme.onSurfaceVariant,
                                             ),
                                           ),
                                         ),
@@ -267,22 +274,22 @@ class _ProfilePanelState extends State<ProfilePanel>
                                     profile.name.isEmpty
                                         ? '未设置昵称'
                                         : profile.name,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontFamily: 'PingFang SC',
                                       fontSize: 20,
                                       fontWeight: FontWeight.w700,
-                                      color: AppColors.text,
+                                      color: scheme.onSurface,
                                       decoration: TextDecoration.none,
                                     ),
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
                                     profile.email.isEmpty ? '' : profile.email,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontFamily: 'PingFang SC',
                                       fontSize: 13,
                                       fontWeight: FontWeight.w400,
-                                      color: AppColors.textTertiary,
+                                      color: scheme.onSurfaceVariant,
                                       decoration: TextDecoration.none,
                                     ),
                                   ),
@@ -292,7 +299,9 @@ class _ProfilePanelState extends State<ProfilePanel>
                                       horizontal: 18,
                                     ),
                                     height: 1,
-                                    color: AppColors.border,
+                                    color: scheme.outline.withValues(
+                                      alpha: 0.36,
+                                    ),
                                   ),
                                   const SizedBox(height: 10),
                                   Padding(
@@ -381,7 +390,9 @@ class _ProfilePanelState extends State<ProfilePanel>
                                       horizontal: 18,
                                     ),
                                     height: 1,
-                                    color: AppColors.border,
+                                    color: scheme.outline.withValues(
+                                      alpha: 0.36,
+                                    ),
                                   ),
                                   Padding(
                                     padding: const EdgeInsets.only(
@@ -458,6 +469,7 @@ class _MenuItemCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -469,29 +481,34 @@ class _MenuItemCard extends StatelessWidget {
               width: 30,
               height: 30,
               decoration: BoxDecoration(
-                color: AppColors.inputBg,
+                color: Color.alphaBlend(
+                  scheme.primary.withValues(alpha: 0.025),
+                  scheme.surface,
+                ),
                 shape: BoxShape.circle,
-                border: Border.all(color: AppColors.border),
+                border: Border.all(
+                  color: scheme.outline.withValues(alpha: 0.4),
+                ),
               ),
-              child: Icon(icon, size: 17, color: AppColors.textSecondary),
+              child: Icon(icon, size: 17, color: scheme.onSurfaceVariant),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
                 label,
-                style: const TextStyle(
+                style: TextStyle(
                   fontFamily: 'PingFang SC',
                   fontSize: 15,
                   fontWeight: FontWeight.w500,
-                  color: AppColors.text,
+                  color: scheme.onSurface,
                   decoration: TextDecoration.none,
                 ),
               ),
             ),
-            const Icon(
+            Icon(
               Icons.chevron_right_rounded,
               size: 18,
-              color: AppColors.textTertiary,
+              color: scheme.onSurfaceVariant.withValues(alpha: 0.72),
             ),
           ],
         ),

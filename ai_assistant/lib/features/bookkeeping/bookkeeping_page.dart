@@ -842,7 +842,7 @@ class _BookkeepingPageState extends ConsumerState<BookkeepingPage> {
     final income = _sum(todayItems, LedgerKind.income);
 
     return Scaffold(
-      backgroundColor: AppColors.scaffoldBg,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           children: [

@@ -463,11 +463,14 @@ class CopilotAvatarView extends StatelessWidget {
   }
 
   Widget _presetBody(CopilotAvatarPreset preset) {
-    return Image.asset(
-      preset.assetPath,
-      width: size,
-      height: size,
-      fit: BoxFit.cover,
+    return Transform.scale(
+      scale: 1.12,
+      child: Image.asset(
+        preset.assetPath,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+      ),
     );
   }
 }

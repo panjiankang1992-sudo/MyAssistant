@@ -17,7 +17,6 @@ class HelpFeedbackPage extends StatefulWidget {
 }
 
 class _HelpFeedbackPageState extends State<HelpFeedbackPage> {
-  final _service = FeedbackService();
   final _titleCtrl = TextEditingController();
   final _contentCtrl = TextEditingController();
   final _contactCtrl = TextEditingController();
@@ -27,14 +26,7 @@ class _HelpFeedbackPageState extends State<HelpFeedbackPage> {
   bool _includeDiagnostics = true;
   bool _submitting = false;
   String _status = '';
-  int _pendingCount = 0;
   final List<String> _screenshotPaths = [];
-
-  @override
-  void initState() {
-    super.initState();
-    _refreshPendingCount();
-  }
 
   @override
   void dispose() {
@@ -44,16 +36,11 @@ class _HelpFeedbackPageState extends State<HelpFeedbackPage> {
     super.dispose();
   }
 
-  Future<void> _refreshPendingCount() async {
-    final count = await _service.pendingCount();
-    if (mounted) setState(() => _pendingCount = count);
-  }
-
   Future<void> _submit() async {
     final title = _titleCtrl.text.trim();
     final content = _contentCtrl.text.trim();
-    if (title.isEmpty || content.length < 8) {
-      setState(() => _status = '请填写标题，并把问题描述得更完整一点。');
+    if (content.length < 8) {
+      setState(() => _status = '请把问题描述得更完整一点，至少写清楚现象或复现步骤。');
       return;
     }
     setState(() {
@@ -65,7 +52,7 @@ class _HelpFeedbackPageState extends State<HelpFeedbackPage> {
       module: _module,
       type: _type,
       severity: _severity,
-      title: title,
+      title: title.isEmpty ? '${_module.label}${_type.label}' : title,
       content: content,
       contact: _contactCtrl.text.trim(),
       includeDiagnostics: _includeDiagnostics,
@@ -78,7 +65,7 @@ class _HelpFeedbackPageState extends State<HelpFeedbackPage> {
     setState(() {
       _submitting = false;
       _status = sent
-          ? '已打开邮件客户端，请确认后发送。'
+          ? '已打开邮件客户端，请确认后发送。截图路径已写入正文，如需附件请在邮件客户端添加图片。'
           : '无法打开邮件客户端，请手动发送到 ${FeedbackService.supportEmail}';
     });
   }
@@ -93,31 +80,6 @@ class _HelpFeedbackPageState extends State<HelpFeedbackPage> {
       },
     );
     return launchUrl(uri);
-  }
-
-  Future<void> _sendEmail() async {
-    final report = FeedbackReport(
-      id: const Uuid().v4(),
-      module: _module,
-      type: _type,
-      severity: _severity,
-      title: _titleCtrl.text.trim().isEmpty
-          ? 'MyAssistant 使用反馈'
-          : _titleCtrl.text.trim(),
-      content: _contentCtrl.text.trim().isEmpty
-          ? '请在这里描述你遇到的问题、复现步骤和期望结果。'
-          : _contentCtrl.text.trim(),
-      contact: _contactCtrl.text.trim(),
-      includeDiagnostics: _includeDiagnostics,
-      screenshotPaths: List.unmodifiable(_screenshotPaths),
-      createdAt: DateTime.now(),
-      diagnostics: buildFeedbackDiagnostics(),
-    );
-    if (!await _sendReportEmail(report)) {
-      setState(
-        () => _status = '无法打开邮件客户端，请手动发送到 ${FeedbackService.supportEmail}',
-      );
-    }
   }
 
   Future<void> _pickScreenshots() async {
@@ -140,21 +102,20 @@ class _HelpFeedbackPageState extends State<HelpFeedbackPage> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: AppColors.scaffoldBg,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(title: const Text('帮助与反馈')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 10, 20, 36),
         children: [
-          _ContactCard(onEmailTap: _sendEmail, pendingCount: _pendingCount),
-          const SizedBox(height: 22),
           const _SectionHeader(title: '使用文档', subtitle: '按模块查看常用能力和操作入口。'),
           const SizedBox(height: 10),
           for (final doc in _helpDocs) _HelpDocCard(doc: doc),
           const SizedBox(height: 24),
           const _SectionHeader(
             title: '提交反馈',
-            subtitle: '按固定格式打开邮件客户端，可附带截图说明。',
+            subtitle: '直接打开邮件客户端发送到 ${FeedbackService.supportEmail}，可附带截图说明。',
           ),
           const SizedBox(height: 12),
           _FeedbackForm(
@@ -192,28 +153,12 @@ class _HelpFeedbackPageState extends State<HelpFeedbackPage> {
                         : const Icon(Icons.mail_outline_rounded, size: 18),
                     label: Text(_submitting ? '打开中' : '发送邮件'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
+                      backgroundColor: scheme.primary,
+                      foregroundColor: scheme.onPrimary,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(22),
                       ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              SizedBox(
-                height: 44,
-                child: OutlinedButton.icon(
-                  onPressed: _sendEmail,
-                  icon: const Icon(Icons.mail_outline_rounded, size: 18),
-                  label: const Text('邮件'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.text,
-                    side: const BorderSide(color: AppColors.border),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(22),
                     ),
                   ),
                 ),
@@ -265,16 +210,51 @@ class _FeedbackForm extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: scheme.surface,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: scheme.outline.withValues(alpha: 0.48)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Container(
+            height: 42,
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            decoration: BoxDecoration(
+              color: Color.alphaBlend(
+                scheme.primary.withValues(alpha: 0.06),
+                scheme.surface,
+              ),
+              borderRadius: BorderRadius.circular(21),
+              border: Border.all(color: scheme.outline.withValues(alpha: 0.36)),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.mail_outline_rounded,
+                  size: 18,
+                  color: scheme.primary,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    FeedbackService.supportEmail,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: scheme.onSurface,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
           AppDropdownField<FeedbackModule>(
             label: '模块',
             value: module,
@@ -307,8 +287,9 @@ class _FeedbackForm extends StatelessWidget {
           const SizedBox(height: 14),
           TextField(
             controller: titleCtrl,
-            decoration: const InputDecoration(
-              labelText: '标题',
+            decoration: appInputDecoration(
+              context: context,
+              label: '标题',
               hintText: '例如：记账统计页面筛选异常',
             ),
           ),
@@ -317,8 +298,9 @@ class _FeedbackForm extends StatelessWidget {
             controller: contentCtrl,
             maxLines: 5,
             minLines: 4,
-            decoration: const InputDecoration(
-              labelText: '问题描述',
+            decoration: appInputDecoration(
+              context: context,
+              label: '问题描述',
               hintText: '请写清楚复现步骤、期望结果和实际结果。',
               alignLabelWithHint: true,
             ),
@@ -327,8 +309,9 @@ class _FeedbackForm extends StatelessWidget {
           TextField(
             controller: contactCtrl,
             keyboardType: TextInputType.emailAddress,
-            decoration: const InputDecoration(
-              labelText: '联系方式（可选）',
+            decoration: appInputDecoration(
+              context: context,
+              label: '联系方式（可选）',
               hintText: '邮箱、微信或其他可联系你的方式',
             ),
           ),
@@ -343,13 +326,17 @@ class _FeedbackForm extends StatelessWidget {
             value: includeDiagnostics,
             onChanged: onDiagnosticsChanged,
             contentPadding: EdgeInsets.zero,
-            title: const Text(
+            title: Text(
               '附带诊断信息',
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: scheme.onSurface,
+              ),
             ),
-            subtitle: const Text(
+            subtitle: Text(
               '包含平台、系统版本、语言和应用版本，不包含个人内容。',
-              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
             ),
           ),
         ],
@@ -440,12 +427,13 @@ class _HelpDocCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: scheme.surface,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: scheme.outline.withValues(alpha: 0.44)),
       ),
       child: Theme(
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
@@ -461,14 +449,15 @@ class _HelpDocCard extends StatelessWidget {
           ),
           title: Text(
             doc.title,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w900,
+              color: scheme.onSurface,
+            ),
           ),
           subtitle: Text(
             doc.summary,
-            style: const TextStyle(
-              fontSize: 12,
-              color: AppColors.textSecondary,
-            ),
+            style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
           ),
           childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
           children: [
@@ -494,8 +483,7 @@ class _HelpDocCard extends StatelessWidget {
                         style: const TextStyle(
                           fontSize: 13,
                           height: 1.42,
-                          color: AppColors.textSecondary,
-                        ),
+                        ).copyWith(color: scheme.onSurfaceVariant),
                       ),
                     ),
                   ],
@@ -508,116 +496,6 @@ class _HelpDocCard extends StatelessWidget {
   }
 }
 
-class _ContactCard extends StatelessWidget {
-  final VoidCallback onEmailTap;
-  final int pendingCount;
-
-  const _ContactCard({required this.onEmailTap, required this.pendingCount});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(26),
-        border: Border.all(color: AppColors.border),
-        boxShadow: AppAnimations.cardShadow(),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                child: const Icon(
-                  Icons.support_agent_rounded,
-                  color: AppColors.primary,
-                  size: 23,
-                ),
-              ),
-              const SizedBox(width: 12),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '使用帮助与问题反馈',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    SizedBox(height: 3),
-                    Text(
-                      '查看指南，或把问题直接反馈给我们。',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          GestureDetector(
-            onTap: onEmailTap,
-            child: Container(
-              height: 42,
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              decoration: BoxDecoration(
-                color: AppColors.inputBg,
-                borderRadius: BorderRadius.circular(21),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: const Row(
-                children: [
-                  Icon(
-                    Icons.mail_outline_rounded,
-                    size: 18,
-                    color: AppColors.primary,
-                  ),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      FeedbackService.supportEmail,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.text,
-                      ),
-                    ),
-                  ),
-                  Icon(
-                    Icons.open_in_new_rounded,
-                    size: 16,
-                    color: AppColors.textTertiary,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          if (pendingCount > 0) ...[
-            const SizedBox(height: 10),
-            Text(
-              '本地待上报反馈：$pendingCount 条',
-              style: const TextStyle(fontSize: 12, color: AppColors.warning),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
 class _StatusBox extends StatelessWidget {
   final String text;
 
@@ -625,19 +503,20 @@ class _StatusBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.08),
+        color: scheme.primary.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.14)),
+        border: Border.all(color: scheme.primary.withValues(alpha: 0.14)),
       ),
       child: Text(
         text,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 13,
           height: 1.35,
-          color: AppColors.textSecondary,
+          color: scheme.onSurfaceVariant,
         ),
       ),
     );

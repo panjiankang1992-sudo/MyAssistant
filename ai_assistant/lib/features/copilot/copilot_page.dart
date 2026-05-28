@@ -27,7 +27,7 @@ class CopilotPage extends ConsumerWidget {
     }
 
     return Scaffold(
-      backgroundColor: AppColors.scaffoldBg,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       drawer: const _HistoryDrawer(),
       body: Row(
         children: [

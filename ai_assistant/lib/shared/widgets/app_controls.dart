@@ -10,9 +10,14 @@ InputDecoration appInputDecoration({
   String? hintText,
   Widget? suffixIcon,
   BuildContext? context,
+  bool alignLabelWithHint = false,
 }) {
   final scheme = context == null ? null : Theme.of(context).colorScheme;
   final accent = scheme?.primary ?? AppColors.primary;
+  final labelColor = scheme?.onSurfaceVariant ?? AppColors.textSecondary;
+  final hintColor =
+      scheme?.onSurfaceVariant.withValues(alpha: 0.62) ??
+      AppColors.textTertiary;
   final fillColor = scheme == null
       ? AppColors.inputBg
       : Color.alphaBlend(
@@ -25,10 +30,28 @@ InputDecoration appInputDecoration({
   return InputDecoration(
     labelText: label,
     hintText: hintText,
+    alignLabelWithHint: alignLabelWithHint,
     filled: true,
     fillColor: fillColor,
     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
     suffixIcon: suffixIcon,
+    suffixIconColor: labelColor,
+    hintStyle: TextStyle(
+      fontSize: 15,
+      fontWeight: FontWeight.w500,
+      color: hintColor,
+    ),
+    labelStyle: TextStyle(
+      fontSize: 12,
+      fontWeight: FontWeight.w700,
+      color: labelColor,
+    ),
+    floatingLabelStyle: TextStyle(
+      fontSize: 12,
+      fontWeight: FontWeight.w800,
+      color: accent,
+    ),
+    counterStyle: TextStyle(color: labelColor),
     border: OutlineInputBorder(
       borderRadius: BorderRadius.circular(18),
       borderSide: BorderSide(color: borderColor),
@@ -152,6 +175,7 @@ class _AppDropdownFieldState<T> extends State<AppDropdownField<T>> {
       (option) => option.value == widget.value,
       orElse: () => widget.options.first,
     );
+    final textColor = Theme.of(context).colorScheme.onSurface;
     return CompositedTransformTarget(
       link: _layerLink,
       child: InkWell(
@@ -175,7 +199,7 @@ class _AppDropdownFieldState<T> extends State<AppDropdownField<T>> {
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
-                ),
+                ).copyWith(color: textColor),
               ),
             ),
           ),
@@ -200,16 +224,16 @@ class _DropdownOverlay<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final accent = scheme.primary;
     return Container(
       width: width,
       constraints: const BoxConstraints(maxHeight: 320),
       padding: const EdgeInsets.symmetric(vertical: 8),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
+        color: scheme.surface,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.46),
-        ),
+        border: Border.all(color: scheme.outline.withValues(alpha: 0.46)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.08),
@@ -225,7 +249,6 @@ class _DropdownOverlay<T> extends StatelessWidget {
         itemBuilder: (context, index) {
           final option = options[index];
           final selected = option.value == value;
-          final accent = Theme.of(context).colorScheme.primary;
           return InkWell(
             onTap: () => onSelected(option.value),
             child: Container(
@@ -247,7 +270,9 @@ class _DropdownOverlay<T> extends StatelessWidget {
                           ? Icons.check_rounded
                           : Icons.keyboard_arrow_right_rounded,
                       size: 16,
-                      color: selected ? accent : AppColors.textTertiary,
+                      color: selected
+                          ? accent
+                          : scheme.onSurfaceVariant.withValues(alpha: 0.8),
                     ),
                   ),
                   const SizedBox(width: 9),
@@ -261,9 +286,7 @@ class _DropdownOverlay<T> extends StatelessWidget {
                         fontWeight: selected
                             ? FontWeight.w900
                             : FontWeight.w800,
-                        color: selected
-                            ? accent
-                            : Theme.of(context).colorScheme.onSurface,
+                        color: selected ? accent : scheme.onSurface,
                       ),
                     ),
                   ),

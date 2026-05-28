@@ -352,7 +352,7 @@ class _NotesPageState extends ConsumerState<NotesPage> {
         .where((n) => !n.deleted && !n.archived && n.isAnalysis)
         .toList();
     return Scaffold(
-      backgroundColor: AppColors.scaffoldBg,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Stack(
           children: [

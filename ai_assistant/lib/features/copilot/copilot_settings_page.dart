@@ -101,7 +101,7 @@ class _CopilotSettingsPageState extends ConsumerState<CopilotSettingsPage> {
     final memoryState = ref.watch(copilotMemoryProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.scaffoldBg,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text('Copilot 设置'),
         backgroundColor: Colors.transparent,

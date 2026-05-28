@@ -121,7 +121,7 @@ class AppTheme {
       tertiary: accent,
       onPrimary: Colors.white,
       onSecondary: Colors.white,
-      surface: isDark ? const Color(0xFF111216) : AppColors.scaffoldBg,
+      surface: isDark ? const Color(0xFF1C1C21) : AppColors.surface,
       onSurface: isDark ? const Color(0xFFF5F5F7) : AppColors.text,
       surfaceContainerHighest: isDark
           ? const Color(0xFF2C2C31)
@@ -136,6 +136,10 @@ class AppTheme {
         : AppAnimations.mediumDuration;
     return theme.copyWith(
       colorScheme: colorScheme,
+      textTheme: theme.textTheme.apply(
+        bodyColor: colorScheme.onSurface,
+        displayColor: colorScheme.onSurface,
+      ),
       visualDensity: visualDensity,
       primaryColor: accent,
       scaffoldBackgroundColor: isDark
@@ -161,6 +165,30 @@ class AppTheme {
           }),
         ),
       ),
+      navigationBarTheme: theme.navigationBarTheme.copyWith(
+        backgroundColor: isDark ? const Color(0xFF17181D) : AppColors.surface,
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          final selected = states.contains(WidgetState.selected);
+          return TextStyle(
+            fontFamily: 'PingFang SC',
+            fontFamilyFallback: const [
+              '.SF Pro Text',
+              'system-ui',
+              'sans-serif',
+            ],
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: selected ? accent : colorScheme.onSurfaceVariant,
+          );
+        }),
+        iconTheme: WidgetStateProperty.resolveWith((states) {
+          final selected = states.contains(WidgetState.selected);
+          return IconThemeData(
+            color: selected ? accent : colorScheme.onSurfaceVariant,
+            size: 20,
+          );
+        }),
+      ),
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) return accent;
@@ -179,6 +207,18 @@ class AppTheme {
         overlayColor: accent.withValues(alpha: 0.12),
       ),
       inputDecorationTheme: theme.inputDecorationTheme.copyWith(
+        fillColor: isDark ? const Color(0xFF17181D) : AppColors.inputBg,
+        hintStyle: theme.inputDecorationTheme.hintStyle?.copyWith(
+          color: colorScheme.onSurfaceVariant.withValues(alpha: 0.68),
+        ),
+        labelStyle: theme.inputDecorationTheme.labelStyle?.copyWith(
+          color: colorScheme.onSurfaceVariant,
+        ),
+        suffixIconColor: colorScheme.onSurfaceVariant,
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: colorScheme.outline),
+        ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
           borderSide: BorderSide(color: accent, width: 1.2),

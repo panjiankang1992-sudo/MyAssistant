@@ -137,7 +137,7 @@ class _TagManagePageState extends ConsumerState<TagManagePage> {
   Widget build(BuildContext context) {
     final asyncTags = ref.watch(allTagsProvider);
     return Scaffold(
-      backgroundColor: AppColors.scaffoldBg,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text('标签管理'),
         backgroundColor: Colors.transparent,

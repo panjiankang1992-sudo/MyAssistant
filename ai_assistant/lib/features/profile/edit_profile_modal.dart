@@ -159,7 +159,7 @@ class _EditProfileContentState extends ConsumerState<_EditProfileContent> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.scaffoldBg,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text('个人信息'),
         backgroundColor: Colors.transparent,

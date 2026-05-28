@@ -210,7 +210,7 @@ class _TodoPageState extends ConsumerState<TodoPage>
     final isToday = _isToday(selectedDate);
 
     return Scaffold(
-      backgroundColor: AppColors.scaffoldBg,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Stack(
         children: [
           SafeArea(

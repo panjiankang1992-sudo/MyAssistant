@@ -13,7 +13,7 @@ class ThemeSettingsPage extends ConsumerWidget {
         ref.watch(themeSettingsProvider).value ?? const ThemeSettings();
     final notifier = ref.read(themeSettingsProvider.notifier);
     return Scaffold(
-      backgroundColor: AppColors.scaffoldBg,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text('主题设置'),
         actions: [
@@ -239,6 +239,7 @@ class _ModeTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final accent = Theme.of(context).colorScheme.primary;
+    final scheme = Theme.of(context).colorScheme;
     return InkWell(
       borderRadius: BorderRadius.circular(18),
       onTap: onTap,
@@ -246,10 +247,12 @@ class _ModeTile extends StatelessWidget {
         duration: AppAnimations.shortDuration,
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: selected ? accent.withValues(alpha: 0.09) : AppColors.surface,
+          color: selected ? accent.withValues(alpha: 0.09) : scheme.surface,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: selected ? accent.withValues(alpha: 0.48) : AppColors.border,
+            color: selected
+                ? accent.withValues(alpha: 0.48)
+                : scheme.outline.withValues(alpha: 0.42),
           ),
         ),
         child: Row(
@@ -270,7 +273,7 @@ class _ModeTile extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w800,
-                      color: selected ? accent : AppColors.text,
+                      color: selected ? accent : scheme.onSurface,
                     ),
                   ),
                   const SizedBox(height: 3),
@@ -278,10 +281,10 @@ class _ModeTile extends StatelessWidget {
                     mode.description,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
                       height: 1.25,
-                      color: AppColors.textSecondary,
+                      color: scheme.onSurfaceVariant,
                     ),
                   ),
                 ],
@@ -332,6 +335,7 @@ class _AccentTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return InkWell(
       borderRadius: BorderRadius.circular(18),
       onTap: onTap,
@@ -341,12 +345,12 @@ class _AccentTile extends StatelessWidget {
         height: 50,
         padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
-          color: selected ? item.softColor : AppColors.surface,
+          color: selected ? item.color.withValues(alpha: 0.12) : scheme.surface,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
             color: selected
                 ? item.color.withValues(alpha: 0.5)
-                : AppColors.border,
+                : scheme.outline.withValues(alpha: 0.42),
           ),
         ),
         child: Row(
@@ -381,7 +385,7 @@ class _AccentTile extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
-                  color: selected ? item.color : AppColors.text,
+                  color: selected ? item.color : scheme.onSurface,
                 ),
               ),
             ),
@@ -401,12 +405,16 @@ class _DensitySelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final accent = Theme.of(context).colorScheme.primary;
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(5),
       decoration: BoxDecoration(
-        color: AppColors.inputBg,
+        color: Color.alphaBlend(
+          scheme.primary.withValues(alpha: 0.025),
+          scheme.surface,
+        ),
         borderRadius: BorderRadius.circular(19),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: scheme.outline.withValues(alpha: 0.42)),
       ),
       child: Row(
         children: [
@@ -418,7 +426,9 @@ class _DensitySelector extends StatelessWidget {
                   duration: AppAnimations.shortDuration,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: selected == item ? Colors.white : Colors.transparent,
+                    color: selected == item
+                        ? scheme.surface
+                        : Colors.transparent,
                     borderRadius: BorderRadius.circular(15),
                     boxShadow: selected == item
                         ? AppAnimations.cardShadow()
@@ -432,7 +442,7 @@ class _DensitySelector extends StatelessWidget {
                         size: 18,
                         color: selected == item
                             ? accent
-                            : AppColors.textTertiary,
+                            : scheme.onSurfaceVariant,
                       ),
                       const SizedBox(width: 8),
                       Text(
@@ -442,7 +452,7 @@ class _DensitySelector extends StatelessWidget {
                           fontWeight: FontWeight.w800,
                           color: selected == item
                               ? accent
-                              : AppColors.textSecondary,
+                              : scheme.onSurfaceVariant,
                         ),
                       ),
                     ],
@@ -474,12 +484,13 @@ class _ToggleRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final accent = Theme.of(context).colorScheme.primary;
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: scheme.surface,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: scheme.outline.withValues(alpha: 0.42)),
       ),
       child: Row(
         children: [
@@ -502,8 +513,7 @@ class _ToggleRow extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w800,
-                    color: AppColors.text,
-                  ),
+                  ).copyWith(color: scheme.onSurface),
                 ),
                 const SizedBox(height: 3),
                 Text(
@@ -511,8 +521,7 @@ class _ToggleRow extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 12,
                     height: 1.25,
-                    color: AppColors.textSecondary,
-                  ),
+                  ).copyWith(color: scheme.onSurfaceVariant),
                 ),
               ],
             ),
@@ -532,25 +541,26 @@ class _SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           title,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w900,
-            color: AppColors.text,
+            color: scheme.onSurface,
           ),
         ),
         if (subtitle != null) ...[
           const SizedBox(height: 5),
           Text(
             subtitle!,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13,
               height: 1.35,
-              color: AppColors.textSecondary,
+              color: scheme.onSurfaceVariant,
             ),
           ),
         ],
