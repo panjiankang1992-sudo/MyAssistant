@@ -24,6 +24,7 @@ class _CopilotSettingsPageState extends ConsumerState<CopilotSettingsPage> {
   late final TextEditingController _callNameController;
   late final TextEditingController _personaController;
   late String _avatarValue;
+  late String _personaStyle;
 
   @override
   void initState() {
@@ -33,6 +34,7 @@ class _CopilotSettingsPageState extends ConsumerState<CopilotSettingsPage> {
     _avatarValue = settings.displayAvatar;
     _callNameController = TextEditingController(text: settings.userCallName);
     _personaController = TextEditingController(text: settings.persona);
+    _personaStyle = settings.displayPersonaStyle;
   }
 
   @override
@@ -63,8 +65,9 @@ class _CopilotSettingsPageState extends ConsumerState<CopilotSettingsPage> {
                 assistantName: _nameController.text.trim(),
                 assistantAvatar: _avatarValue,
                 userCallName: _callNameController.text.trim(),
+                personaStyle: _personaStyle,
                 persona: _personaController.text.trim().isEmpty
-                    ? CopilotSettings.defaultPersona
+                    ? CopilotPersonaCatalog.defaultPromptOf(_personaStyle)
                     : _personaController.text.trim(),
               ),
         );
@@ -141,6 +144,20 @@ class _CopilotSettingsPageState extends ConsumerState<CopilotSettingsPage> {
                   ),
                 ),
                 const SizedBox(height: 12),
+                _PersonaPicker(
+                  value: _personaStyle,
+                  onChanged: (value) {
+                    setState(() {
+                      _personaStyle = value;
+                      if (value != CopilotPersonaCatalog.customValue) {
+                        _personaController.text = CopilotPersonaCatalog.byValue(
+                          value,
+                        ).prompt;
+                      }
+                    });
+                  },
+                ),
+                const SizedBox(height: 10),
                 TextField(
                   controller: _personaController,
                   minLines: 5,
@@ -149,6 +166,13 @@ class _CopilotSettingsPageState extends ConsumerState<CopilotSettingsPage> {
                     label: '性格与聊天风格',
                     hintText: CopilotSettings.defaultPersona,
                   ),
+                  onChanged: (_) {
+                    if (_personaStyle != CopilotPersonaCatalog.customValue) {
+                      setState(
+                        () => _personaStyle = CopilotPersonaCatalog.customValue,
+                      );
+                    }
+                  },
                 ),
                 const SizedBox(height: 14),
                 _AssistantPreview(
@@ -521,6 +545,131 @@ class _AvatarChoice extends StatelessWidget {
                 fontSize: 11,
                 fontWeight: FontWeight.w800,
                 color: selected ? AppColors.primary : AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PersonaPicker extends StatelessWidget {
+  final String value;
+  final ValueChanged<String> onChanged;
+
+  const _PersonaPicker({required this.value, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final normalized = CopilotPersonaCatalog.normalizeStyle(value);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            '性格预设',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textTertiary,
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 9,
+          runSpacing: 9,
+          children: [
+            for (final preset in CopilotPersonaCatalog.presets)
+              _PersonaChoice(
+                label: preset.label,
+                description: preset.description,
+                selected: normalized == preset.value,
+                onTap: () => onChanged(preset.value),
+              ),
+            _PersonaChoice(
+              label: '自定义',
+              description: '按你的文本框内容执行。',
+              selected: normalized == CopilotPersonaCatalog.customValue,
+              onTap: () => onChanged(CopilotPersonaCatalog.customValue),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _PersonaChoice extends StatelessWidget {
+  final String label;
+  final String description;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _PersonaChoice({
+    required this.label,
+    required this.description,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: AnimatedContainer(
+        duration: AppAnimations.shortDuration,
+        width: 126,
+        constraints: const BoxConstraints(minHeight: 82),
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+        decoration: BoxDecoration(
+          color: selected
+              ? AppColors.primary.withValues(alpha: 0.08)
+              : AppColors.inputBg.withValues(alpha: 0.72),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: selected
+                ? AppColors.primary.withValues(alpha: 0.36)
+                : AppColors.border.withValues(alpha: 0.75),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                      color: selected ? AppColors.primary : AppColors.text,
+                    ),
+                  ),
+                ),
+                if (selected)
+                  const Icon(
+                    Icons.check_circle_rounded,
+                    size: 15,
+                    color: AppColors.primary,
+                  ),
+              ],
+            ),
+            const SizedBox(height: 5),
+            Text(
+              description,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 11,
+                height: 1.28,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textTertiary,
               ),
             ),
           ],
