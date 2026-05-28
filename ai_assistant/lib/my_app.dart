@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +9,7 @@ import 'features/auth/auth_provider.dart';
 import 'features/auth/auth_page.dart';
 import 'features/bookkeeping/bookkeeping_page.dart';
 import 'features/todo/todo_page.dart';
+import 'features/todo/providers/todo_provider.dart';
 import 'features/copilot/copilot_page.dart';
 import 'features/notes/notes_page.dart';
 import 'features/profile/profile_panel.dart';
@@ -74,17 +77,59 @@ class _AuthWrapperState extends ConsumerState<AuthWrapper> {
   }
 }
 
-class HomePage extends StatefulWidget {
+class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
 
   @override
-  State<HomePage> createState() => _HomePageState();
+  ConsumerState<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
+class _HomePageState extends ConsumerState<HomePage>
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   int _currentIndex = 0;
   bool _profileOpen = false;
   bool _profileFetched = false;
+  bool _calendarSyncRunning = false;
+  Timer? _calendarSyncTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    Future.microtask(() => _syncCalendarTodosSilently(force: true));
+    _calendarSyncTimer = Timer.periodic(
+      const Duration(minutes: 10),
+      (_) => _syncCalendarTodosSilently(force: true),
+    );
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _calendarSyncTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _syncCalendarTodosSilently(force: true);
+    }
+  }
+
+  Future<void> _syncCalendarTodosSilently({required bool force}) async {
+    if (_calendarSyncRunning) return;
+    _calendarSyncRunning = true;
+    try {
+      await ref
+          .read(todoNotifierProvider.notifier)
+          .importCalendarTodos(force: force);
+    } catch (_) {
+      // 权限、平台或日历读取异常不影响主界面启动，下一次定时同步会重试。
+    } finally {
+      _calendarSyncRunning = false;
+    }
+  }
 
   List<Widget> _pages() => [
     TodoPage(onAvatarTap: _openProfile),

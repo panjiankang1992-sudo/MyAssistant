@@ -46,7 +46,7 @@ class TodoNotifier extends Notifier<List<Todo>> {
       datasource: ref.read(datasourceProvider),
       todoRepository: ref.read(todoRepoProvider),
     );
-    final result = await service.importUpcoming();
+    final result = await service.importUpcoming(days: 30);
     final selectedDate = ref.read(selectedDateProvider);
     state = await ref.read(todoRepoProvider).getTodosByDate(selectedDate);
     return result;
@@ -64,7 +64,7 @@ class TodoNotifier extends Notifier<List<Todo>> {
   bool _shouldImportCalendar() {
     final last = _lastCalendarImportAt;
     if (last == null) return true;
-    return DateTime.now().difference(last) > const Duration(hours: 1);
+    return DateTime.now().difference(last) >= const Duration(minutes: 10);
   }
 
   Future<void> _generateRoutineTodos() async {
