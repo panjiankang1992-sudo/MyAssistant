@@ -427,34 +427,51 @@ class _AvatarPicker extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 6),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: [
-            for (final preset in CopilotAvatarCatalog.presets)
-              _AvatarChoice(
-                label: preset.label,
-                selected: normalized == preset.value,
-                child: CopilotAvatarView(
-                  value: preset.value,
-                  size: 44,
+        for (final group in CopilotAvatarCatalog.groups) ...[
+          Padding(
+            padding: const EdgeInsets.only(top: 8, bottom: 6),
+            child: Text(
+              group.label,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              for (final preset in CopilotAvatarCatalog.presets.where(
+                (item) => item.kind == group.kind,
+              ))
+                _AvatarChoice(
+                  label: preset.label,
                   selected: normalized == preset.value,
+                  onTap: () => onChanged(preset.value),
+                  child: CopilotAvatarView(
+                    value: preset.value,
+                    size: 44,
+                    selected: normalized == preset.value,
+                  ),
                 ),
-                onTap: () => onChanged(preset.value),
-              ),
-            if (normalized.startsWith('file:'))
-              _AvatarChoice(
-                label: '自选',
-                selected: true,
-                onTap: onPickCustom,
-                child: CopilotAvatarView(
-                  value: normalized,
-                  size: 44,
-                  selected: true,
-                ),
-              ),
-          ],
-        ),
+            ],
+          ),
+        ],
+        if (normalized.startsWith('file:')) ...[
+          const SizedBox(height: 10),
+          _AvatarChoice(
+            label: '自选',
+            selected: true,
+            onTap: onPickCustom,
+            child: CopilotAvatarView(
+              value: normalized,
+              size: 44,
+              selected: true,
+            ),
+          ),
+        ],
       ],
     );
   }
