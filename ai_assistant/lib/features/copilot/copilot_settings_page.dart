@@ -45,14 +45,26 @@ class _CopilotSettingsPageState extends ConsumerState<CopilotSettingsPage> {
     super.dispose();
   }
 
-  Future<void> _pickCustomAvatar() async {
+  Future<String?> _pickCustomAvatarValue() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.image,
       allowMultiple: false,
     );
     final path = result?.files.single.path;
-    if (path == null || path.trim().isEmpty) return;
-    setState(() => _avatarValue = CopilotAvatarCatalog.fileValue(path));
+    if (path == null || path.trim().isEmpty) return null;
+    return CopilotAvatarCatalog.fileValue(path);
+  }
+
+  Future<void> _openAvatarPicker() async {
+    final value = await showDialog<String>(
+      context: context,
+      builder: (context) => _AvatarPickerDialog(
+        value: _avatarValue,
+        onPickCustom: _pickCustomAvatarValue,
+      ),
+    );
+    if (value == null || value.trim().isEmpty) return;
+    setState(() => _avatarValue = value);
   }
 
   Future<void> _save() async {
@@ -115,7 +127,10 @@ class _CopilotSettingsPageState extends ConsumerState<CopilotSettingsPage> {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    CopilotAvatarView(value: _avatarValue, size: 58),
+                    _AvatarSummary(
+                      value: _avatarValue,
+                      onTap: _openAvatarPicker,
+                    ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: TextField(
@@ -128,12 +143,6 @@ class _CopilotSettingsPageState extends ConsumerState<CopilotSettingsPage> {
                       ),
                     ),
                   ],
-                ),
-                const SizedBox(height: 12),
-                _AvatarPicker(
-                  value: _avatarValue,
-                  onChanged: (value) => setState(() => _avatarValue = value),
-                  onPickCustom: _pickCustomAvatar,
                 ),
                 const SizedBox(height: 12),
                 TextField(
@@ -415,88 +424,194 @@ class _AssistantPreview extends StatelessWidget {
   }
 }
 
-class _AvatarPicker extends StatelessWidget {
+class _AvatarSummary extends StatelessWidget {
   final String value;
-  final ValueChanged<String> onChanged;
-  final VoidCallback onPickCustom;
+  final VoidCallback onTap;
 
-  const _AvatarPicker({
-    required this.value,
-    required this.onChanged,
-    required this.onPickCustom,
-  });
+  const _AvatarSummary({required this.value, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    final normalized = CopilotAvatarCatalog.normalize(value);
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Row(
-          children: [
-            const Text(
-              '默认头像',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-                color: AppColors.textTertiary,
-              ),
-            ),
-            const Spacer(),
-            TextButton.icon(
-              onPressed: onPickCustom,
-              icon: const Icon(Icons.image_rounded, size: 16),
-              label: const Text('选择图片'),
-            ),
-          ],
-        ),
-        const SizedBox(height: 6),
-        for (final group in CopilotAvatarCatalog.groups) ...[
-          Padding(
-            padding: const EdgeInsets.only(top: 8, bottom: 6),
-            child: Text(
-              group.label,
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w900,
-                color: AppColors.textSecondary,
-              ),
-            ),
+        InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(24),
+          child: Padding(
+            padding: const EdgeInsets.all(2),
+            child: CopilotAvatarView(value: value, size: 58),
           ),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              for (final preset in CopilotAvatarCatalog.presets.where(
-                (item) => item.kind == group.kind,
-              ))
-                _AvatarChoice(
-                  label: preset.label,
-                  selected: normalized == preset.value,
-                  onTap: () => onChanged(preset.value),
-                  child: CopilotAvatarView(
-                    value: preset.value,
-                    size: 44,
-                    selected: normalized == preset.value,
-                  ),
-                ),
+        ),
+        const SizedBox(height: 5),
+        TextButton(
+          onPressed: onTap,
+          style: TextButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            minimumSize: const Size(0, 28),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+          child: const Text(
+            '更换头像',
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _AvatarPickerDialog extends StatefulWidget {
+  final String value;
+  final Future<String?> Function() onPickCustom;
+
+  const _AvatarPickerDialog({required this.value, required this.onPickCustom});
+
+  @override
+  State<_AvatarPickerDialog> createState() => _AvatarPickerDialogState();
+}
+
+class _AvatarPickerDialogState extends State<_AvatarPickerDialog> {
+  late String _selected;
+
+  @override
+  void initState() {
+    super.initState();
+    _selected = CopilotAvatarCatalog.normalize(widget.value);
+  }
+
+  Future<void> _pickCustom() async {
+    final value = await widget.onPickCustom();
+    if (value == null || value.trim().isEmpty) return;
+    setState(() => _selected = value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isCustom = _selected.startsWith('file:');
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 620, maxHeight: 680),
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.14),
+                blurRadius: 34,
+                offset: const Offset(0, 18),
+              ),
             ],
           ),
-        ],
-        if (normalized.startsWith('file:')) ...[
-          const SizedBox(height: 10),
-          _AvatarChoice(
-            label: '自选',
-            selected: true,
-            onTap: onPickCustom,
-            child: CopilotAvatarView(
-              value: normalized,
-              size: 44,
-              selected: true,
-            ),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 18, 14, 10),
+                child: Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        '选择 Copilot 头像',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.text,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: '关闭',
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.close_rounded),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                child: Row(
+                  children: [
+                    CopilotAvatarView(value: _selected, size: 54),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        CopilotAvatarCatalog.descriptionOf(_selected),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: _pickCustom,
+                      icon: const Icon(Icons.photo_library_rounded, size: 17),
+                      label: const Text('图库上传'),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1, color: AppColors.border),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 18),
+                  child: Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: [
+                      for (final preset in CopilotAvatarCatalog.presets)
+                        _AvatarChoice(
+                          label: preset.label,
+                          selected: _selected == preset.value,
+                          onTap: () => setState(() => _selected = preset.value),
+                          child: CopilotAvatarView(
+                            value: preset.value,
+                            size: 54,
+                            selected: _selected == preset.value,
+                          ),
+                        ),
+                      if (isCustom)
+                        _AvatarChoice(
+                          label: '自选',
+                          selected: true,
+                          onTap: _pickCustom,
+                          child: CopilotAvatarView(
+                            value: _selected,
+                            size: 54,
+                            selected: true,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 18),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const Text('取消'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: () => Navigator.of(context).pop(_selected),
+                        child: const Text('确定'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
-      ],
+        ),
+      ),
     );
   }
 }
@@ -518,20 +633,20 @@ class _AvatarChoice extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(18),
       child: AnimatedContainer(
         duration: AppAnimations.shortDuration,
-        width: 70,
+        width: 78,
         padding: const EdgeInsets.symmetric(vertical: 8),
         decoration: BoxDecoration(
           color: selected
               ? AppColors.primary.withValues(alpha: 0.08)
-              : AppColors.inputBg.withValues(alpha: 0.75),
-          borderRadius: BorderRadius.circular(16),
+              : AppColors.inputBg.withValues(alpha: 0.72),
+          borderRadius: BorderRadius.circular(18),
           border: Border.all(
             color: selected
-                ? AppColors.primary.withValues(alpha: 0.32)
-                : AppColors.border.withValues(alpha: 0.8),
+                ? AppColors.primary.withValues(alpha: 0.34)
+                : AppColors.border.withValues(alpha: 0.75),
           ),
         ),
         child: Column(
@@ -541,6 +656,8 @@ class _AvatarChoice extends StatelessWidget {
             const SizedBox(height: 5),
             Text(
               label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w800,
