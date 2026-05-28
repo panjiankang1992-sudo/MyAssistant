@@ -236,8 +236,14 @@ class _TodoItemState extends State<TodoItem>
                               color: AppColors.textTertiary,
                             ),
                           ),
-                          if (widget.todo.tags.isNotEmpty)
-                            const SizedBox(width: 8),
+                          const SizedBox(width: 8),
+                          if (_shouldShowSourceChip(widget.todo.source))
+                            Padding(
+                              padding: const EdgeInsets.only(right: 4),
+                              child: _TodoMiniSourceChip(
+                                source: widget.todo.source,
+                              ),
+                            ),
                           ...widget.todo.tags
                               .take(3)
                               .map(
@@ -307,6 +313,10 @@ class _TodoItemState extends State<TodoItem>
   }
 }
 
+bool _shouldShowSourceChip(String source) {
+  return source == 'routine' || source == 'calendar';
+}
+
 class _TodoMiniTag extends StatelessWidget {
   final Tag tag;
 
@@ -330,6 +340,40 @@ class _TodoMiniTag extends StatelessWidget {
           fontWeight: FontWeight.w600,
           color: fg.withValues(alpha: 0.88),
         ),
+      ),
+    );
+  }
+}
+
+class _TodoMiniSourceChip extends StatelessWidget {
+  final String source;
+
+  const _TodoMiniSourceChip({required this.source});
+
+  @override
+  Widget build(BuildContext context) {
+    final item = TodoSources.byValue(source);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        color: item.color.withValues(alpha: 0.11),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(item.icon, size: 11, color: item.color),
+          const SizedBox(width: 3),
+          Text(
+            item.label,
+            style: TextStyle(
+              fontSize: 11,
+              height: 1.1,
+              fontWeight: FontWeight.w600,
+              color: item.color.withValues(alpha: 0.9),
+            ),
+          ),
+        ],
       ),
     );
   }

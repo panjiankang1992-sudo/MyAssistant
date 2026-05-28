@@ -58,7 +58,12 @@ class TodoSources {
   static const options = [
     TodoSource('ai', 'AI', Icons.auto_awesome_rounded, AppColors.primary),
     TodoSource('routine', '例行', Icons.repeat_rounded, AppColors.warning),
-    TodoSource('calendar', '日历', Icons.event_rounded, AppColors.purple),
+    TodoSource(
+      'calendar',
+      '日历',
+      Icons.calendar_month_rounded,
+      AppColors.calendarText,
+    ),
     TodoSource(
       'message',
       '消息',
