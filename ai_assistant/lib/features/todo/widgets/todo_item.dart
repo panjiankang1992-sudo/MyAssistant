@@ -340,12 +340,16 @@ class _TodoMiniTag extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final fg = TagPalette.textColor(tag.colorKey);
     final bg = TagPalette.bgColor(tag.colorKey);
+    final fill = scheme.isDarkTheme
+        ? Color.alphaBlend(fg.withValues(alpha: 0.16), scheme.appSurface)
+        : bg.withValues(alpha: 0.55);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
       decoration: BoxDecoration(
-        color: bg.withValues(alpha: 0.55),
+        color: fill,
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(

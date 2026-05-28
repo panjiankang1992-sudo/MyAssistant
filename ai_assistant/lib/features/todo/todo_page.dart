@@ -498,6 +498,7 @@ class _BookkeepingFeedbackAnimationState
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) {
@@ -517,10 +518,10 @@ class _BookkeepingFeedbackAnimationState
                 height: 138,
                 padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
                 decoration: BoxDecoration(
-                  color: AppColors.surface,
+                  color: scheme.appElevatedSurface.withValues(alpha: 0.96),
                   borderRadius: BorderRadius.circular(24),
                   border: Border.all(
-                    color: AppColors.primary.withValues(alpha: 0.12),
+                    color: scheme.appBorder.withValues(alpha: 0.75),
                   ),
                   boxShadow: [
                     BoxShadow(
@@ -551,6 +552,8 @@ class _BookkeepingFeedbackAnimationState
                               size: const Size(double.infinity, 22),
                               painter: _BookkeepingLinePainter(
                                 progress: _progress.value,
+                                baseColor: scheme.appBorder,
+                                inkColor: scheme.primary,
                               ),
                             ),
                           ),
@@ -605,8 +608,7 @@ class _BookkeepingFeedbackAnimationState
                         ],
                         fontSize: 17,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.text,
-                      ),
+                      ).copyWith(color: scheme.appText),
                     ),
                     const SizedBox(height: 2),
                     Text(
@@ -620,8 +622,7 @@ class _BookkeepingFeedbackAnimationState
                         ],
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
-                        color: AppColors.textTertiary,
-                      ),
+                      ).copyWith(color: scheme.appMutedText),
                     ),
                   ],
                 ),
@@ -636,18 +637,24 @@ class _BookkeepingFeedbackAnimationState
 
 class _BookkeepingLinePainter extends CustomPainter {
   final double progress;
+  final Color baseColor;
+  final Color inkColor;
 
-  const _BookkeepingLinePainter({required this.progress});
+  const _BookkeepingLinePainter({
+    required this.progress,
+    required this.baseColor,
+    required this.inkColor,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
     final basePaint = Paint()
-      ..color = AppColors.border
+      ..color = baseColor
       ..strokeWidth = 3
       ..strokeCap = StrokeCap.round
       ..style = PaintingStyle.stroke;
     final inkPaint = Paint()
-      ..color = AppColors.primary
+      ..color = inkColor
       ..strokeWidth = 4
       ..strokeCap = StrokeCap.round
       ..style = PaintingStyle.stroke;

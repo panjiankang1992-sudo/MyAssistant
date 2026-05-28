@@ -549,6 +549,7 @@ class _LayoutToggleButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return IconButton(
       tooltip: value == _NotesLayoutMode.list ? '切换宫格' : '切换列表',
       onPressed: () => onChanged(
@@ -560,16 +561,16 @@ class _LayoutToggleButton extends StatelessWidget {
         value == _NotesLayoutMode.list
             ? Icons.grid_view_rounded
             : Icons.view_agenda_outlined,
-        color: AppColors.primary,
+        color: scheme.primary,
       ),
       style: IconButton.styleFrom(
         fixedSize: const Size(40, 40),
         minimumSize: const Size(40, 40),
         maximumSize: const Size(40, 40),
-        backgroundColor: AppColors.inputBg,
+        backgroundColor: scheme.appInput,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: AppColors.border),
+          side: BorderSide(color: scheme.appBorder),
         ),
       ),
     );
@@ -1015,10 +1016,14 @@ class _MiniTag extends StatelessWidget {
   Widget build(BuildContext context) {
     final fg = TagPalette.textColor(tag.colorKey);
     final bg = TagPalette.bgColor(tag.colorKey);
+    final scheme = Theme.of(context).colorScheme;
+    final fill = scheme.isDarkTheme
+        ? Color.alphaBlend(fg.withValues(alpha: 0.16), scheme.appSurface)
+        : bg.withValues(alpha: 0.55);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
       decoration: BoxDecoration(
-        color: bg.withValues(alpha: 0.55),
+        color: fill,
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
@@ -1042,27 +1047,29 @@ class _NotesModeSegmented extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       height: 40,
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        color: AppColors.inputBg,
+        color: scheme.appInput,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: scheme.appBorder),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _modeItem('日记', _NotesViewMode.diary),
-          _modeItem('文档', _NotesViewMode.document),
-          _modeItem('归纳', _NotesViewMode.analysis),
+          _modeItem(context, '日记', _NotesViewMode.diary),
+          _modeItem(context, '文档', _NotesViewMode.document),
+          _modeItem(context, '归纳', _NotesViewMode.analysis),
         ],
       ),
     );
   }
 
-  Widget _modeItem(String label, _NotesViewMode mode) {
+  Widget _modeItem(BuildContext context, String label, _NotesViewMode mode) {
     final selected = value == mode;
+    final scheme = Theme.of(context).colorScheme;
     return InkWell(
       onTap: () => onChanged(mode),
       borderRadius: BorderRadius.circular(15),
@@ -1072,12 +1079,12 @@ class _NotesModeSegmented extends StatelessWidget {
         height: 34,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: selected ? AppColors.primary : Colors.transparent,
+          color: selected ? scheme.primary : Colors.transparent,
           borderRadius: BorderRadius.circular(15),
           boxShadow: selected
               ? [
                   BoxShadow(
-                    color: AppColors.primary.withValues(alpha: 0.2),
+                    color: scheme.primary.withValues(alpha: 0.2),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
                   ),
@@ -1089,7 +1096,7 @@ class _NotesModeSegmented extends StatelessWidget {
           style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w800,
-            color: selected ? Colors.white : AppColors.textSecondary,
+            color: selected ? scheme.onPrimary : scheme.appMutedText,
           ),
         ),
       ),
@@ -1751,16 +1758,17 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                         controller: _content,
                         minLines: _blocks.isEmpty ? 16 : 7,
                         maxLines: null,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 18,
                           height: 1.7,
-                          color: AppColors.text,
+                          color: scheme.appText,
                         ),
                         decoration: InputDecoration(
                           hintText: _mode == _NoteInputMode.checklist
                               ? '输入清单，一行一项...'
                               : '开始记录...',
                           border: InputBorder.none,
+                          hintStyle: TextStyle(color: scheme.appSubtleText),
                         ),
                       ),
                     if (_blocks.isNotEmpty) ...[
@@ -1816,6 +1824,7 @@ class _CircleTool extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return InkWell(
       onTap: faded ? null : onTap,
       borderRadius: BorderRadius.circular(28),
@@ -1823,15 +1832,14 @@ class _CircleTool extends StatelessWidget {
         width: 52,
         height: 52,
         decoration: BoxDecoration(
-          color: AppColors.inputBg.withValues(alpha: faded ? 0.45 : 0.95),
+          color: scheme.appInput.withValues(alpha: faded ? 0.45 : 0.95),
           shape: BoxShape.circle,
+          border: Border.all(color: scheme.appBorder.withValues(alpha: 0.55)),
         ),
         child: Icon(
           icon,
           size: 26,
-          color: faded
-              ? AppColors.textTertiary.withValues(alpha: 0.45)
-              : AppColors.text,
+          color: faded ? scheme.appDisabledText : scheme.appText,
         ),
       ),
     );
@@ -2350,6 +2358,7 @@ class _NoteEditorToolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Row(
       children: [
         Expanded(
@@ -2357,8 +2366,11 @@ class _NoteEditorToolbar extends StatelessWidget {
             height: 74,
             padding: const EdgeInsets.symmetric(horizontal: 18),
             decoration: BoxDecoration(
-              color: AppColors.surface.withValues(alpha: 0.96),
+              color: scheme.appElevatedSurface.withValues(alpha: 0.96),
               borderRadius: BorderRadius.circular(37),
+              border: Border.all(
+                color: scheme.appBorder.withValues(alpha: 0.72),
+              ),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.08),
@@ -2402,8 +2414,11 @@ class _NoteEditorToolbar extends StatelessWidget {
             decoration: BoxDecoration(
               color: listening
                   ? AppColors.danger.withValues(alpha: 0.12)
-                  : const Color(0xFFF7F7FF),
+                  : scheme.appInput,
               shape: BoxShape.circle,
+              border: Border.all(
+                color: scheme.appBorder.withValues(alpha: 0.72),
+              ),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.06),
@@ -2437,13 +2452,14 @@ class _ToolIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return InkResponse(
       onTap: onTap,
       radius: 26,
       child: Icon(
         icon,
         size: 30,
-        color: selected ? AppColors.primary : AppColors.text,
+        color: selected ? scheme.primary : scheme.appText,
       ),
     );
   }

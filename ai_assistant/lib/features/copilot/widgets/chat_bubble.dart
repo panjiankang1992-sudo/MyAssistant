@@ -246,8 +246,9 @@ MarkdownStyleSheet _markdownStyle(
 }) {
   const fontFamily = 'PingFang SC';
   const fallback = ['.SF Pro Text', 'system-ui', 'sans-serif'];
-  final textColor = isError ? AppColors.danger : AppColors.text;
-  final secondaryColor = isError ? AppColors.danger : AppColors.textSecondary;
+  final scheme = Theme.of(context).colorScheme;
+  final textColor = isError ? AppColors.danger : scheme.appText;
+  final secondaryColor = isError ? AppColors.danger : scheme.appMutedText;
 
   return MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
     p: TextStyle(
@@ -315,9 +316,9 @@ MarkdownStyleSheet _markdownStyle(
     ),
     codeblockPadding: const EdgeInsets.all(14),
     codeblockDecoration: BoxDecoration(
-      color: const Color(0xFFF6F8FB),
+      color: scheme.appInput,
       borderRadius: BorderRadius.circular(14),
-      border: Border.all(color: AppColors.border.withValues(alpha: 0.8)),
+      border: Border.all(color: scheme.appBorder.withValues(alpha: 0.8)),
     ),
     blockquote: TextStyle(
       fontFamily: fontFamily,
@@ -337,12 +338,12 @@ MarkdownStyleSheet _markdownStyle(
         ),
       ),
     ),
-    tableHead: const TextStyle(
+    tableHead: TextStyle(
       fontFamily: fontFamily,
       fontFamilyFallback: fallback,
       fontSize: 14,
       fontWeight: FontWeight.w700,
-      color: AppColors.text,
+      color: textColor,
     ),
     tableBody: TextStyle(
       fontFamily: fontFamily,
@@ -352,13 +353,13 @@ MarkdownStyleSheet _markdownStyle(
       color: textColor,
     ),
     tableBorder: TableBorder.all(
-      color: AppColors.border.withValues(alpha: 0.8),
+      color: scheme.appBorder.withValues(alpha: 0.8),
     ),
     tableCellsPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
     blockSpacing: 12,
     listIndent: 22,
-    horizontalRuleDecoration: const BoxDecoration(
-      border: Border(top: BorderSide(color: AppColors.border)),
+    horizontalRuleDecoration: BoxDecoration(
+      border: Border(top: BorderSide(color: scheme.appBorder)),
     ),
   );
 }

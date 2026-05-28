@@ -112,15 +112,20 @@ class TagChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final bg = _getBackgroundColor();
     final fg = _getTextColor();
+    final fill = scheme.isDarkTheme
+        ? Color.alphaBlend(
+            fg.withValues(alpha: selected ? 0.24 : 0.16),
+            scheme.appSurface,
+          )
+        : (selected ? fg.withValues(alpha: 0.16) : bg.withValues(alpha: 0.62));
     return AnimatedContainer(
       duration: AppAnimations.shortDuration,
       padding: EdgeInsets.fromLTRB(selected ? 8 : 10, 5, 10, 5),
       decoration: BoxDecoration(
-        color: selected
-            ? fg.withValues(alpha: 0.16)
-            : bg.withValues(alpha: 0.62),
+        color: fill,
         borderRadius: BorderRadius.circular(999),
         border: Border.all(
           color: selected

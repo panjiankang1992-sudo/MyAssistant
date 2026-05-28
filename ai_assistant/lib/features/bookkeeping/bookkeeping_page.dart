@@ -1507,10 +1507,14 @@ class _LedgerKindPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
+        color: Color.alphaBlend(
+          color.withValues(alpha: scheme.isDarkTheme ? 0.18 : 0.1),
+          scheme.appSurface,
+        ),
         borderRadius: BorderRadius.circular(18),
       ),
       child: Text(
@@ -1529,21 +1533,23 @@ class _LedgerDetailInfoTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.inputBg,
+        color: scheme.appInput,
         borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: scheme.appBorder.withValues(alpha: 0.52)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w800,
-              color: AppColors.textSecondary,
+              color: scheme.appMutedText,
             ),
           ),
           const SizedBox(height: 8),
@@ -1551,7 +1557,11 @@ class _LedgerDetailInfoTile extends StatelessWidget {
             value,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w900,
+              color: scheme.appText,
+            ),
           ),
         ],
       ),
@@ -1567,6 +1577,7 @@ class _LedgerDetailLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 13),
       child: Row(
@@ -1575,9 +1586,9 @@ class _LedgerDetailLine extends StatelessWidget {
             width: 92,
             child: Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 fontWeight: FontWeight.w800,
-                color: AppColors.textSecondary,
+                color: scheme.appMutedText,
               ),
             ),
           ),
@@ -1585,7 +1596,11 @@ class _LedgerDetailLine extends StatelessWidget {
             child: Text(
               value,
               textAlign: TextAlign.right,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w900,
+                color: scheme.appText,
+              ),
             ),
           ),
         ],
@@ -2218,13 +2233,15 @@ class _StatsChartCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       height: height,
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(24, 22, 24, 18),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: scheme.appSurface,
         borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: scheme.appBorder.withValues(alpha: 0.58)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2267,10 +2284,11 @@ class _StatCategoryRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.only(bottom: 18),
       child: Material(
-        color: AppColors.surface,
+        color: scheme.appSurface,
         borderRadius: BorderRadius.circular(24),
         child: InkWell(
           onTap: onTap,
@@ -2612,13 +2630,24 @@ class _CategoryIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final fill = scheme.isDarkTheme
+        ? Color.alphaBlend(
+            category.color.withValues(alpha: 0.22),
+            scheme.appSurface,
+          )
+        : category.color;
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: category.color,
+        color: fill,
         borderRadius: BorderRadius.circular(size * 0.28),
-        border: Border.all(color: category.color.withValues(alpha: 0.75)),
+        border: Border.all(
+          color: category.color.withValues(
+            alpha: scheme.isDarkTheme ? 0.42 : 0.75,
+          ),
+        ),
       ),
       child: Center(
         child: Text(
