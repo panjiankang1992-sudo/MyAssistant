@@ -51,5 +51,5 @@
 
 ## 联系方式
 
-- 邮箱：feedback@myassistant.app
+- 邮箱：yuyutian_assistant@foxmail.com
 - 应用内入口：个人信息 -> 帮助与反馈

@@ -9,25 +9,37 @@ InputDecoration appInputDecoration({
   required String label,
   String? hintText,
   Widget? suffixIcon,
+  BuildContext? context,
 }) {
+  final scheme = context == null ? null : Theme.of(context).colorScheme;
+  final accent = scheme?.primary ?? AppColors.primary;
+  final fillColor = scheme == null
+      ? AppColors.inputBg
+      : Color.alphaBlend(
+          scheme.primary.withValues(alpha: 0.025),
+          scheme.surface,
+        );
+  final borderColor =
+      scheme?.outline.withValues(alpha: 0.58) ??
+      AppColors.border.withValues(alpha: 0.8);
   return InputDecoration(
     labelText: label,
     hintText: hintText,
     filled: true,
-    fillColor: AppColors.inputBg,
+    fillColor: fillColor,
     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
     suffixIcon: suffixIcon,
     border: OutlineInputBorder(
       borderRadius: BorderRadius.circular(18),
-      borderSide: BorderSide(color: AppColors.border.withValues(alpha: 0.8)),
+      borderSide: BorderSide(color: borderColor),
     ),
     enabledBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(18),
-      borderSide: BorderSide(color: AppColors.border.withValues(alpha: 0.8)),
+      borderSide: BorderSide(color: borderColor),
     ),
     focusedBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(18),
-      borderSide: const BorderSide(color: AppColors.primary, width: 1.4),
+      borderSide: BorderSide(color: accent, width: 1.4),
     ),
   );
 }
@@ -148,6 +160,7 @@ class _AppDropdownFieldState<T> extends State<AppDropdownField<T>> {
         borderRadius: BorderRadius.circular(18),
         child: InputDecorator(
           decoration: appInputDecoration(
+            context: context,
             label: widget.label,
             suffixIcon: const Icon(Icons.keyboard_arrow_down_rounded),
           ),
@@ -162,7 +175,6 @@ class _AppDropdownFieldState<T> extends State<AppDropdownField<T>> {
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.text,
                 ),
               ),
             ),
@@ -193,9 +205,11 @@ class _DropdownOverlay<T> extends StatelessWidget {
       constraints: const BoxConstraints(maxHeight: 320),
       padding: const EdgeInsets.symmetric(vertical: 8),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.border.withValues(alpha: 0.76)),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.46),
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.08),
@@ -211,6 +225,7 @@ class _DropdownOverlay<T> extends StatelessWidget {
         itemBuilder: (context, index) {
           final option = options[index];
           final selected = option.value == value;
+          final accent = Theme.of(context).colorScheme.primary;
           return InkWell(
             onTap: () => onSelected(option.value),
             child: Container(
@@ -222,8 +237,9 @@ class _DropdownOverlay<T> extends StatelessWidget {
                     width: 28,
                     height: 28,
                     decoration: BoxDecoration(
-                      color: (selected ? AppColors.primary : AppColors.text)
-                          .withValues(alpha: selected ? 0.12 : 0.06),
+                      color: (selected ? accent : AppColors.text).withValues(
+                        alpha: selected ? 0.12 : 0.06,
+                      ),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Icon(
@@ -231,9 +247,7 @@ class _DropdownOverlay<T> extends StatelessWidget {
                           ? Icons.check_rounded
                           : Icons.keyboard_arrow_right_rounded,
                       size: 16,
-                      color: selected
-                          ? AppColors.primary
-                          : AppColors.textTertiary,
+                      color: selected ? accent : AppColors.textTertiary,
                     ),
                   ),
                   const SizedBox(width: 9),
@@ -247,7 +261,9 @@ class _DropdownOverlay<T> extends StatelessWidget {
                         fontWeight: selected
                             ? FontWeight.w900
                             : FontWeight.w800,
-                        color: selected ? AppColors.primary : AppColors.text,
+                        color: selected
+                            ? accent
+                            : Theme.of(context).colorScheme.onSurface,
                       ),
                     ),
                   ),

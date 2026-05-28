@@ -1,8 +1,12 @@
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../shared/widgets/app_controls.dart';
 import 'feedback_service.dart';
 
 class HelpFeedbackPage extends StatefulWidget {
@@ -24,6 +28,7 @@ class _HelpFeedbackPageState extends State<HelpFeedbackPage> {
   bool _submitting = false;
   String _status = '';
   int _pendingCount = 0;
+  final List<String> _screenshotPaths = [];
 
   @override
   void initState() {
@@ -64,33 +69,73 @@ class _HelpFeedbackPageState extends State<HelpFeedbackPage> {
       content: content,
       contact: _contactCtrl.text.trim(),
       includeDiagnostics: _includeDiagnostics,
+      screenshotPaths: List.unmodifiable(_screenshotPaths),
       createdAt: DateTime.now(),
       diagnostics: buildFeedbackDiagnostics(),
     );
-    final result = await _service.submit(report);
-    await _refreshPendingCount();
+    final sent = await _sendReportEmail(report);
     if (!mounted) return;
     setState(() {
       _submitting = false;
-      _status = result.traceId == null
-          ? result.message
-          : '${result.message} 追踪号：${result.traceId}';
+      _status = sent
+          ? '已打开邮件客户端，请确认后发送。'
+          : '无法打开邮件客户端，请手动发送到 ${FeedbackService.supportEmail}';
     });
   }
 
+  Future<bool> _sendReportEmail(FeedbackReport report) async {
+    final uri = Uri(
+      scheme: 'mailto',
+      path: FeedbackService.supportEmail,
+      queryParameters: {
+        'subject': report.emailSubject,
+        'body': report.emailBody,
+      },
+    );
+    return launchUrl(uri);
+  }
+
   Future<void> _sendEmail() async {
-    final subject = Uri.encodeComponent('MyAssistant 使用反馈');
-    final body = Uri.encodeComponent(
-      '模块：${_module.label}\n类型：${_type.label}\n\n请描述你遇到的问题：\n',
+    final report = FeedbackReport(
+      id: const Uuid().v4(),
+      module: _module,
+      type: _type,
+      severity: _severity,
+      title: _titleCtrl.text.trim().isEmpty
+          ? 'MyAssistant 使用反馈'
+          : _titleCtrl.text.trim(),
+      content: _contentCtrl.text.trim().isEmpty
+          ? '请在这里描述你遇到的问题、复现步骤和期望结果。'
+          : _contentCtrl.text.trim(),
+      contact: _contactCtrl.text.trim(),
+      includeDiagnostics: _includeDiagnostics,
+      screenshotPaths: List.unmodifiable(_screenshotPaths),
+      createdAt: DateTime.now(),
+      diagnostics: buildFeedbackDiagnostics(),
     );
-    final uri = Uri.parse(
-      'mailto:${FeedbackService.supportEmail}?subject=$subject&body=$body',
-    );
-    if (!await launchUrl(uri)) {
+    if (!await _sendReportEmail(report)) {
       setState(
         () => _status = '无法打开邮件客户端，请手动发送到 ${FeedbackService.supportEmail}',
       );
     }
+  }
+
+  Future<void> _pickScreenshots() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+      allowMultiple: true,
+    );
+    final paths = result?.files
+        .map((file) => file.path)
+        .whereType<String>()
+        .where((path) => path.trim().isNotEmpty)
+        .toList();
+    if (paths == null || paths.isEmpty) return;
+    setState(() {
+      for (final path in paths) {
+        if (!_screenshotPaths.contains(path)) _screenshotPaths.add(path);
+      }
+    });
   }
 
   @override
@@ -107,7 +152,10 @@ class _HelpFeedbackPageState extends State<HelpFeedbackPage> {
           const SizedBox(height: 10),
           for (final doc in _helpDocs) _HelpDocCard(doc: doc),
           const SizedBox(height: 24),
-          const _SectionHeader(title: '提交反馈', subtitle: '服务端接口未上线时会先保存到本地待上报。'),
+          const _SectionHeader(
+            title: '提交反馈',
+            subtitle: '按固定格式打开邮件客户端，可附带截图说明。',
+          ),
           const SizedBox(height: 12),
           _FeedbackForm(
             titleCtrl: _titleCtrl,
@@ -117,11 +165,15 @@ class _HelpFeedbackPageState extends State<HelpFeedbackPage> {
             type: _type,
             severity: _severity,
             includeDiagnostics: _includeDiagnostics,
+            screenshotPaths: _screenshotPaths,
             onModuleChanged: (value) => setState(() => _module = value),
             onTypeChanged: (value) => setState(() => _type = value),
             onSeverityChanged: (value) => setState(() => _severity = value),
             onDiagnosticsChanged: (value) =>
                 setState(() => _includeDiagnostics = value),
+            onPickScreenshots: _pickScreenshots,
+            onRemoveScreenshot: (path) =>
+                setState(() => _screenshotPaths.remove(path)),
           ),
           const SizedBox(height: 14),
           Row(
@@ -137,8 +189,8 @@ class _HelpFeedbackPageState extends State<HelpFeedbackPage> {
                             height: 16,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : const Icon(Icons.upload_rounded, size: 18),
-                    label: Text(_submitting ? '提交中' : '提交反馈'),
+                        : const Icon(Icons.mail_outline_rounded, size: 18),
+                    label: Text(_submitting ? '打开中' : '发送邮件'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,
@@ -186,10 +238,13 @@ class _FeedbackForm extends StatelessWidget {
   final FeedbackType type;
   final FeedbackSeverity severity;
   final bool includeDiagnostics;
+  final List<String> screenshotPaths;
   final ValueChanged<FeedbackModule> onModuleChanged;
   final ValueChanged<FeedbackType> onTypeChanged;
   final ValueChanged<FeedbackSeverity> onSeverityChanged;
   final ValueChanged<bool> onDiagnosticsChanged;
+  final VoidCallback onPickScreenshots;
+  final ValueChanged<String> onRemoveScreenshot;
 
   const _FeedbackForm({
     required this.titleCtrl,
@@ -199,10 +254,13 @@ class _FeedbackForm extends StatelessWidget {
     required this.type,
     required this.severity,
     required this.includeDiagnostics,
+    required this.screenshotPaths,
     required this.onModuleChanged,
     required this.onTypeChanged,
     required this.onSeverityChanged,
     required this.onDiagnosticsChanged,
+    required this.onPickScreenshots,
+    required this.onRemoveScreenshot,
   });
 
   @override
@@ -217,28 +275,34 @@ class _FeedbackForm extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _ChoiceWrap<FeedbackModule>(
+          AppDropdownField<FeedbackModule>(
             label: '模块',
-            values: FeedbackModule.values,
-            selected: module,
-            textOf: (item) => item.label,
-            onSelected: onModuleChanged,
+            value: module,
+            options: [
+              for (final item in FeedbackModule.values)
+                AppDropdownOption(value: item, label: item.label),
+            ],
+            onChanged: onModuleChanged,
           ),
           const SizedBox(height: 14),
-          _ChoiceWrap<FeedbackType>(
+          AppDropdownField<FeedbackType>(
             label: '类型',
-            values: FeedbackType.values,
-            selected: type,
-            textOf: (item) => item.label,
-            onSelected: onTypeChanged,
+            value: type,
+            options: [
+              for (final item in FeedbackType.values)
+                AppDropdownOption(value: item, label: item.label),
+            ],
+            onChanged: onTypeChanged,
           ),
           const SizedBox(height: 14),
-          _ChoiceWrap<FeedbackSeverity>(
+          AppDropdownField<FeedbackSeverity>(
             label: '优先级',
-            values: FeedbackSeverity.values,
-            selected: severity,
-            textOf: (item) => item.label,
-            onSelected: onSeverityChanged,
+            value: severity,
+            options: [
+              for (final item in FeedbackSeverity.values)
+                AppDropdownOption(value: item, label: item.label),
+            ],
+            onChanged: onSeverityChanged,
           ),
           const SizedBox(height: 14),
           TextField(
@@ -269,6 +333,12 @@ class _FeedbackForm extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 10),
+          _ScreenshotPicker(
+            paths: screenshotPaths,
+            onPick: onPickScreenshots,
+            onRemove: onRemoveScreenshot,
+          ),
+          const SizedBox(height: 10),
           SwitchListTile.adaptive(
             value: includeDiagnostics,
             onChanged: onDiagnosticsChanged,
@@ -288,74 +358,76 @@ class _FeedbackForm extends StatelessWidget {
   }
 }
 
-class _ChoiceWrap<T> extends StatelessWidget {
-  final String label;
-  final List<T> values;
-  final T selected;
-  final String Function(T value) textOf;
-  final ValueChanged<T> onSelected;
+class _ScreenshotPicker extends StatelessWidget {
+  final List<String> paths;
+  final VoidCallback onPick;
+  final ValueChanged<String> onRemove;
 
-  const _ChoiceWrap({
-    required this.label,
-    required this.values,
-    required this.selected,
-    required this.textOf,
-    required this.onSelected,
+  const _ScreenshotPicker({
+    required this.paths,
+    required this.onPick,
+    required this.onRemove,
   });
 
   @override
   Widget build(BuildContext context) {
-    final accent = Theme.of(context).colorScheme.primary;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w800,
-            color: AppColors.textSecondary,
-          ),
+        OutlinedButton.icon(
+          onPressed: onPick,
+          icon: const Icon(Icons.add_photo_alternate_rounded, size: 18),
+          label: Text(paths.isEmpty ? '添加截图' : '继续添加截图'),
         ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            for (final item in values)
-              GestureDetector(
-                onTap: () => onSelected(item),
-                child: AnimatedContainer(
-                  duration: AppAnimations.shortDuration,
-                  height: 34,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  decoration: BoxDecoration(
-                    color: item == selected
-                        ? accent.withValues(alpha: 0.1)
-                        : AppColors.inputBg,
-                    borderRadius: BorderRadius.circular(17),
-                    border: Border.all(
-                      color: item == selected
-                          ? accent.withValues(alpha: 0.34)
-                          : AppColors.border,
-                    ),
-                  ),
-                  child: Center(
-                    child: Text(
-                      textOf(item),
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                        color: item == selected
-                            ? accent
-                            : AppColors.textSecondary,
+        if (paths.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              for (final path in paths)
+                Stack(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.file(
+                        File(path),
+                        width: 76,
+                        height: 76,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => Container(
+                          width: 76,
+                          height: 76,
+                          color: AppColors.inputBg,
+                          child: const Icon(Icons.broken_image_rounded),
+                        ),
                       ),
                     ),
-                  ),
+                    Positioned(
+                      right: 4,
+                      top: 4,
+                      child: GestureDetector(
+                        onTap: () => onRemove(path),
+                        child: Container(
+                          width: 22,
+                          height: 22,
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.55),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.close_rounded,
+                            size: 15,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-          ],
-        ),
+            ],
+          ),
+        ],
       ],
     );
   }

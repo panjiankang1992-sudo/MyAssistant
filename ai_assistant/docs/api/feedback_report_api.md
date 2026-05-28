@@ -1,6 +1,6 @@
 # Feedback Report API
 
-客户端已接入反馈上报能力。服务端完成下方接口后，应用会优先在线提交；接口不可用或网络失败时，客户端会把反馈写入本地待上报队列。
+当前客户端按用户要求优先通过邮件直接发送反馈到 `yuyutian_assistant@foxmail.com`，邮件正文使用下方请求结构格式化。下方接口作为后续服务端上报能力预留；服务端完成后，客户端可恢复在线提交和失败重试。
 
 ## Endpoint
 
@@ -83,10 +83,16 @@ Authorization: Bearer <jwt>   # 登录态存在时携带
 - 对 `title`、`content`、`contact` 做长度限制和基础清洗。
 - 后台可按 `module`、`type`、`severity`、`createdAt` 建索引。
 
-## Client Behavior
+## Current Client Behavior
 
 - 应用端入口：个人信息 -> 帮助与反馈。
-- 支持邮件反馈：`feedback@myassistant.app`。
+- 当前提交按钮会打开系统邮件客户端，收件人为 `yuyutian_assistant@foxmail.com`。
+- 邮件主题格式：`[MyAssistant反馈][模块][优先级] 标题`。
+- 邮件正文包含模块、类型、优先级、联系方式、提交时间、问题描述和诊断信息。
+- 支持选择截图；由于 `mailto` 通常无法可靠自动携带附件，客户端会在邮件正文中列出截图路径，用户可在邮件客户端中附加对应图片。
+
+## Future API Client Behavior
+
 - 在线提交失败时，客户端写入本地文件：
 
 ```text

@@ -54,6 +54,7 @@ class FeedbackReport {
   final String content;
   final String contact;
   final bool includeDiagnostics;
+  final List<String> screenshotPaths;
   final DateTime createdAt;
   final Map<String, Object?> diagnostics;
 
@@ -66,6 +67,7 @@ class FeedbackReport {
     required this.content,
     required this.contact,
     required this.includeDiagnostics,
+    this.screenshotPaths = const [],
     required this.createdAt,
     required this.diagnostics,
   });
@@ -80,9 +82,45 @@ class FeedbackReport {
       'content': content,
       'contact': contact,
       'includeDiagnostics': includeDiagnostics,
+      'screenshotPaths': screenshotPaths,
       'createdAt': createdAt.toIso8601String(),
       'diagnostics': includeDiagnostics ? diagnostics : <String, Object?>{},
     };
+  }
+
+  String get emailSubject {
+    return '[MyAssistant反馈][${module.label}][${severity.label}] $title';
+  }
+
+  String get emailBody {
+    final buffer = StringBuffer()
+      ..writeln('【反馈标题】')
+      ..writeln(title)
+      ..writeln()
+      ..writeln('【反馈模块】${module.label}')
+      ..writeln('【反馈类型】${type.label}')
+      ..writeln('【优先级】${severity.label}')
+      ..writeln('【联系方式】${contact.isEmpty ? '未填写' : contact}')
+      ..writeln('【提交时间】${createdAt.toIso8601String()}')
+      ..writeln()
+      ..writeln('【问题描述】')
+      ..writeln(content)
+      ..writeln();
+    if (screenshotPaths.isNotEmpty) {
+      buffer
+        ..writeln('【截图】')
+        ..writeln('当前系统邮件入口可能无法自动携带附件，请在邮件客户端中附加以下截图：');
+      for (final path in screenshotPaths) {
+        buffer.writeln('- $path');
+      }
+      buffer.writeln();
+    }
+    if (includeDiagnostics) {
+      buffer
+        ..writeln('【诊断信息】')
+        ..writeln(const JsonEncoder.withIndent('  ').convert(diagnostics));
+    }
+    return buffer.toString();
   }
 }
 
@@ -101,7 +139,7 @@ class FeedbackSubmitResult {
 }
 
 class FeedbackService {
-  static const supportEmail = 'feedback@myassistant.app';
+  static const supportEmail = 'yuyutian_assistant@foxmail.com';
   static const feedbackEndpoint = '/api/public/feedback/report';
 
   Future<FeedbackSubmitResult> submit(FeedbackReport report) async {

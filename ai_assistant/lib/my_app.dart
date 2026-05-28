@@ -153,6 +153,7 @@ class _HomePageState extends ConsumerState<HomePage>
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Stack(
       children: [
         Consumer(
@@ -193,9 +194,12 @@ class _HomePageState extends ConsumerState<HomePage>
           bottomNavigationBar: Container(
             padding: const EdgeInsets.fromLTRB(12, 7, 12, 8),
             decoration: BoxDecoration(
-              color: AppColors.surface,
-              border: const Border(
-                top: BorderSide(color: AppColors.border, width: 0.5),
+              color: scheme.surface,
+              border: Border(
+                top: BorderSide(
+                  color: scheme.outline.withValues(alpha: 0.32),
+                  width: 0.5,
+                ),
               ),
               boxShadow: [
                 BoxShadow(
@@ -262,7 +266,8 @@ class _BottomNavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = selected ? AppColors.primary : AppColors.textTertiary;
+    final scheme = Theme.of(context).colorScheme;
+    final color = selected ? scheme.primary : scheme.onSurfaceVariant;
     return Expanded(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -271,8 +276,8 @@ class _BottomNavItem extends StatelessWidget {
           child: InkWell(
             onTap: onTap,
             borderRadius: BorderRadius.circular(18),
-            splashColor: AppColors.primary.withValues(alpha: 0.04),
-            highlightColor: AppColors.primary.withValues(alpha: 0.025),
+            splashColor: scheme.primary.withValues(alpha: 0.04),
+            highlightColor: scheme.primary.withValues(alpha: 0.025),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 180),
               curve: Curves.easeOut,
@@ -280,12 +285,12 @@ class _BottomNavItem extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
               decoration: BoxDecoration(
                 color: selected
-                    ? AppColors.primary.withValues(alpha: 0.055)
+                    ? scheme.primary.withValues(alpha: 0.075)
                     : Colors.transparent,
                 borderRadius: BorderRadius.circular(18),
                 border: Border.all(
                   color: selected
-                      ? AppColors.primary.withValues(alpha: 0.10)
+                      ? scheme.primary.withValues(alpha: 0.14)
                       : Colors.transparent,
                   width: 0.6,
                 ),

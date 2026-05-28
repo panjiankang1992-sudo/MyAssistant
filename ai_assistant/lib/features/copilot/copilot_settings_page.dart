@@ -631,40 +631,28 @@ class _AvatarChoice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(18),
-      child: AnimatedContainer(
-        duration: AppAnimations.shortDuration,
-        width: 78,
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        decoration: BoxDecoration(
-          color: selected
-              ? AppColors.primary.withValues(alpha: 0.08)
-              : AppColors.inputBg.withValues(alpha: 0.72),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
+    return Tooltip(
+      message: label,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: AnimatedContainer(
+          duration: AppAnimations.shortDuration,
+          width: 72,
+          height: 72,
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
             color: selected
-                ? AppColors.primary.withValues(alpha: 0.34)
-                : AppColors.border.withValues(alpha: 0.75),
-          ),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            child,
-            const SizedBox(height: 5),
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
-                color: selected ? AppColors.primary : AppColors.textSecondary,
-              ),
+                ? AppColors.primary.withValues(alpha: 0.08)
+                : AppColors.inputBg.withValues(alpha: 0.72),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: selected
+                  ? AppColors.primary.withValues(alpha: 0.34)
+                  : AppColors.border.withValues(alpha: 0.75),
             ),
-          ],
+          ),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [child]),
         ),
       ),
     );
