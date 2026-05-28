@@ -32,6 +32,10 @@
 	<string>用于读取系统日历并自动生成代办。</string>
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>用于读取系统日历并自动生成代办。</string>
+	<key>NSRemindersUsageDescription</key>
+	<string>用于读取系统提醒事项并自动生成代办。</string>
+	<key>NSRemindersFullAccessUsageDescription</key>
+	<string>用于读取系统提醒事项并自动生成代办。</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>用于将语音转成文字并辅助识别待办内容。</string>
 	<key>NSMainNibFile</key>

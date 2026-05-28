@@ -112,7 +112,9 @@ class CalendarTodoService {
           todo.date.month == event.start.month &&
           todo.date.day == event.start.day;
       final sameTitle = todo.title.trim() == event.title.trim();
-      return sameDay && (sameEvent || sameTitle);
+      final sameTime =
+          todo.time == (event.allDay ? '09:00' : _timeOf(event.start));
+      return sameDay && (sameEvent || (sameTitle && sameTime));
     });
   }
 
@@ -120,7 +122,7 @@ class CalendarTodoService {
     final parts = [
       if (event.location.trim().isNotEmpty) '地点：${event.location.trim()}',
       if (event.notes.trim().isNotEmpty) event.notes.trim(),
-      '来源：${event.platformLabel} 日历',
+      '来源：${event.platformLabel} ${event.sourceLabel}',
     ];
     return parts.join('\n');
   }
@@ -151,6 +153,7 @@ class CalendarEvent {
   final DateTime end;
   final bool allDay;
   final String platform;
+  final String sourceType;
 
   const CalendarEvent({
     required this.id,
@@ -161,7 +164,15 @@ class CalendarEvent {
     required this.end,
     required this.allDay,
     required this.platform,
+    this.sourceType = 'event',
   });
+
+  String get sourceLabel {
+    return switch (sourceType) {
+      'reminder' => '提醒事项',
+      _ => '日历',
+    };
+  }
 
   String get platformLabel {
     return switch (platform) {
@@ -184,6 +195,7 @@ class CalendarEvent {
       end: DateTime.fromMillisecondsSinceEpoch(endMillis),
       allDay: map['allDay'] as bool? ?? false,
       platform: map['platform'] as String? ?? 'unknown',
+      sourceType: map['sourceType'] as String? ?? 'event',
     );
   }
 }

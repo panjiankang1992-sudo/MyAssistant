@@ -46,31 +46,84 @@ class AppDelegate: FlutterAppDelegate {
   }
 
   private func fetchEvents(startMillis: Int64, endMillis: Int64, result: @escaping FlutterResult) {
-    requestCalendarAccess { [weak self] granted in
+    requestCalendarAccess { [weak self] calendarGranted in
       guard let self = self else { return }
-      guard granted else {
+      guard calendarGranted else {
         result(FlutterError(code: "calendar_denied", message: "没有日历访问权限", details: nil))
         return
       }
       let start = Date(timeIntervalSince1970: TimeInterval(startMillis) / 1000.0)
       let end = Date(timeIntervalSince1970: TimeInterval(endMillis) / 1000.0)
-      let predicate = self.eventStore.predicateForEvents(withStart: start, end: end, calendars: nil)
-      let events = self.eventStore.events(matching: predicate)
-      let payload = events
+      let payload = self.fetchCalendarEvents(start: start, end: end)
+      self.requestReminderAccess { remindersGranted in
+        guard remindersGranted else {
+          result(payload)
+          return
+        }
+        self.fetchReminders(start: start, end: end) { reminders in
+          result(payload + reminders)
+        }
+      }
+    }
+  }
+
+  private func fetchCalendarEvents(start: Date, end: Date) -> [[String: Any]] {
+    let predicate = eventStore.predicateForEvents(withStart: start, end: end, calendars: nil)
+    let events = eventStore.events(matching: predicate)
+    return events
         .filter { !$0.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
         .map { event in
-          [
-            "id": event.calendarItemIdentifier,
+          let startMillis = Int64(event.startDate.timeIntervalSince1970 * 1000)
+          let endMillis = Int64(event.endDate.timeIntervalSince1970 * 1000)
+          return [
+            "id": "macos-event-\(event.calendarItemIdentifier)-\(startMillis)",
             "title": event.title ?? "",
             "notes": event.notes ?? "",
             "location": event.location ?? "",
-            "startMillis": Int64(event.startDate.timeIntervalSince1970 * 1000),
-            "endMillis": Int64(event.endDate.timeIntervalSince1970 * 1000),
+            "startMillis": startMillis,
+            "endMillis": endMillis,
             "allDay": event.isAllDay,
-            "platform": "macos"
+            "platform": "macos",
+            "sourceType": "event"
           ] as [String : Any]
         }
-      result(payload)
+  }
+
+  private func fetchReminders(
+    start: Date,
+    end: Date,
+    completion: @escaping ([[String: Any]]) -> Void
+  ) {
+    let predicate = eventStore.predicateForIncompleteReminders(
+      withDueDateStarting: start,
+      ending: end,
+      calendars: nil
+    )
+    eventStore.fetchReminders(matching: predicate) { reminders in
+      let payload = (reminders ?? [])
+        .filter { !$0.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        .compactMap { reminder -> [String: Any]? in
+          guard let dueComponents = reminder.dueDateComponents else { return nil }
+          var normalizedDueComponents = dueComponents
+          if normalizedDueComponents.calendar == nil {
+            normalizedDueComponents.calendar = Calendar.current
+          }
+          guard let due = normalizedDueComponents.date else { return nil }
+          let startMillis = Int64(due.timeIntervalSince1970 * 1000)
+          let endMillis = Int64(due.addingTimeInterval(60 * 60).timeIntervalSince1970 * 1000)
+          return [
+            "id": "macos-reminder-\(reminder.calendarItemIdentifier)-\(startMillis)",
+            "title": reminder.title ?? "",
+            "notes": reminder.notes ?? "",
+            "location": "",
+            "startMillis": startMillis,
+            "endMillis": endMillis,
+            "allDay": dueComponents.hour == nil,
+            "platform": "macos",
+            "sourceType": "reminder"
+          ] as [String: Any]
+        }
+      DispatchQueue.main.async { completion(payload) }
     }
   }
 
@@ -103,6 +156,32 @@ class AppDelegate: FlutterAppDelegate {
         }
       } else {
         eventStore.requestAccess(to: .event) { granted, _ in
+          DispatchQueue.main.async { completion(granted) }
+        }
+      }
+    case .fullAccess:
+      completion(true)
+    case .writeOnly:
+      completion(false)
+    @unknown default:
+      completion(false)
+    }
+  }
+
+  private func requestReminderAccess(_ completion: @escaping (Bool) -> Void) {
+    let status = EKEventStore.authorizationStatus(for: .reminder)
+    switch status {
+    case .authorized:
+      completion(true)
+    case .denied, .restricted:
+      completion(false)
+    case .notDetermined:
+      if #available(macOS 14.0, *) {
+        eventStore.requestFullAccessToReminders { granted, _ in
+          DispatchQueue.main.async { completion(granted) }
+        }
+      } else {
+        eventStore.requestAccess(to: .reminder) { granted, _ in
           DispatchQueue.main.async { completion(granted) }
         }
       }

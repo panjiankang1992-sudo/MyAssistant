@@ -108,14 +108,15 @@ class MainActivity: FlutterActivity() {
                 val end = if (it.isNull(endIndex)) start else it.getLong(endIndex)
                 events.add(
                     mapOf(
-                        "id" to "android-$id",
+                        "id" to "android-event-$id-$start",
                         "title" to title,
                         "notes" to (it.getString(descriptionIndex) ?: ""),
                         "location" to (it.getString(locationIndex) ?: ""),
                         "startMillis" to start,
                         "endMillis" to end,
                         "allDay" to (it.getInt(allDayIndex) == 1),
-                        "platform" to "android"
+                        "platform" to "android",
+                        "sourceType" to "event"
                     )
                 )
             }
