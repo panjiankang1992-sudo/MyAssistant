@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'theme_settings.dart';
+
 class AppColors {
   static const Color primary = Color(0xFF0071E3);
   static const Color primaryLight = Color(0xFFE8F2FD);
@@ -94,6 +96,101 @@ class AppAnimations {
 }
 
 class AppTheme {
+  static ThemeData lightThemeFor(ThemeSettings settings) {
+    return _withSettings(lightTheme, settings, Brightness.light);
+  }
+
+  static ThemeData darkThemeFor(ThemeSettings settings) {
+    return _withSettings(_darkTheme, settings, Brightness.dark);
+  }
+
+  static ThemeData _withSettings(
+    ThemeData theme,
+    ThemeSettings settings,
+    Brightness brightness,
+  ) {
+    final accent = settings.accent.color;
+    final isDark = brightness == Brightness.dark;
+    final visualDensity = settings.density == AppThemeDensity.compact
+        ? VisualDensity.compact
+        : VisualDensity.standard;
+    final colorScheme = theme.colorScheme.copyWith(
+      brightness: brightness,
+      primary: accent,
+      secondary: accent,
+      tertiary: accent,
+      onPrimary: Colors.white,
+      onSecondary: Colors.white,
+      surface: isDark ? const Color(0xFF111216) : AppColors.scaffoldBg,
+      onSurface: isDark ? const Color(0xFFF5F5F7) : AppColors.text,
+      surfaceContainerHighest: isDark
+          ? const Color(0xFF2C2C31)
+          : AppColors.border,
+      onSurfaceVariant: isDark
+          ? const Color(0xFFC7C7CC)
+          : AppColors.textSecondary,
+      outline: isDark ? const Color(0xFF3A3A40) : AppColors.handleBar,
+    );
+    final duration = settings.reduceMotion
+        ? Durations.short1
+        : AppAnimations.mediumDuration;
+    return theme.copyWith(
+      colorScheme: colorScheme,
+      visualDensity: visualDensity,
+      primaryColor: accent,
+      scaffoldBackgroundColor: isDark
+          ? const Color(0xFF0F1014)
+          : AppColors.scaffoldBg,
+      splashFactory: settings.reduceMotion
+          ? NoSplash.splashFactory
+          : InkSparkle.splashFactory,
+      appBarTheme: theme.appBarTheme.copyWith(
+        foregroundColor: isDark ? Colors.white : AppColors.text,
+        systemOverlayStyle: SystemUiOverlayStyle(
+          statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
+          statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+        ),
+      ),
+      segmentedButtonTheme: SegmentedButtonThemeData(
+        style: ButtonStyle(
+          visualDensity: visualDensity,
+          animationDuration: duration,
+          foregroundColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) return accent;
+            return isDark ? const Color(0xFFD1D1D6) : AppColors.textSecondary;
+          }),
+        ),
+      ),
+      switchTheme: SwitchThemeData(
+        thumbColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) return accent;
+          return isDark ? const Color(0xFFD1D1D6) : Colors.white;
+        }),
+        trackColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return accent.withValues(alpha: 0.36);
+          }
+          return isDark ? const Color(0xFF3A3A40) : AppColors.border;
+        }),
+      ),
+      sliderTheme: theme.sliderTheme.copyWith(
+        activeTrackColor: accent,
+        thumbColor: accent,
+        overlayColor: accent.withValues(alpha: 0.12),
+      ),
+      inputDecorationTheme: theme.inputDecorationTheme.copyWith(
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: accent, width: 1.2),
+        ),
+      ),
+      floatingActionButtonTheme: theme.floatingActionButtonTheme.copyWith(
+        backgroundColor: accent,
+        foregroundColor: Colors.white,
+      ),
+    );
+  }
+
   static ThemeData get lightTheme {
     return ThemeData(
       useMaterial3: true,
@@ -373,6 +470,43 @@ class AppTheme {
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         backgroundColor: const Color(0xFF1D1D1F),
+      ),
+    );
+  }
+
+  static ThemeData get _darkTheme {
+    final base = lightTheme;
+    return base.copyWith(
+      brightness: Brightness.dark,
+      colorScheme: const ColorScheme.dark(
+        primary: AppColors.primary,
+        onPrimary: Colors.white,
+        secondary: AppColors.primary,
+        onSecondary: Colors.white,
+        surface: Color(0xFF111216),
+        onSurface: Color(0xFFF5F5F7),
+        surfaceContainerHighest: Color(0xFF2C2C31),
+        onSurfaceVariant: Color(0xFFC7C7CC),
+        outline: Color(0xFF3A3A40),
+        error: AppColors.danger,
+        onError: Colors.white,
+        shadow: Color(0x66000000),
+      ),
+      scaffoldBackgroundColor: const Color(0xFF0F1014),
+      cardTheme: base.cardTheme.copyWith(
+        color: const Color(0xFF1C1C21),
+        shadowColor: const Color(0x66000000),
+      ),
+      chipTheme: base.chipTheme.copyWith(
+        backgroundColor: const Color(0xFF2C2C31),
+        selectedColor: AppColors.primary.withValues(alpha: 0.22),
+        labelStyle: base.chipTheme.labelStyle?.copyWith(
+          color: const Color(0xFFD1D1D6),
+        ),
+      ),
+      dividerTheme: base.dividerTheme.copyWith(color: const Color(0xFF2C2C31)),
+      snackBarTheme: base.snackBarTheme.copyWith(
+        backgroundColor: const Color(0xFF2C2C31),
       ),
     );
   }

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/theme/app_theme.dart';
+import 'core/theme/theme_settings.dart';
 import 'core/providers/core_providers.dart';
 import 'features/auth/auth_provider.dart';
 import 'features/auth/auth_page.dart';
@@ -18,15 +19,19 @@ import 'data/api/api_client.dart';
 import 'data/api/profile_service.dart';
 import 'features/sync/webdav_provisioner.dart';
 
-class App extends StatelessWidget {
+class App extends ConsumerWidget {
   const App({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeSettings =
+        ref.watch(themeSettingsProvider).value ?? const ThemeSettings();
     return MaterialApp(
       title: 'AI 助手',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
+      theme: AppTheme.lightThemeFor(themeSettings),
+      darkTheme: AppTheme.darkThemeFor(themeSettings),
+      themeMode: themeSettings.materialThemeMode,
       localizationsDelegates: [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
