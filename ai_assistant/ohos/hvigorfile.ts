@@ -1,6 +1,9 @@
 import path from 'path'
 import { appTasks } from '@ohos/hvigor-ohos-plugin';
 import { flutterHvigorPlugin } from 'flutter-hvigor-plugin';
+import { ensureOhosPluginList } from './flutter_plugin_compat';
+
+ensureOhosPluginList(path.dirname(__dirname))
 
 export default {
     system: appTasks,  /* Built-in plugin of Hvigor. It cannot be modified. */
