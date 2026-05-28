@@ -1,7 +1,6 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../core/theme/app_theme.dart';
 
@@ -34,7 +33,7 @@ class CopilotAvatarPreset {
 
   String get value => 'preset:$id';
 
-  String get assetPath => 'assets/avatars/copilot_$id.svg';
+  String get assetPath => 'assets/avatars/copilot_$id.png';
 }
 
 class CopilotAvatarGroup {
@@ -464,7 +463,7 @@ class CopilotAvatarView extends StatelessWidget {
   }
 
   Widget _presetBody(CopilotAvatarPreset preset) {
-    return SvgPicture.asset(
+    return Image.asset(
       preset.assetPath,
       width: size,
       height: size,
