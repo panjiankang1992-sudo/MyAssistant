@@ -40,6 +40,7 @@ class _TodoPageState extends ConsumerState<TodoPage>
   bool _showBookkeepingFeedback = false;
   bool _bookkeepingFeedbackSuccess = false;
   int _bookkeepingFeedbackTick = 0;
+  bool _calendarSyncing = false;
   final stt.SpeechToText _fabSpeech = stt.SpeechToText();
   bool _fabSpeechReady = false;
   bool _fabListening = false;
@@ -120,6 +121,37 @@ class _TodoPageState extends ConsumerState<TodoPage>
       initialDate: selectedDate,
       initialVoiceText: text.isEmpty ? null : text,
     );
+  }
+
+  Future<void> _syncCalendarTodos() async {
+    if (_calendarSyncing) return;
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _calendarSyncing = true);
+    try {
+      final result = await ref
+          .read(todoNotifierProvider.notifier)
+          .importCalendarTodos(force: true);
+      if (!mounted) return;
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              result.created == 0
+                  ? '日历同步完成，暂无新代办'
+                  : '已从日历生成 ${result.created} 条代办',
+            ),
+            duration: const Duration(milliseconds: 1400),
+          ),
+        );
+    } catch (_) {
+      if (!mounted) return;
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(content: Text('无法读取系统日历，请检查日历权限')));
+    } finally {
+      if (mounted) setState(() => _calendarSyncing = false);
+    }
   }
 
   @override
@@ -252,6 +284,26 @@ class _TodoPageState extends ConsumerState<TodoPage>
                                     size: 24,
                                     color: AppColors.textSecondary,
                                   ),
+                                ),
+                                const SizedBox(width: 2),
+                                IconButton(
+                                  tooltip: '同步系统日历',
+                                  onPressed: _calendarSyncing
+                                      ? null
+                                      : _syncCalendarTodos,
+                                  icon: _calendarSyncing
+                                      ? const SizedBox(
+                                          width: 18,
+                                          height: 18,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                      : const Icon(
+                                          Icons.event_available_rounded,
+                                          size: 22,
+                                          color: AppColors.textSecondary,
+                                        ),
                                 ),
                               ],
                             ),

@@ -4,9 +4,12 @@ import '../../../core/providers/core_providers.dart';
 import '../../../domain/models/routine.dart';
 import '../../../domain/models/todo.dart';
 import '../../bookkeeping/bookkeeping_action_service.dart';
+import '../../calendar/calendar_todo_service.dart';
 import 'selected_date_provider.dart';
 
 class TodoNotifier extends Notifier<List<Todo>> {
+  DateTime? _lastCalendarImportAt;
+
   @override
   List<Todo> build() {
     final selectedDate = ref.watch(selectedDateProvider);
@@ -24,9 +27,44 @@ class TodoNotifier extends Notifier<List<Todo>> {
     if (!normalizedDate.isBefore(today) &&
         !normalizedDate.isAfter(lastGeneratedDate)) {
       await _generateRoutineTodos();
+      await _importCalendarTodosIfNeeded();
     }
 
     state = await repo.getTodosByDate(normalizedDate);
+  }
+
+  Future<CalendarImportResult> importCalendarTodos({bool force = false}) async {
+    if (!force && !_shouldImportCalendar()) {
+      return const CalendarImportResult(
+        created: 0,
+        skipped: 0,
+        unsupported: false,
+      );
+    }
+    _lastCalendarImportAt = DateTime.now();
+    final service = CalendarTodoService(
+      datasource: ref.read(datasourceProvider),
+      todoRepository: ref.read(todoRepoProvider),
+    );
+    final result = await service.importUpcoming();
+    final selectedDate = ref.read(selectedDateProvider);
+    state = await ref.read(todoRepoProvider).getTodosByDate(selectedDate);
+    return result;
+  }
+
+  Future<void> _importCalendarTodosIfNeeded() async {
+    if (!_shouldImportCalendar()) return;
+    try {
+      await importCalendarTodos();
+    } catch (_) {
+      // 日历权限或平台适配异常不应阻断代办列表加载。
+    }
+  }
+
+  bool _shouldImportCalendar() {
+    final last = _lastCalendarImportAt;
+    if (last == null) return true;
+    return DateTime.now().difference(last) > const Duration(hours: 1);
   }
 
   Future<void> _generateRoutineTodos() async {

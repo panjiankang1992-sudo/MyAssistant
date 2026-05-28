@@ -1,6 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.example.ai_assistant">
 
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
+
     <application
         android:label="ai_assistant"
         android:name="${applicationName}"
