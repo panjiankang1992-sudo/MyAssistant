@@ -21,6 +21,8 @@ const PERMISSIONS_CHANNEL = 'my_assistant/permissions';
 const TODO_REMINDERS_CHANNEL = 'my_assistant/todo_reminders';
 const FILE_PICKER_CHANNEL = 'my_assistant/file_picker';
 const APP_LAUNCHER_CHANNEL = 'my_assistant/app_launcher';
+const CALENDAR_CHANNEL = 'my_assistant/calendar';
+const SMS_CHANNEL = 'my_assistant/sms';
 const LOCAL_STORE_CHANNEL = 'my_assistant/local_store';
 const SETTINGS_BUNDLE = 'com.huawei.hmos.settings';
 const SETTINGS_ABILITY = 'com.huawei.hmos.settings.MainAbility';
@@ -340,7 +342,7 @@ class AssistantAppLauncherHandler {
   }
 
   private launchableApps(): Array<LaunchableAppPayload> {
-    return [
+    const systemApps: Array<LaunchableAppPayload> = [
       {
         platform: 'ohos',
         id: SETTINGS_BUNDLE,
@@ -406,6 +408,121 @@ class AssistantAppLauncherHandler {
         abilityName: 'MainAbility',
       },
     ];
+    const commonApps: Array<LaunchableAppPayload> = [
+      {
+        platform: 'ohos',
+        id: 'com.tencent.wechat',
+        label: '微信',
+        subtitle: 'com.tencent.wechat',
+        bundleName: 'com.tencent.wechat',
+        abilityName: 'EntryAbility',
+      },
+      {
+        platform: 'ohos',
+        id: 'com.tencent.mm',
+        label: '微信（兼容）',
+        subtitle: 'com.tencent.mm',
+        bundleName: 'com.tencent.mm',
+        abilityName: 'EntryAbility',
+      },
+      {
+        platform: 'ohos',
+        id: 'com.eg.android.AlipayGphone',
+        label: '支付宝',
+        subtitle: 'com.eg.android.AlipayGphone',
+        bundleName: 'com.eg.android.AlipayGphone',
+        abilityName: 'EntryAbility',
+      },
+      {
+        platform: 'ohos',
+        id: 'com.tencent.mobileqq',
+        label: 'QQ',
+        subtitle: 'com.tencent.mobileqq',
+        bundleName: 'com.tencent.mobileqq',
+        abilityName: 'EntryAbility',
+      },
+      {
+        platform: 'ohos',
+        id: 'com.alibaba.android.rimet',
+        label: '钉钉',
+        subtitle: 'com.alibaba.android.rimet',
+        bundleName: 'com.alibaba.android.rimet',
+        abilityName: 'EntryAbility',
+      },
+      {
+        platform: 'ohos',
+        id: 'com.ss.android.lark',
+        label: '飞书',
+        subtitle: 'com.ss.android.lark',
+        bundleName: 'com.ss.android.lark',
+        abilityName: 'EntryAbility',
+      },
+      {
+        platform: 'ohos',
+        id: 'com.taobao.taobao',
+        label: '淘宝',
+        subtitle: 'com.taobao.taobao',
+        bundleName: 'com.taobao.taobao',
+        abilityName: 'EntryAbility',
+      },
+      {
+        platform: 'ohos',
+        id: 'com.jingdong.app.mall',
+        label: '京东',
+        subtitle: 'com.jingdong.app.mall',
+        bundleName: 'com.jingdong.app.mall',
+        abilityName: 'EntryAbility',
+      },
+      {
+        platform: 'ohos',
+        id: 'com.sankuai.meituan',
+        label: '美团',
+        subtitle: 'com.sankuai.meituan',
+        bundleName: 'com.sankuai.meituan',
+        abilityName: 'EntryAbility',
+      },
+      {
+        platform: 'ohos',
+        id: 'com.ss.android.ugc.aweme',
+        label: '抖音',
+        subtitle: 'com.ss.android.ugc.aweme',
+        bundleName: 'com.ss.android.ugc.aweme',
+        abilityName: 'EntryAbility',
+      },
+      {
+        platform: 'ohos',
+        id: 'com.xingin.xhs',
+        label: '小红书',
+        subtitle: 'com.xingin.xhs',
+        bundleName: 'com.xingin.xhs',
+        abilityName: 'EntryAbility',
+      },
+      {
+        platform: 'ohos',
+        id: 'com.autonavi.minimap',
+        label: '高德地图',
+        subtitle: 'com.autonavi.minimap',
+        bundleName: 'com.autonavi.minimap',
+        abilityName: 'EntryAbility',
+      },
+      {
+        platform: 'ohos',
+        id: 'com.baidu.BaiduMap',
+        label: '百度地图',
+        subtitle: 'com.baidu.BaiduMap',
+        bundleName: 'com.baidu.BaiduMap',
+        abilityName: 'EntryAbility',
+      },
+      {
+        platform: 'ohos',
+        id: 'com.tencent.hm.qqmusic',
+        label: 'QQ音乐',
+        subtitle: 'com.tencent.hm.qqmusic',
+        bundleName: 'com.tencent.hm.qqmusic',
+        abilityName: 'EntryAbility',
+      },
+    ];
+    return [...systemApps, ...commonApps];
   }
 
   private findPreset(id: string): LaunchableAppPayload | null {
@@ -458,6 +575,66 @@ class AssistantAppLauncherHandler {
           error.code ?? null
         );
       });
+  }
+}
+
+class AssistantCalendarHandler {
+  private context: common.UIAbilityContext;
+
+  constructor(context: common.UIAbilityContext) {
+    this.context = context;
+  }
+
+  onMethodCall(call: MethodCall, result: MethodResult): void {
+    switch (call.method) {
+      case 'openCalendar':
+        this.replyWithOpen(result, this.openCalendar());
+        break;
+      case 'fetchEvents':
+        result.error(
+          'unsupported',
+          'HarmonyOS does not expose direct calendar reads to this app.',
+          null
+        );
+        break;
+      default:
+        result.notImplemented();
+    }
+  }
+
+  private async openCalendar(): Promise<void> {
+    await this.context.startAbility({
+      bundleName: 'com.huawei.hmos.calendar',
+      abilityName: 'MainAbility'
+    });
+  }
+
+  private replyWithOpen(result: MethodResult, task: Promise<void>): void {
+    task
+      .then(() => result.success(true))
+      .catch((error: BusinessError) => {
+        result.error(
+          'calendar_open_error',
+          error.message ?? 'Failed to open calendar',
+          error.code ?? null
+        );
+      });
+  }
+}
+
+class AssistantSmsHandler {
+  onMethodCall(call: MethodCall, result: MethodResult): void {
+    switch (call.method) {
+      case 'fetchRecent':
+        result.error(
+          'unsupported',
+          'HarmonyOS does not expose direct SMS inbox reads to this app.',
+          null
+        );
+        break;
+      default:
+        result.notImplemented();
+    }
   }
 }
 
@@ -545,6 +722,10 @@ export default class EntryAbility extends FlutterAbility {
       .setMethodCallHandler(new AssistantFilePickerHandler(this.context));
     new MethodChannel(messenger, APP_LAUNCHER_CHANNEL)
       .setMethodCallHandler(new AssistantAppLauncherHandler(this.context));
+    new MethodChannel(messenger, CALENDAR_CHANNEL)
+      .setMethodCallHandler(new AssistantCalendarHandler(this.context));
+    new MethodChannel(messenger, SMS_CHANNEL)
+      .setMethodCallHandler(new AssistantSmsHandler());
     this.localStoreHandler = new AssistantLocalStoreHandler(this.context);
     this.localStoreChannel = new MethodChannel(messenger, LOCAL_STORE_CHANNEL);
     this.localStoreChannel.setMethodCallHandler(this.localStoreHandler);

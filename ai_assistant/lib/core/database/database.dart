@@ -633,9 +633,14 @@ class AppDatabase extends _$AppDatabase {
       name: 'ai_assistant_db',
       native: const DriftNativeOptions(
         databaseDirectory: getAppDocumentsDirectory,
+        tempDirectoryPath: _sqliteTempDirectoryPath,
       ),
     );
   }
+}
+
+Future<String> _sqliteTempDirectoryPath() async {
+  return (await getAppTemporaryDirectory()).path;
 }
 
 class _PresetTag {

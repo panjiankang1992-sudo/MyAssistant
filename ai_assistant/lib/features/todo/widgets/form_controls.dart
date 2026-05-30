@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../../../core/platform/app_launcher_service.dart';
 import '../../../core/theme/app_theme.dart';
@@ -585,6 +586,84 @@ class _AppLaunchPickerSheetState extends State<_AppLaunchPickerSheet> {
     }).toList();
   }
 
+  Future<void> _addManualTarget() async {
+    final bundleController = TextEditingController(text: _query);
+    final abilityController = TextEditingController();
+    final result = await showDialog<AppLaunchTarget>(
+      context: context,
+      builder: (context) {
+        final platform = defaultTargetPlatform.name.toLowerCase();
+        final isOhos = platform == 'ohos';
+        return AlertDialog(
+          title: const Text('手动添加应用'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: bundleController,
+                autofocus: true,
+                decoration: InputDecoration(
+                  labelText: isOhos ? 'Bundle 名称' : '包名',
+                  hintText: isOhos
+                      ? '例如 com.tencent.wechat'
+                      : '例如 com.tencent.mm',
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: abilityController,
+                decoration: InputDecoration(
+                  labelText: isOhos ? 'Ability 名称' : 'Activity 名称',
+                  hintText: isOhos ? '默认 EntryAbility' : '可留空',
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final id = bundleController.text.trim();
+                if (id.isEmpty) return;
+                final ability = abilityController.text.trim();
+                final payload = <String, Object?>{};
+                if (platform == 'android') {
+                  payload['packageName'] = id;
+                  if (ability.isNotEmpty) payload['activityName'] = ability;
+                } else if (isOhos) {
+                  payload['bundleName'] = id;
+                  payload['abilityName'] = ability.isEmpty
+                      ? 'EntryAbility'
+                      : ability;
+                } else {
+                  payload['bundleName'] = id;
+                  if (ability.isNotEmpty) payload['abilityName'] = ability;
+                }
+                Navigator.of(context).pop(
+                  AppLaunchTarget(
+                    platform: platform,
+                    id: id,
+                    label: id.split('.').last,
+                    subtitle: id,
+                    payload: payload,
+                  ),
+                );
+              },
+              child: const Text('添加'),
+            ),
+          ],
+        );
+      },
+    );
+    bundleController.dispose();
+    abilityController.dispose();
+    if (!mounted || result == null) return;
+    Navigator.of(context).pop(result);
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -712,6 +791,17 @@ class _AppLaunchPickerSheetState extends State<_AppLaunchPickerSheet> {
                     itemCount: apps.length,
                   );
                 },
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 18),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _addManualTarget,
+                  icon: const Icon(Icons.edit_note_rounded),
+                  label: const Text('手动输入包名'),
+                ),
               ),
             ),
           ],

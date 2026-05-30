@@ -25,12 +25,13 @@ class CalendarTodoService {
     final base = now ?? DateTime.now();
     final start = DateTime(base.year, base.month, base.day);
     final end = start.add(Duration(days: days));
-    final events = await _fetchEvents(start: start, end: end);
+    final fetched = await _fetchEvents(start: start, end: end);
+    final events = fetched.events;
     if (events.isEmpty) {
-      return const CalendarImportResult(
+      return CalendarImportResult(
         created: 0,
         skipped: 0,
-        unsupported: false,
+        unsupported: fetched.unsupported,
       );
     }
 
@@ -84,7 +85,7 @@ class CalendarTodoService {
     }
   }
 
-  Future<List<CalendarEvent>> _fetchEvents({
+  Future<_CalendarFetchResult> _fetchEvents({
     required DateTime start,
     required DateTime end,
   }) async {
@@ -98,17 +99,18 @@ class CalendarTodoService {
             const Duration(seconds: 2),
             onTimeout: () => const <dynamic>[],
           );
-      return (raw ?? const [])
+      final events = (raw ?? const [])
           .whereType<Map>()
           .map((item) => CalendarEvent.fromMap(item.cast<String, Object?>()))
           .where(
             (event) => event.end.isAfter(start) && event.start.isBefore(end),
           )
           .toList();
+      return _CalendarFetchResult(events: events);
     } on MissingPluginException {
-      return const [];
-    } on PlatformException {
-      return const [];
+      return const _CalendarFetchResult(unsupported: true);
+    } on PlatformException catch (e) {
+      return _CalendarFetchResult(unsupported: e.code == 'unsupported');
     }
   }
 
@@ -139,6 +141,16 @@ class CalendarTodoService {
   String _timeOf(DateTime date) {
     return '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
   }
+}
+
+class _CalendarFetchResult {
+  final List<CalendarEvent> events;
+  final bool unsupported;
+
+  const _CalendarFetchResult({
+    this.events = const [],
+    this.unsupported = false,
+  });
 }
 
 class CalendarImportResult {

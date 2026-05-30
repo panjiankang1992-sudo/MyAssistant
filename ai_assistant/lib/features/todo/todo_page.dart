@@ -90,7 +90,9 @@ class _TodoPageState extends ConsumerState<TodoPage>
         ..showSnackBar(
           SnackBar(
             content: Text(
-              result.created == 0
+              result.unsupported
+                  ? '当前平台暂不支持直接读取系统日历'
+                  : result.created == 0
                   ? '日历同步完成，暂无新代办'
                   : '已从日历生成 ${result.created} 条代办',
             ),

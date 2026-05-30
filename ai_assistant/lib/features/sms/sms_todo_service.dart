@@ -27,9 +27,14 @@ class SmsTodoService {
 
   Future<SmsImportResult> importRecent({int days = 7, DateTime? now}) async {
     final base = now ?? DateTime.now();
-    final messages = await _fetchMessages(days: days);
+    final fetched = await _fetchMessages(days: days);
+    final messages = fetched.messages;
     if (messages.isEmpty) {
-      return const SmsImportResult(created: 0, skipped: 0, unsupported: false);
+      return SmsImportResult(
+        created: 0,
+        skipped: 0,
+        unsupported: fetched.unsupported,
+      );
     }
 
     final existing = await datasource.getAllTodos();
@@ -71,7 +76,7 @@ class SmsTodoService {
     );
   }
 
-  Future<List<SmsMessage>> _fetchMessages({required int days}) async {
+  Future<_SmsFetchResult> _fetchMessages({required int days}) async {
     try {
       final raw = await _channel
           .invokeMethod<List<dynamic>>('fetchRecent', {'days': days})
@@ -79,15 +84,16 @@ class SmsTodoService {
             const Duration(seconds: 2),
             onTimeout: () => const <dynamic>[],
           );
-      return (raw ?? const [])
+      final messages = (raw ?? const [])
           .whereType<Map>()
           .map((item) => SmsMessage.fromMap(item.cast<String, Object?>()))
           .where((message) => message.body.trim().isNotEmpty)
           .toList();
+      return _SmsFetchResult(messages: messages);
     } on MissingPluginException {
-      return const [];
-    } on PlatformException {
-      return const [];
+      return const _SmsFetchResult(unsupported: true);
+    } on PlatformException catch (e) {
+      return _SmsFetchResult(unsupported: e.code == 'unsupported');
     }
   }
 
@@ -266,6 +272,13 @@ class SmsTodoService {
         '${date.hour.toString().padLeft(2, '0')}:'
         '${date.minute.toString().padLeft(2, '0')}';
   }
+}
+
+class _SmsFetchResult {
+  final List<SmsMessage> messages;
+  final bool unsupported;
+
+  const _SmsFetchResult({this.messages = const [], this.unsupported = false});
 }
 
 class SmsImportResult {

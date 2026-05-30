@@ -31,6 +31,13 @@ class AppPaths {
     );
   }
 
+  static Future<Directory> temporaryDirectory() async {
+    return _withFallback(
+      preferred: path_provider.getTemporaryDirectory,
+      child: 'tmp',
+    );
+  }
+
   static Future<Directory> _withFallback({
     required Future<Directory> Function() preferred,
     required String child,
@@ -95,3 +102,5 @@ class AppPaths {
 Future<Directory> getAppSupportDirectory() => AppPaths.supportDirectory();
 
 Future<Directory> getAppDocumentsDirectory() => AppPaths.documentsDirectory();
+
+Future<Directory> getAppTemporaryDirectory() => AppPaths.temporaryDirectory();
