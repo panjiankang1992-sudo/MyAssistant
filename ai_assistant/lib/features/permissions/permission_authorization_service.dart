@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 enum AppPermissionKind {
@@ -21,6 +22,7 @@ class PermissionAuthorizationService {
   const PermissionAuthorizationService();
 
   static List<AppPermissionKind> requiredPermissionKinds() {
+    if (kIsWeb) return const [];
     if (Platform.isAndroid) {
       return const [
         AppPermissionKind.calendar,

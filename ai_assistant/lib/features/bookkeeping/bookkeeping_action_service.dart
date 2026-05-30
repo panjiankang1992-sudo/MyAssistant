@@ -54,7 +54,7 @@ class BookkeepingActionService {
       id: 'todo-bookkeeping-${todo.id}',
       kind: LedgerKind.expense,
       categoryId: category.id,
-      categoryName: category.name,
+      categoryName: ledgerCategoryDisplayNameForSelection(category),
       categoryEmoji: category.emoji,
       note: parsed.note.isEmpty ? todo.title : parsed.note,
       amount: amount,
@@ -143,7 +143,9 @@ class BookkeepingActionService {
   }
 
   bool _isConfidentLocalParse(_TodoLedgerParse parsed) {
-    return parsed.amount > 0 && parsed.categoryName != '其他';
+    return parsed.amount > 0 &&
+        parsed.categoryName != '其他' &&
+        parsed.categoryName != '自定义';
   }
 
   LedgerCategory _guessCategory(
@@ -157,30 +159,48 @@ class BookkeepingActionService {
     for (final item in all) {
       if (text.contains(item.name)) return item;
     }
-    if (RegExp('地铁|公交|打车|交通|车费|停车|加油|高速').hasMatch(text)) {
-      return findDefaultLedgerCategory('交通');
+    if (RegExp('地铁').hasMatch(text)) return findDefaultLedgerCategory('地铁');
+    if (RegExp('公交').hasMatch(text)) return findDefaultLedgerCategory('公交');
+    if (RegExp('打车|滴滴|出租|网约车').hasMatch(text)) {
+      return findDefaultLedgerCategory('打车');
     }
-    if (RegExp('饭|餐|咖啡|奶茶|早餐|午餐|晚餐|外卖|肯德基|麦当劳').hasMatch(text)) {
-      return findDefaultLedgerCategory('餐饮');
+    if (RegExp('停车').hasMatch(text)) return findDefaultLedgerCategory('停车');
+    if (RegExp('加油|油费').hasMatch(text)) return findDefaultLedgerCategory('加油');
+    if (RegExp('高速|过路费').hasMatch(text)) {
+      return findDefaultLedgerCategory('高速费');
+    }
+    if (RegExp('交通|车费').hasMatch(text)) return findDefaultLedgerCategory('交通');
+    if (RegExp('早餐|早饭').hasMatch(text)) return findDefaultLedgerCategory('早餐');
+    if (RegExp('午餐|午饭').hasMatch(text)) return findDefaultLedgerCategory('午餐');
+    if (RegExp('晚餐|晚饭|夜宵').hasMatch(text)) {
+      return findDefaultLedgerCategory('晚餐');
+    }
+    if (RegExp('咖啡').hasMatch(text)) return findDefaultLedgerCategory('咖啡');
+    if (RegExp('奶茶|茶饮').hasMatch(text)) return findDefaultLedgerCategory('奶茶');
+    if (RegExp('外卖|饿了么|美团').hasMatch(text)) {
+      return findDefaultLedgerCategory('外卖');
+    }
+    if (RegExp('饭|餐|肯德基|麦当劳').hasMatch(text)) {
+      return findDefaultLedgerCategory('三餐');
     }
     if (RegExp('买|购物|超市|淘宝|京东|拼多多').hasMatch(text)) {
       return findDefaultLedgerCategory('购物');
     }
     if (RegExp('零食|饮料|水果|蔬菜').hasMatch(text)) {
-      if (text.contains('水果')) return findDefaultLedgerCategory('水果');
-      if (text.contains('蔬菜')) return findDefaultLedgerCategory('蔬菜');
+      if (text.contains('水果')) return findDefaultLedgerCategory('买菜');
+      if (text.contains('蔬菜')) return findDefaultLedgerCategory('买菜');
       return findDefaultLedgerCategory('零食');
     }
     if (RegExp('药|医院|门诊|体检|医疗').hasMatch(text)) {
       return findDefaultLedgerCategory('医疗');
     }
     if (RegExp('书|课程|学习|培训').hasMatch(text)) {
-      return findDefaultLedgerCategory('学习');
+      return findDefaultLedgerCategory('书籍');
     }
     if (RegExp('水费|电费|燃气|煤气|物业|话费|宽带|生活缴费').hasMatch(text)) {
-      return findDefaultLedgerCategory('生活缴费');
+      return findDefaultLedgerCategory('生活');
     }
-    return findDefaultLedgerCategory('其他');
+    return findDefaultLedgerCategory('自定义');
   }
 
   LedgerCategory _categoryByName(
@@ -192,8 +212,11 @@ class BookkeepingActionService {
       ...customCategories.where((item) => item.kind == LedgerKind.expense),
     ];
     return all.firstWhere(
-      (item) => item.name == name || item.id == name,
-      orElse: () => findDefaultLedgerCategory('其他'),
+      (item) =>
+          item.name == name ||
+          item.id == name ||
+          ledgerCategoryDisplayNameForSelection(item) == name,
+      orElse: () => findDefaultLedgerCategory('自定义'),
     );
   }
 

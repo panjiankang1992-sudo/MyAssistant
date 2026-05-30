@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/storage/app_paths.dart';
@@ -40,7 +41,7 @@ class PermissionGuideStore {
       jsonEncode({
         'accepted': true,
         'acceptedAt': DateTime.now().toIso8601String(),
-        'platform': Platform.operatingSystem,
+        'platform': kIsWeb ? 'web' : Platform.operatingSystem,
       }),
       flush: true,
     );
