@@ -6,7 +6,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/providers/core_providers.dart';
@@ -233,20 +232,10 @@ class NotesPage extends ConsumerStatefulWidget {
 }
 
 class _NotesPageState extends ConsumerState<NotesPage> {
-  final stt.SpeechToText _fabSpeech = stt.SpeechToText();
   DateTime? _filterDate;
   _NotesViewMode _mode = _NotesViewMode.diary;
   _NotesLayoutMode _layoutMode = _NotesLayoutMode.list;
   bool _analyzing = false;
-  bool _fabSpeechReady = false;
-  bool _fabListening = false;
-  String _fabVoiceText = '';
-
-  @override
-  void dispose() {
-    _fabSpeech.cancel();
-    super.dispose();
-  }
 
   List<QuickNote> _visibleNotes(List<QuickNote> notes) {
     final now = DateTime.now();
@@ -310,48 +299,6 @@ class _NotesPageState extends ConsumerState<NotesPage> {
     );
     if (!mounted || picked == null) return;
     setState(() => _filterDate = picked);
-  }
-
-  Future<void> _startFabVoiceInput() async {
-    if (_fabListening) return;
-    if (!_fabSpeechReady) {
-      _fabSpeechReady = await _fabSpeech.initialize(
-        onStatus: (status) {
-          if (!mounted) return;
-          setState(() => _fabListening = status == 'listening');
-        },
-        onError: (_) {
-          if (!mounted) return;
-          setState(() => _fabListening = false);
-        },
-      );
-    }
-    if (!_fabSpeechReady) return;
-    setState(() {
-      _fabListening = true;
-      _fabVoiceText = '';
-    });
-    await _fabSpeech.listen(
-      onResult: (result) {
-        if (!mounted) return;
-        final text = result.recognizedWords.trim();
-        if (text.isNotEmpty) setState(() => _fabVoiceText = text);
-      },
-      listenOptions: stt.SpeechListenOptions(
-        localeId: 'zh_CN',
-        listenFor: const Duration(seconds: 20),
-        pauseFor: const Duration(seconds: 3),
-      ),
-    );
-  }
-
-  Future<void> _finishFabVoiceInput() async {
-    if (_fabListening) await _fabSpeech.stop();
-    await Future<void>.delayed(const Duration(milliseconds: 120));
-    if (!mounted) return;
-    final text = _fabVoiceText.trim();
-    setState(() => _fabListening = false);
-    _openEditor(null, text.isEmpty ? null : text);
   }
 
   void _openEditor([QuickNote? note, String? initialText]) {
@@ -496,12 +443,9 @@ class _NotesPageState extends ConsumerState<NotesPage> {
                 right: 0,
                 bottom: 14,
                 child: Center(
-                  child: AppVoiceInputFab(
-                    listening: _fabListening,
-                    transcript: _fabVoiceText,
+                  child: AppAddFab(
+                    tooltip: '新增随手记',
                     onPressed: () => _openEditor(),
-                    onLongPressStart: _startFabVoiceInput,
-                    onLongPressEnd: _finishFabVoiceInput,
                     gradientColors: const [
                       Color(0xFF6C63FF),
                       Color(0xFF0A84FF),
@@ -1570,14 +1514,12 @@ enum _NoteInputMode { text, checklist, handwriting }
 class _NoteEditorPageState extends State<_NoteEditorPage> {
   late final TextEditingController _title;
   late final TextEditingController _content;
-  late final stt.SpeechToText _speech;
   late DateTime _date;
   late List<Tag> _tags;
   late List<_NoteBlock> _blocks;
   final ScrollController _scrollController = ScrollController();
   final GlobalKey _blocksPreviewKey = GlobalKey();
   _NoteInputMode _mode = _NoteInputMode.text;
-  bool _listening = false;
   bool _loadingSnapshot = false;
   late bool _editing;
   final List<List<Offset>> _strokes = [];
@@ -1594,7 +1536,6 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
     _content = TextEditingController(
       text: initialText.isNotEmpty ? initialText : parsed.text,
     );
-    _speech = stt.SpeechToText();
     _date = widget.initial?.date ?? widget.initialDate;
     _tags = List.from(widget.initial?.tags ?? const []);
     _blocks = [...parsed.blocks];
@@ -1613,25 +1554,6 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
     if (!_editing || widget.readOnly) return;
     final current = _content.text.trimRight();
     _content.text = current.isEmpty ? text : '$current\n$text';
-  }
-
-  Future<void> _toggleRecording() async {
-    if (!_editing || widget.readOnly) return;
-    if (_listening) {
-      await _speech.stop();
-      if (mounted) setState(() => _listening = false);
-      return;
-    }
-    final ready = await _speech.initialize();
-    if (!ready) return;
-    setState(() => _listening = true);
-    await _speech.listen(
-      onResult: (result) {
-        if (result.finalResult && result.recognizedWords.trim().isNotEmpty) {
-          _appendContent(result.recognizedWords.trim());
-        }
-      },
-    );
   }
 
   Future<void> _insertImage() async {
@@ -1971,7 +1893,6 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                   bottom: 16,
                   child: _NoteEditorToolbar(
                     mode: _mode,
-                    listening: _listening,
                     onText: () => setState(() => _mode = _NoteInputMode.text),
                     onChecklist: () {
                       setState(() => _mode = _NoteInputMode.checklist);
@@ -1982,7 +1903,6 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                     onImage: _insertImage,
                     onAttachment: _insertAttachment,
                     onSnapshot: _captureWebSnapshot,
-                    onRecord: _toggleRecording,
                   ),
                 ),
             ],
@@ -2821,25 +2741,21 @@ class _BrokenBlock extends StatelessWidget {
 
 class _NoteEditorToolbar extends StatelessWidget {
   final _NoteInputMode mode;
-  final bool listening;
   final VoidCallback onText;
   final VoidCallback onChecklist;
   final VoidCallback onHandwriting;
   final VoidCallback onImage;
   final VoidCallback onAttachment;
   final VoidCallback onSnapshot;
-  final VoidCallback onRecord;
 
   const _NoteEditorToolbar({
     required this.mode,
-    required this.listening,
     required this.onText,
     required this.onChecklist,
     required this.onHandwriting,
     required this.onImage,
     required this.onAttachment,
     required this.onSnapshot,
-    required this.onRecord,
   });
 
   @override
@@ -2890,38 +2806,6 @@ class _NoteEditorToolbar extends StatelessWidget {
                 _ToolIcon(icon: Icons.attach_file_rounded, onTap: onAttachment),
                 _ToolIcon(icon: Icons.article_outlined, onTap: onSnapshot),
               ],
-            ),
-          ),
-        ),
-        const SizedBox(width: 10),
-        InkWell(
-          onTap: onRecord,
-          borderRadius: BorderRadius.circular(29),
-          child: Container(
-            width: 58,
-            height: 58,
-            decoration: BoxDecoration(
-              color: listening
-                  ? AppColors.danger.withValues(alpha: 0.12)
-                  : scheme.appInput,
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: scheme.appBorder.withValues(alpha: 0.72),
-              ),
-              boxShadow: reduceMotion
-                  ? null
-                  : [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.06),
-                        blurRadius: 18,
-                        offset: const Offset(0, 7),
-                      ),
-                    ],
-            ),
-            child: Icon(
-              listening ? Icons.stop_rounded : Icons.mic_rounded,
-              size: 29,
-              color: listening ? AppColors.danger : AppColors.primary,
             ),
           ),
         ),

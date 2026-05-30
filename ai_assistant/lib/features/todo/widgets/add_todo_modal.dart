@@ -273,6 +273,9 @@ class _AddTodoModalContentState extends ConsumerState<_AddTodoModalContent>
     if (_isListening) {
       await _speech.stop();
       if (mounted) setState(() => _isListening = false);
+      if (_titleController.text.trim().isNotEmpty) {
+        await _applyAiParse();
+      }
       return;
     }
     if (!_speechReady) {
@@ -302,12 +305,18 @@ class _AddTodoModalContentState extends ConsumerState<_AddTodoModalContent>
   Future<void> _handleSpeechResult(SpeechRecognitionResult result) async {
     final text = result.recognizedWords.trim();
     if (!mounted || text.isEmpty) return;
-    if (!result.finalResult) return;
     setState(() {
       _titleController.text = text;
-      _isListening = false;
+      _titleController.selection = TextSelection.collapsed(
+        offset: _titleController.text.length,
+      );
+      if (result.finalResult) {
+        _isListening = false;
+      }
     });
-    await _applyAiParse();
+    if (result.finalResult) {
+      await _applyAiParse();
+    }
   }
 
   Future<void> _pickDateTime() async {
@@ -862,6 +871,14 @@ class _AddTodoModalContentState extends ConsumerState<_AddTodoModalContent>
         if (_tabController.index != 0) return const SizedBox.shrink();
         return AppFloatingActionBar(
           actions: [
+            AppBottomAction(
+              label: _isListening ? '停止' : '语音',
+              icon: _isListening ? Icons.stop_rounded : Icons.mic_rounded,
+              onPressed: () => unawaited(_toggleVoiceInput()),
+              tone: _isListening
+                  ? AppActionButtonTone.danger
+                  : AppActionButtonTone.neutral,
+            ),
             AppBottomAction(
               label: _saving ? '保存中' : '保存',
               icon: _saving ? Icons.hourglass_top_rounded : Icons.check_rounded,

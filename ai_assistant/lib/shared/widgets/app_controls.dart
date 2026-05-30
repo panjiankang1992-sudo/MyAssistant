@@ -317,6 +317,69 @@ class AppDateMarker {
 
 typedef AppDateMarkerBuilder = AppDateMarker? Function(DateTime date);
 
+class AppAddFab extends StatelessWidget {
+  final VoidCallback onPressed;
+  final String tooltip;
+  final List<Color> gradientColors;
+
+  const AppAddFab({
+    super.key,
+    required this.onPressed,
+    this.tooltip = '新增',
+    this.gradientColors = const [Color(0xFF8B5CF6), Color(0xFF0A84FF)],
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final reduceMotion = AppPerformance.shouldReduceMotion(context);
+    return Transform.translate(
+      offset: const Offset(0, -12),
+      child: Tooltip(
+        message: tooltip,
+        child: Material(
+          color: Colors.transparent,
+          shape: const CircleBorder(),
+          child: InkWell(
+            onTap: onPressed,
+            customBorder: const CircleBorder(),
+            child: Ink(
+              width: 58,
+              height: 58,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  colors: gradientColors,
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                boxShadow: reduceMotion
+                    ? null
+                    : [
+                        BoxShadow(
+                          color: gradientColors.last.withValues(alpha: 0.26),
+                          blurRadius: 18,
+                          offset: const Offset(0, 8),
+                        ),
+                        BoxShadow(
+                          color: gradientColors.first.withValues(alpha: 0.16),
+                          blurRadius: 10,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+              ),
+              child: const Icon(
+                Icons.add_rounded,
+                size: 29,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 enum AppActionButtonTone { primary, danger, neutral }
 
 class AppRoundIconButton extends StatelessWidget {

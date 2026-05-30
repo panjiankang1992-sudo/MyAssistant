@@ -7,10 +7,12 @@ import 'dart:ui' as ui;
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:uuid/uuid.dart';
 
 import '../../core/database/database.dart' hide Tag;
+import '../../core/platform/app_performance.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/providers/core_providers.dart';
 import '../../data/datasources/local_datasource.dart';
@@ -773,13 +775,9 @@ class BookkeepingPage extends ConsumerStatefulWidget {
 
 class _BookkeepingPageState extends ConsumerState<BookkeepingPage> {
   late final BookkeepingStore _store;
-  final _fabSpeech = stt.SpeechToText();
   late final ExchangeService _exchangeService;
   var _entries = <LedgerEntry>[];
   var _selectedDate = DateTime.now();
-  var _fabSpeechReady = false;
-  var _fabListening = false;
-  var _fabVoiceText = '';
 
   @override
   void initState() {
@@ -787,62 +785,6 @@ class _BookkeepingPageState extends ConsumerState<BookkeepingPage> {
     _store = BookkeepingStore(ref.read(databaseProvider));
     _exchangeService = ExchangeService(_store);
     _load();
-  }
-
-  @override
-  void dispose() {
-    _fabSpeech.cancel();
-    super.dispose();
-  }
-
-  Future<void> _startFabVoiceInput() async {
-    if (_fabListening) return;
-    if (!_fabSpeechReady) {
-      _fabSpeechReady = await _fabSpeech.initialize(
-        onStatus: (status) {
-          if (!mounted) return;
-          setState(() => _fabListening = status == 'listening');
-        },
-        onError: (_) {
-          if (!mounted) return;
-          setState(() => _fabListening = false);
-        },
-      );
-    }
-    if (!_fabSpeechReady) return;
-    setState(() {
-      _fabListening = true;
-      _fabVoiceText = '';
-    });
-    await _fabSpeech.listen(
-      onResult: (result) {
-        if (!mounted) return;
-        final text = result.recognizedWords.trim();
-        if (text.isNotEmpty) setState(() => _fabVoiceText = text);
-      },
-      listenOptions: stt.SpeechListenOptions(
-        localeId: 'zh_CN',
-        listenFor: const Duration(seconds: 20),
-        pauseFor: const Duration(seconds: 3),
-      ),
-    );
-  }
-
-  Future<void> _finishFabVoiceInput() async {
-    if (_fabListening) await _fabSpeech.stop();
-    await Future<void>.delayed(const Duration(milliseconds: 120));
-    if (!mounted) return;
-    final text = _fabVoiceText.trim();
-    setState(() => _fabListening = false);
-    showAddLedgerPage(
-      context,
-      ref: ref,
-      date: _selectedDate,
-      exchangeService: _exchangeService,
-      onSaved: _addEntry,
-      onCategoriesChanged: _markBillCategoriesDirty,
-      initialVoiceText: text.isEmpty ? null : text,
-    );
   }
 
   Future<void> _load() async {
@@ -1020,9 +962,8 @@ class _BookkeepingPageState extends ConsumerState<BookkeepingPage> {
         ),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: AppVoiceInputFab(
-        listening: _fabListening,
-        transcript: _fabVoiceText,
+      floatingActionButton: AppAddFab(
+        tooltip: '新增记账',
         onPressed: () => showAddLedgerPage(
           context,
           ref: ref,
@@ -1031,8 +972,6 @@ class _BookkeepingPageState extends ConsumerState<BookkeepingPage> {
           onSaved: _addEntry,
           onCategoriesChanged: _markBillCategoriesDirty,
         ),
-        onLongPressStart: _startFabVoiceInput,
-        onLongPressEnd: _finishFabVoiceInput,
       ),
     );
   }
@@ -2873,6 +2812,7 @@ class _AddLedgerPage extends StatefulWidget {
 class _AddLedgerPageState extends State<_AddLedgerPage>
     with TickerProviderStateMixin {
   final _noteController = TextEditingController();
+  final _speech = stt.SpeechToText();
   var _kind = LedgerKind.expense;
   var _category = _expenseCategories.first;
   var _amountText = '';
@@ -2882,6 +2822,8 @@ class _AddLedgerPageState extends State<_AddLedgerPage>
   var _customCategories = <LedgerCategory>[];
   var _saving = false;
   var _showAllCategories = false;
+  var _speechReady = false;
+  var _listening = false;
 
   @override
   void initState() {
@@ -2918,8 +2860,70 @@ class _AddLedgerPageState extends State<_AddLedgerPage>
 
   @override
   void dispose() {
+    _speech.cancel();
     _noteController.dispose();
     super.dispose();
+  }
+
+  Future<void> _initSpeech() async {
+    final available = await _speech.initialize(
+      onStatus: (status) {
+        if (!mounted) return;
+        setState(() => _listening = status == 'listening');
+      },
+      onError: (_) {
+        if (!mounted) return;
+        setState(() => _listening = false);
+      },
+    );
+    if (!mounted) return;
+    setState(() => _speechReady = available);
+  }
+
+  Future<void> _toggleVoiceInput() async {
+    if (_listening) {
+      await _speech.stop();
+      if (mounted) setState(() => _listening = false);
+      final text = _noteController.text.trim();
+      if (text.isNotEmpty) await _parseLedgerText(text);
+      return;
+    }
+    if (!_speechReady) {
+      await _initSpeech();
+    }
+    if (!_speechReady) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('当前设备暂不可用语音识别，请检查麦克风/语音识别权限')),
+        );
+      }
+      return;
+    }
+    setState(() => _listening = true);
+    await _speech.listen(
+      onResult: _handleSpeechResult,
+      listenOptions: stt.SpeechListenOptions(
+        localeId: 'zh_CN',
+        listenFor: const Duration(seconds: 20),
+        pauseFor: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  Future<void> _handleSpeechResult(SpeechRecognitionResult result) async {
+    final text = result.recognizedWords.trim();
+    if (!mounted || text.isEmpty) return;
+    setState(() {
+      _noteController.text = text;
+      _noteController.selection = TextSelection.collapsed(
+        offset: _noteController.text.length,
+      );
+      _aiGenerated = true;
+      if (result.finalResult) _listening = false;
+    });
+    if (result.finalResult) {
+      await _parseLedgerText(text);
+    }
   }
 
   Future<void> _loadCustomCategories() async {
@@ -2939,6 +2943,7 @@ class _AddLedgerPageState extends State<_AddLedgerPage>
 
   Future<void> _parseLedgerText(String text) async {
     final parsed = await _aiParse(text) ?? _localParse(text);
+    if (!mounted) return;
     final cats = _categoriesFor(parsed.kind);
     setState(() {
       _kind = parsed.kind;
@@ -3384,7 +3389,7 @@ class _AddLedgerPageState extends State<_AddLedgerPage>
                             child: TextField(
                               controller: _noteController,
                               decoration: InputDecoration(
-                                hintText: '备注，例如：地铁、午餐',
+                                hintText: '备注，例如：地铁 6 元、午餐 28 元',
                                 filled: true,
                                 fillColor: scheme.appSurface,
                                 border: OutlineInputBorder(
@@ -3402,7 +3407,43 @@ class _AddLedgerPageState extends State<_AddLedgerPage>
                               ),
                             ),
                           ),
+                          const SizedBox(width: 10),
+                          AppRoundIconButton(
+                            tooltip: _listening ? '停止语音输入' : '语音输入',
+                            onPressed: () => unawaited(_toggleVoiceInput()),
+                            icon: _listening
+                                ? Icons.stop_rounded
+                                : Icons.mic_rounded,
+                            foregroundColor: _listening
+                                ? AppColors.danger
+                                : AppColors.primary,
+                          ),
                         ],
+                      ),
+                      AnimatedSwitcher(
+                        duration: AppPerformance.lowLatencyMode
+                            ? Duration.zero
+                            : const Duration(milliseconds: 180),
+                        child: _listening
+                            ? Padding(
+                                key: const ValueKey('ledger-listening'),
+                                padding: const EdgeInsets.only(top: 8),
+                                child: Text(
+                                  _noteController.text.trim().isEmpty
+                                      ? '正在听...'
+                                      : '正在听：${_noteController.text.trim()}',
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: scheme.appMutedText,
+                                  ),
+                                ),
+                              )
+                            : const SizedBox.shrink(
+                                key: ValueKey('ledger-listening-hidden'),
+                              ),
                       ),
                       const SizedBox(height: 14),
                       TagSelector(

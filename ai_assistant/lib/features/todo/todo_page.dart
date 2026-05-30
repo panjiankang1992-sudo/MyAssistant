@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'providers/todo_provider.dart';
 import 'providers/selected_date_provider.dart';
 import 'widgets/add_todo_modal.dart';
@@ -42,10 +41,6 @@ class _TodoPageState extends ConsumerState<TodoPage>
   bool _bookkeepingFeedbackSuccess = false;
   int _bookkeepingFeedbackTick = 0;
   bool _calendarSyncing = false;
-  final stt.SpeechToText _fabSpeech = stt.SpeechToText();
-  bool _fabSpeechReady = false;
-  bool _fabListening = false;
-  String _fabVoiceText = '';
   Map<DateTime, int> _todoDateCounts = {};
 
   @override
@@ -78,54 +73,7 @@ class _TodoPageState extends ConsumerState<TodoPage>
     WidgetsBinding.instance.removeObserver(this);
     _poetryTimer?.cancel();
     _bookkeepingFeedbackTimer?.cancel();
-    _fabSpeech.cancel();
     super.dispose();
-  }
-
-  Future<void> _startFabVoiceInput() async {
-    if (_fabListening) return;
-    if (!_fabSpeechReady) {
-      _fabSpeechReady = await _fabSpeech.initialize(
-        onStatus: (status) {
-          if (!mounted) return;
-          setState(() => _fabListening = status == 'listening');
-        },
-        onError: (_) {
-          if (!mounted) return;
-          setState(() => _fabListening = false);
-        },
-      );
-    }
-    if (!_fabSpeechReady) return;
-    setState(() {
-      _fabListening = true;
-      _fabVoiceText = '';
-    });
-    await _fabSpeech.listen(
-      onResult: (result) {
-        if (!mounted) return;
-        final text = result.recognizedWords.trim();
-        if (text.isNotEmpty) setState(() => _fabVoiceText = text);
-      },
-      listenOptions: stt.SpeechListenOptions(
-        localeId: 'zh_CN',
-        listenFor: const Duration(seconds: 20),
-        pauseFor: const Duration(seconds: 3),
-      ),
-    );
-  }
-
-  Future<void> _finishFabVoiceInput(DateTime selectedDate) async {
-    if (_fabListening) await _fabSpeech.stop();
-    await Future<void>.delayed(const Duration(milliseconds: 120));
-    if (!mounted) return;
-    final text = _fabVoiceText.trim();
-    setState(() => _fabListening = false);
-    showAddTodoModal(
-      context,
-      initialDate: selectedDate,
-      initialVoiceText: text.isEmpty ? null : text,
-    );
   }
 
   Future<void> _syncCalendarTodos() async {
@@ -430,12 +378,9 @@ class _TodoPageState extends ConsumerState<TodoPage>
             ),
         ],
       ),
-      floatingActionButton: AppVoiceInputFab(
-        listening: _fabListening,
-        transcript: _fabVoiceText,
+      floatingActionButton: AppAddFab(
+        tooltip: '新增代办',
         onPressed: () => showAddTodoModal(context, initialDate: selectedDate),
-        onLongPressStart: _startFabVoiceInput,
-        onLongPressEnd: () => _finishFabVoiceInput(selectedDate),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
