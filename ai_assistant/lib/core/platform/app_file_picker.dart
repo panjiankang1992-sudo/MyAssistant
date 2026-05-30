@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:open_filex/open_filex.dart';
 
@@ -17,7 +18,9 @@ class AppFilePicker {
 
   const AppFilePicker._();
 
-  static bool get _isOhos => Platform.operatingSystem == 'ohos';
+  static bool get _isOhos =>
+      defaultTargetPlatform.name.toLowerCase() == 'ohos' ||
+      Platform.operatingSystem == 'ohos';
 
   static Future<List<AppPickedFile>> pickImages({
     bool allowMultiple = true,

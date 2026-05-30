@@ -1,6 +1,10 @@
+import 'dart:convert';
+
 import 'package:ai_assistant/core/database/database.dart' hide QuickNote, Tag;
 import 'package:ai_assistant/core/providers/core_providers.dart';
+import 'package:ai_assistant/data/datasources/local_datasource.dart';
 import 'package:ai_assistant/data/datasources/local_sync_datasource.dart';
+import 'package:ai_assistant/domain/models/app_attachment.dart';
 import 'package:ai_assistant/domain/models/quick_note.dart';
 import 'package:ai_assistant/domain/models/tag.dart';
 import 'package:ai_assistant/features/bookkeeping/bookkeeping_page.dart';
@@ -195,5 +199,91 @@ void main() {
 
       await tester.pumpWidget(const SizedBox.shrink());
     });
+
+    testWidgets('shows saved image and file attachments on note detail', (
+      tester,
+    ) async {
+      final db = AppDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      final now = DateTime(2026, 5, 30, 11);
+      final datasource = LocalDatasource(db);
+      final image = AppAttachment(
+        id: 'att-image',
+        ownerType: 'note',
+        ownerId: 'note-attachments',
+        attachmentType: 'image',
+        fileName: 'photo.png',
+        mimeType: 'image/png',
+        sizeBytes: _onePixelPngBytes.length,
+        contentBase64: base64Encode(_onePixelPngBytes),
+        createdAt: now,
+        updatedAt: now,
+      );
+      final file = AppAttachment(
+        id: 'att-file',
+        ownerType: 'note',
+        ownerId: 'note-attachments',
+        attachmentType: 'file',
+        fileName: 'report.txt',
+        mimeType: 'text/plain',
+        sizeBytes: 5,
+        contentBase64: base64Encode(utf8.encode('hello')),
+        createdAt: now,
+        updatedAt: now,
+      );
+      await datasource.upsertAttachment(image);
+      await datasource.upsertAttachment(file);
+      await NotesStore(db).save([
+        QuickNote(
+          id: 'note-attachments',
+          title: '带附件文档',
+          content: '附件展示验证',
+          summary: '附件展示验证',
+          date: now,
+          createdAt: now,
+          updatedAt: now,
+          noteType: QuickNoteType.document,
+          attachmentIds: const ['att-image', 'att-file'],
+        ),
+      ]);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            databaseProvider.overrideWithValue(db),
+            dataSyncServiceProvider.overrideWith(
+              (ref) => DataSyncService(
+                engineLoader: () async => null,
+                syncConfigured: () async => false,
+                localSync: LocalSyncDatasource(db),
+                notifier: ref.read(syncNotifierProvider.notifier),
+              ),
+            ),
+          ],
+          child: MaterialApp(home: NotesPage(onAvatarTap: () {})),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('文档'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('带附件文档'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byWidgetPredicate(
+          (widget) => widget is Image && widget.image is MemoryImage,
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('report.txt'), findsOneWidget);
+      expect(find.textContaining('点击打开附件'), findsOneWidget);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
   });
 }
+
+final _onePixelPngBytes = base64Decode(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=',
+);

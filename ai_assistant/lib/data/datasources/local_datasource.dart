@@ -26,6 +26,7 @@ class LocalDatasource {
     'my_assistant/local_store',
   );
   static List<model.Todo>? _fallbackTodoCache;
+  static List<model_attachment.AppAttachment>? _fallbackAttachmentCache;
 
   Future<String?> readLocalStoreText(String name) => _readFallbackStore(name);
 
@@ -78,6 +79,44 @@ class LocalDatasource {
     await _writeFallbackStore(
       'todos_json',
       jsonEncode(todos.map(_todoToJson).toList()),
+    );
+  }
+
+  Future<List<model_attachment.AppAttachment>>
+  _readFallbackAttachments() async {
+    final cached = _fallbackAttachmentCache;
+    if (cached != null) return List<model_attachment.AppAttachment>.of(cached);
+    final raw = await _readFallbackStore('attachments_json');
+    if (raw == null || raw.trim().isEmpty) {
+      _fallbackAttachmentCache = const [];
+      return const [];
+    }
+    final decoded = jsonDecode(raw);
+    if (decoded is! List) {
+      _fallbackAttachmentCache = const [];
+      return const [];
+    }
+    final attachments = decoded
+        .whereType<Map>()
+        .map(
+          (item) => model_attachment.AppAttachment.fromJson(
+            item.cast<String, dynamic>(),
+          ),
+        )
+        .toList();
+    _fallbackAttachmentCache =
+        List<model_attachment.AppAttachment>.unmodifiable(attachments);
+    return attachments;
+  }
+
+  Future<void> _writeFallbackAttachments(
+    List<model_attachment.AppAttachment> attachments,
+  ) async {
+    _fallbackAttachmentCache =
+        List<model_attachment.AppAttachment>.unmodifiable(attachments);
+    await _writeFallbackStore(
+      'attachments_json',
+      jsonEncode(attachments.map((item) => item.toJson()).toList()),
     );
   }
 
@@ -806,11 +845,16 @@ class LocalDatasource {
   }
 
   Future<List<model_attachment.AppAttachment>> getAllAttachments() async {
+    if (_useFileFallback) return _readFallbackAttachments();
     final rows = await _db.select(_db.attachments).get();
     return rows.map(_mapAttachment).toList();
   }
 
   Future<model_attachment.AppAttachment?> getAttachmentById(String id) async {
+    if (_useFileFallback) {
+      final attachments = await _readFallbackAttachments();
+      return attachments.where((item) => item.id == id).firstOrNull;
+    }
     final row = await (_db.select(
       _db.attachments,
     )..where((t) => t.id.equals(id))).getSingleOrNull();
@@ -822,6 +866,18 @@ class LocalDatasource {
   ) async {
     if (attachment.exceedsMaxSize) {
       throw ArgumentError('附件不能超过 20MB');
+    }
+    if (_useFileFallback) {
+      final attachments = await _readFallbackAttachments();
+      final next = [
+        for (final item in attachments)
+          if (item.id == attachment.id) attachment else item,
+      ];
+      if (!next.any((item) => item.id == attachment.id)) {
+        next.add(attachment);
+      }
+      await _writeFallbackAttachments(next);
+      return;
     }
     await _db
         .into(_db.attachments)

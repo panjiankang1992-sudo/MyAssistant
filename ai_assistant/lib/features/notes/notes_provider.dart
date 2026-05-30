@@ -14,7 +14,8 @@ import '../sync/data_sync_service.dart';
 import 'notes_store.dart';
 
 final notesStoreProvider = Provider<NotesStore>(
-  (ref) => NotesStore(ref.watch(databaseProvider)),
+  (ref) =>
+      NotesStore(ref.watch(databaseProvider), ref.watch(datasourceProvider)),
 );
 
 final notesNotifierProvider = NotifierProvider<NotesNotifier, List<QuickNote>>(

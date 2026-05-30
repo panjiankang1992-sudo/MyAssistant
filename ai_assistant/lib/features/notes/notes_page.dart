@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/providers/core_providers.dart';
 import '../../core/platform/app_file_picker.dart';
+import '../../core/platform/app_launcher_service.dart';
 import '../../core/platform/app_performance.dart';
 import '../../core/storage/app_paths.dart';
 import '../../core/theme/app_theme.dart';
@@ -143,9 +144,7 @@ List<NoteAttachmentDraft> _attachmentDraftsFromBlocks(List<_NoteBlock> blocks) {
         (block) => NoteAttachmentDraft(
           path: block.value,
           fileName: block.title,
-          attachmentType: block.type == _NoteBlockType.image
-              ? 'image'
-              : _attachmentTypeForFileName(block.title),
+          attachmentType: block.type == _NoteBlockType.image ? 'image' : 'file',
           mimeType: _mimeTypeForFileName(block.title),
         ),
       )
@@ -200,7 +199,27 @@ String _inferNoteTitle(String content, List<_NoteBlock> blocks) {
 Future<void> _openUrl(String url) async {
   final uri = Uri.tryParse(url.startsWith('http') ? url : 'https://$url');
   if (uri == null) return;
-  await launchUrl(uri, mode: LaunchMode.externalApplication);
+  var opened = false;
+  try {
+    opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+  } on PlatformException {
+    opened = false;
+  } on MissingPluginException {
+    opened = false;
+  }
+  if (opened) return;
+  await AppLauncherService.openApp(
+    AppLaunchTarget(
+      platform: 'ohos',
+      id: 'url:${uri.toString()}',
+      label: uri.host.isEmpty ? uri.toString() : uri.host,
+      payload: {
+        'action': 'ohos.want.action.viewData',
+        'uri': uri.toString(),
+        'type': 'text/html',
+      },
+    ),
+  );
 }
 
 Future<void> _openFile(String path) async {
@@ -2156,6 +2175,11 @@ class _ReadOnlyNoteBody extends ConsumerWidget {
           MarkdownBody(
             data: markdown,
             selectable: true,
+            onTapLink: (text, href, title) {
+              if (href != null && href.trim().isNotEmpty) {
+                _openUrl(href);
+              }
+            },
             styleSheet: _noteMarkdownStyle(context),
           ),
         if (parsed.blocks.isNotEmpty) ...[

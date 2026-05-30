@@ -19,7 +19,7 @@ class AppDataSkillService {
   }) : bookkeepingStore =
            bookkeepingStore ??
            BookkeepingStore(datasource.database, datasource),
-       notesStore = notesStore ?? NotesStore(datasource.database);
+       notesStore = notesStore ?? NotesStore(datasource.database, datasource);
 
   Future<AppDataSkillResult> buildFor(String input) async {
     final todos = await datasource.getAllTodos();

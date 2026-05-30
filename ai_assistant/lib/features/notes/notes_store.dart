@@ -8,10 +8,17 @@ import '../../domain/models/quick_note.dart';
 
 class NotesStore {
   final AppDatabase _db;
+  final LocalDatasource? _localDatasource;
 
-  NotesStore(this._db);
+  NotesStore(this._db, [this._localDatasource]);
+
+  static const _notesStoreName = 'quick_notes_json';
+
+  bool get _useFileFallback =>
+      LocalDatasource.usesFileFallback && _localDatasource != null;
 
   Future<List<QuickNote>> load() async {
+    if (_useFileFallback) return _loadFallbackNotes();
     final rows = await _db.select(_db.quickNotes).get();
     return rows
         .map(
@@ -41,6 +48,7 @@ class NotesStore {
   }
 
   Future<void> save(List<QuickNote> notes) async {
+    if (_useFileFallback) return _saveFallbackNotes(notes);
     final incomingIds = notes.map((note) => note.id).toSet();
     final existing = await _db.select(_db.quickNotes).get();
     for (final note in notes) {
@@ -90,5 +98,24 @@ class NotesStore {
         );
       }
     }
+  }
+
+  Future<List<QuickNote>> _loadFallbackNotes() async {
+    final raw = await _localDatasource!.readLocalStoreText(_notesStoreName);
+    if (raw == null || raw.trim().isEmpty) return const [];
+    final decoded = jsonDecode(raw);
+    if (decoded is! List) return const [];
+    return decoded
+        .whereType<Map>()
+        .map((item) => QuickNote.fromJson(item.cast<String, dynamic>()))
+        .toList()
+      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+  }
+
+  Future<void> _saveFallbackNotes(List<QuickNote> notes) async {
+    await _localDatasource!.writeLocalStoreText(
+      _notesStoreName,
+      jsonEncode(notes.map((note) => note.toJson()).toList()),
+    );
   }
 }
