@@ -225,10 +225,19 @@ class ExchangeCache {
 
 class BookkeepingStore {
   final AppDatabase _db;
+  final LocalDatasource? _localDatasource;
 
-  BookkeepingStore(this._db);
+  BookkeepingStore(this._db, [this._localDatasource]);
+
+  static const _entriesStoreName = 'bookkeeping_entries_json';
+  static const _categoriesStoreName = 'bookkeeping_categories_json';
+  static const _exchangeStoreName = 'bookkeeping_exchange_json';
+
+  bool get _useFileFallback =>
+      LocalDatasource.usesFileFallback && _localDatasource != null;
 
   Future<List<LedgerEntry>> loadEntries() async {
+    if (_useFileFallback) return _loadFallbackEntries();
     final rows = await (_db.select(
       _db.bills,
     )..where((t) => t.isDeleted.equals(false))).get();
@@ -257,6 +266,7 @@ class BookkeepingStore {
   }
 
   Future<void> saveEntries(List<LedgerEntry> entries) async {
+    if (_useFileFallback) return _saveFallbackEntries(entries);
     final existing = await _db.select(_db.bills).get();
     final ids = entries.map((item) => item.id).toSet();
     for (final entry in entries) {
@@ -301,6 +311,7 @@ class BookkeepingStore {
   }
 
   Future<List<LedgerCategory>> loadCustomCategories() async {
+    if (_useFileFallback) return _loadFallbackCategories();
     final rows = await (_db.select(
       _db.billCategories,
     )..where((t) => t.isDeleted.equals(false))).get();
@@ -318,6 +329,7 @@ class BookkeepingStore {
   }
 
   Future<void> saveCustomCategories(List<LedgerCategory> categories) async {
+    if (_useFileFallback) return _saveFallbackCategories(categories);
     final existing = await _db.select(_db.billCategories).get();
     final ids = categories.map((item) => item.id).toSet();
     final now = DateTime.now();
@@ -355,18 +367,81 @@ class BookkeepingStore {
   }
 
   Future<ExchangeCache?> loadExchange() async {
+    if (_useFileFallback) {
+      final raw = await _localDatasource!.readLocalStoreText(
+        _exchangeStoreName,
+      );
+      if (raw == null || raw.trim().isEmpty) return null;
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) return null;
+      return ExchangeCache.fromJson(decoded.cast<String, dynamic>());
+    }
     final datasource = LocalDatasource(_db);
     final data = await datasource.getAppSettingJson('data', 'exchange_cache');
     return data == null ? null : ExchangeCache.fromJson(data);
   }
 
   Future<void> saveExchange(ExchangeCache cache) async {
+    if (_useFileFallback) {
+      await _localDatasource!.writeLocalStoreText(
+        _exchangeStoreName,
+        jsonEncode(cache.toJson()),
+      );
+      return;
+    }
     await LocalDatasource(_db).upsertAppSettingJson(
       module: 'profile',
       dataType: 'data',
       id: 'exchange_cache',
       payload: cache.toJson(),
       updatedAt: cache.updatedAt,
+    );
+  }
+
+  Future<List<LedgerEntry>> _loadFallbackEntries() async {
+    final raw = await _localDatasource!.readLocalStoreText(_entriesStoreName);
+    if (raw == null || raw.trim().isEmpty) return const [];
+    final decoded = jsonDecode(raw);
+    if (decoded is! List) return const [];
+    final entries = decoded
+        .whereType<Map>()
+        .map((item) => LedgerEntry.fromJson(item.cast<String, dynamic>()))
+        .where((item) => !item.deleted)
+        .toList();
+    entries.sort((a, b) => b.date.compareTo(a.date));
+    return entries;
+  }
+
+  Future<void> _saveFallbackEntries(List<LedgerEntry> entries) async {
+    final payload = entries
+        .map((entry) => entry.toJson())
+        .toList(growable: false);
+    await _localDatasource!.writeLocalStoreText(
+      _entriesStoreName,
+      jsonEncode(payload),
+    );
+  }
+
+  Future<List<LedgerCategory>> _loadFallbackCategories() async {
+    final raw = await _localDatasource!.readLocalStoreText(
+      _categoriesStoreName,
+    );
+    if (raw == null || raw.trim().isEmpty) return const [];
+    final decoded = jsonDecode(raw);
+    if (decoded is! List) return const [];
+    return decoded
+        .whereType<Map>()
+        .map((item) => LedgerCategory.fromJson(item.cast<String, dynamic>()))
+        .toList();
+  }
+
+  Future<void> _saveFallbackCategories(List<LedgerCategory> categories) async {
+    final payload = categories
+        .map((category) => category.toJson())
+        .toList(growable: false);
+    await _localDatasource!.writeLocalStoreText(
+      _categoriesStoreName,
+      jsonEncode(payload),
     );
   }
 }
@@ -782,7 +857,10 @@ class _BookkeepingPageState extends ConsumerState<BookkeepingPage> {
   @override
   void initState() {
     super.initState();
-    _store = BookkeepingStore(ref.read(databaseProvider));
+    _store = BookkeepingStore(
+      ref.read(databaseProvider),
+      ref.read(datasourceProvider),
+    );
     _exchangeService = ExchangeService(_store);
     _load();
   }
@@ -798,8 +876,7 @@ class _BookkeepingPageState extends ConsumerState<BookkeepingPage> {
     final next = [entry.copyWith(updatedAt: now), ..._entries]
       ..sort((a, b) => b.date.compareTo(a.date));
     setState(() => _entries = next);
-    await _store.saveEntries(next);
-    await _markBillDirty(entry, 'upsert');
+    unawaited(_persistEntries(next, entry, 'upsert'));
   }
 
   Future<void> _updateEntry(LedgerEntry entry) async {
@@ -813,8 +890,7 @@ class _BookkeepingPageState extends ConsumerState<BookkeepingPage> {
             .toList()
           ..sort((a, b) => b.date.compareTo(a.date));
     setState(() => _entries = next);
-    await _store.saveEntries(next);
-    await _markBillDirty(entry, 'upsert');
+    unawaited(_persistEntries(next, entry, 'upsert'));
   }
 
   Future<void> _deleteEntry(LedgerEntry entry) async {
@@ -827,8 +903,20 @@ class _BookkeepingPageState extends ConsumerState<BookkeepingPage> {
         .where((item) => !item.deleted)
         .toList();
     setState(() => _entries = next);
-    await _store.saveEntries(next);
-    await _markBillDirty(entry, 'delete');
+    unawaited(_persistEntries(next, entry, 'delete'));
+  }
+
+  Future<void> _persistEntries(
+    List<LedgerEntry> entries,
+    LedgerEntry dirtyEntry,
+    String operation,
+  ) async {
+    try {
+      await _store.saveEntries(entries);
+      unawaited(_markBillDirty(dirtyEntry, operation));
+    } catch (error, stackTrace) {
+      debugPrint('Failed to persist ledger entries: $error\n$stackTrace');
+    }
   }
 
   Future<void> _markBillDirty(LedgerEntry entry, String operation) {
@@ -3485,32 +3573,72 @@ class _AddLedgerPageState extends State<_AddLedgerPage>
                         ),
                       ),
                       const SizedBox(height: 12),
+                      _LedgerSaveButton(
+                        label: _saving
+                            ? '保存中'
+                            : widget.initialEntry == null
+                            ? '完成记账'
+                            : '保存修改',
+                        icon: _saving
+                            ? Icons.hourglass_top_rounded
+                            : Icons.check_rounded,
+                        onPressed: _save,
+                      ),
+                      const SizedBox(height: 12),
                       _NumberPad(
                         currency: _currency,
                         onCurrencyTap: _showCurrencyPicker,
                         onTap: _tapNumber,
                       ),
+                      const SizedBox(height: 20),
                     ],
                   ),
                 ],
               ),
             ),
-            AppFloatingActionBar(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 18),
-              actions: [
-                AppBottomAction(
-                  label: _saving
-                      ? '保存中'
-                      : widget.initialEntry == null
-                      ? '完成记账'
-                      : '保存修改',
-                  icon: _saving
-                      ? Icons.hourglass_top_rounded
-                      : Icons.check_rounded,
-                  onPressed: _save,
-                  tone: AppActionButtonTone.primary,
-                ),
-              ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LedgerSaveButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final VoidCallback onPressed;
+
+  const _LedgerSaveButton({
+    required this.label,
+    required this.icon,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Listener(
+      behavior: HitTestBehavior.opaque,
+      onPointerDown: (_) => onPressed(),
+      child: Container(
+        height: 58,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: AppColors.primary,
+          borderRadius: BorderRadius.circular(22),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 22, color: Colors.white),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w900,
+                color: Colors.white,
+              ),
             ),
           ],
         ),

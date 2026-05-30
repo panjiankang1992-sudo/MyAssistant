@@ -17,7 +17,8 @@ class AppDataSkillService {
     BookkeepingStore? bookkeepingStore,
     NotesStore? notesStore,
   }) : bookkeepingStore =
-           bookkeepingStore ?? BookkeepingStore(datasource.database),
+           bookkeepingStore ??
+           BookkeepingStore(datasource.database, datasource),
        notesStore = notesStore ?? NotesStore(datasource.database);
 
   Future<AppDataSkillResult> buildFor(String input) async {

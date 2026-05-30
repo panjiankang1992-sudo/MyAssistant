@@ -29,7 +29,12 @@ class BookkeepingActionService {
     ].join(' ');
     if (text.trim().isEmpty) return false;
 
-    final store = _store ?? BookkeepingStore(ref.read(databaseProvider));
+    final store =
+        _store ??
+        BookkeepingStore(
+          ref.read(databaseProvider),
+          ref.read(datasourceProvider),
+        );
     final exchangeService = _exchangeService ?? ExchangeService(store);
     final customCategories = await store.loadCustomCategories();
     final localParsed = _localParse(text, customCategories);

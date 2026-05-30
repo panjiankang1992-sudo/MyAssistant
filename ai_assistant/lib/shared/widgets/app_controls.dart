@@ -466,7 +466,7 @@ class AppFloatingActionBar extends StatelessWidget {
           builder: (context, constraints) {
             return Listener(
               behavior: HitTestBehavior.opaque,
-              onPointerUp: (event) {
+              onPointerDown: (event) {
                 if (actions.isEmpty) return;
                 final gapTotal = 10.0 * (actions.length - 1);
                 final itemWidth =
@@ -765,59 +765,49 @@ class AppPillActionButton extends StatelessWidget {
     final side = action.tone == AppActionButtonTone.neutral
         ? BorderSide(color: scheme.appBorder.withValues(alpha: 0.8))
         : BorderSide.none;
-    final style = ButtonStyle(
-      minimumSize: WidgetStateProperty.all(Size(0, height)),
-      fixedSize: WidgetStateProperty.all(Size.fromHeight(height)),
-      padding: WidgetStateProperty.all(
-        const EdgeInsets.symmetric(horizontal: 12),
-      ),
-      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      elevation: WidgetStateProperty.all(0),
-      animationDuration: AppPerformance.lowLatencyMode
-          ? Duration.zero
-          : AppAnimations.shortDuration,
-      backgroundColor: WidgetStateProperty.all(background),
-      foregroundColor: WidgetStateProperty.all(foreground),
-      overlayColor: WidgetStateProperty.all(
-        foreground.withValues(
-          alpha: action.tone == AppActionButtonTone.neutral ? 0.08 : 0.14,
-        ),
-      ),
-      side: WidgetStateProperty.all(side),
-      shape: WidgetStateProperty.all(
-        RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      ),
-    );
     return SizedBox(
       height: height,
       child: Semantics(
         button: true,
         label: action.label,
+        onTap: action.onPressed,
         excludeSemantics: true,
-        child: FilledButton(
-          onPressed: action.onPressed,
-          style: style,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (action.icon != null) ...[
-                Icon(action.icon, size: 19, color: foreground),
-                const SizedBox(width: 6),
-              ],
-              Flexible(
-                child: Text(
-                  action.label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w900,
-                    color: foreground,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: action.onPressed,
+          child: Container(
+            height: height,
+            alignment: Alignment.center,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: background,
+              borderRadius: BorderRadius.circular(24),
+              border: side == BorderSide.none
+                  ? null
+                  : Border.fromBorderSide(side),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (action.icon != null) ...[
+                  Icon(action.icon, size: 19, color: foreground),
+                  const SizedBox(width: 6),
+                ],
+                Flexible(
+                  child: Text(
+                    action.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w900,
+                      color: foreground,
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

@@ -20,10 +20,18 @@ class LocalDatasource {
   static bool get _useFileFallback =>
       defaultTargetPlatform.name.toLowerCase() == 'ohos';
 
+  static bool get usesFileFallback => _useFileFallback;
+
   static const MethodChannel _localStoreChannel = MethodChannel(
     'my_assistant/local_store',
   );
   static List<model.Todo>? _fallbackTodoCache;
+
+  Future<String?> readLocalStoreText(String name) => _readFallbackStore(name);
+
+  Future<void> writeLocalStoreText(String name, String content) {
+    return _writeFallbackStore(name, content);
+  }
 
   Future<String?> _readFallbackStore(String name) async {
     try {

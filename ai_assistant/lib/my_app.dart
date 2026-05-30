@@ -36,7 +36,17 @@ class App extends ConsumerWidget {
       ],
       supportedLocales: const [Locale('zh', 'CN'), Locale('en', 'US')],
       locale: const Locale('zh', 'CN'),
-      home: const HomePage(),
+      builder: (context, child) {
+        return Navigator(
+          reportsRouteUpdateToEngine: false,
+          onGenerateRoute: (settings) {
+            return MaterialPageRoute<void>(
+              settings: settings,
+              builder: (_) => const HomePage(),
+            );
+          },
+        );
+      },
     );
   }
 }
