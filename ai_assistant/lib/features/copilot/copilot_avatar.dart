@@ -368,22 +368,17 @@ class CopilotAvatarView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final normalized = CopilotAvatarCatalog.normalize(value);
-    final borderColor = selected
-        ? AppColors.primary.withValues(alpha: 0.64)
-        : Colors.white.withValues(alpha: 0.2);
-    return Container(
-      width: size,
-      height: size,
-      margin: margin,
-      padding: EdgeInsets.all(selected ? 3 : 0),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(size * 0.26),
-        color: selected ? AppColors.primary.withValues(alpha: 0.12) : null,
-        border: selected ? Border.all(color: borderColor, width: 1.5) : null,
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(size * 0.22),
-        child: _avatarBody(normalized),
+    return Align(
+      widthFactor: 1,
+      heightFactor: 1,
+      child: Container(
+        width: size,
+        height: size,
+        margin: margin,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(size * 0.22),
+          child: _avatarBody(normalized),
+        ),
       ),
     );
   }
@@ -394,13 +389,17 @@ class CopilotAvatarView extends StatelessWidget {
     }
     if (value.startsWith('file:')) {
       final path = value.replaceFirst('file:', '');
-      return Image.file(
-        File(path),
-        width: size,
-        height: size,
-        fit: BoxFit.cover,
-        errorBuilder: (_, _, _) => _presetBody(
-          CopilotAvatarCatalog.presetOf(CopilotAvatarCatalog.defaultValue),
+      return Container(
+        color: AppColors.inputBg.withValues(alpha: 0.42),
+        child: Image.file(
+          File(path),
+          width: size,
+          height: size,
+          fit: BoxFit.contain,
+          filterQuality: FilterQuality.high,
+          errorBuilder: (_, _, _) => _presetBody(
+            CopilotAvatarCatalog.presetOf(CopilotAvatarCatalog.defaultValue),
+          ),
         ),
       );
     }
@@ -463,13 +462,15 @@ class CopilotAvatarView extends StatelessWidget {
   }
 
   Widget _presetBody(CopilotAvatarPreset preset) {
-    return Transform.scale(
-      scale: 1.12,
+    return Container(
+      color: AppColors.inputBg.withValues(alpha: 0.32),
       child: Image.asset(
         preset.assetPath,
         width: size,
         height: size,
-        fit: BoxFit.cover,
+        fit: BoxFit.contain,
+        alignment: Alignment.center,
+        filterQuality: FilterQuality.high,
       ),
     );
   }

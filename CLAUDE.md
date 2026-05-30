@@ -61,12 +61,12 @@ dart analyze
 - `domain/models/` — Plain Dart classes with hand-written `copyWith` (Freezed declared but not used for models)
 - `data/api/` — HTTP client + services (base URL hardcoded to `localhost:23110`, JWT auth, file-based token storage)
 - `data/datasources/` — `LocalDatasource` (Drift queries), `LocalSyncDatasource` (sync index), `WebDavDatasource`
-- `data/repositories/` — Thin wrappers over datasources that trigger auto-sync after mutations
-- `core/database/` — Drift database (schema v4, 5 tables), generated code in `*.g.dart`
+- `data/repositories/` — Thin wrappers over datasources; sync is captured by database triggers, not repository calls
+- `core/database/` — Drift database (schema v11+, sync/sync_index/sync_data/sync_control), generated code in `*.g.dart`
 
-**Sync engine** (`features/sync/`): Bidirectional WebDAV sync with Last-Write-Wins conflict resolution. Cloud path: `MyAssistant/{username}/todos/{year}/{month}/{day}/{uuid}.json`. Soft delete with 30-day retention.
+**Sync engine** (`features/sync/`): Bidirectional WebDAV sync with Last-Write-Wins conflict resolution. Cloud root is the user-selected WebDAV directory plus `MyAssistant/`; table changes enqueue `sync_data` automatically and sync writes use `sync_control` mute mode.
 
-**Database tables**: Todos, Routines, ChangeRecords, SyncIndex, DeviceSyncState. Schema migrations are incremental in `database.dart`.
+**Database tables**: Todos, Routines, ChangeRecords, SyncIndex, SyncData, SyncFiles (`sync`), SyncControl, DeviceSyncState, Tags, MetadataOptions. Schema migrations are incremental in `database.dart`.
 
 ## Key Conventions
 

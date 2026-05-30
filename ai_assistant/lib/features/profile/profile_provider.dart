@@ -1,6 +1,5 @@
-import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../data/api/api_client.dart';
+import '../../core/providers/core_providers.dart';
 
 class UserProfile {
   final String name;
@@ -9,6 +8,7 @@ class UserProfile {
   final int avatarColorIndex;
   final String? avatarEmoji;
   final String? avatarPath;
+  final String? avatarValue;
   final String? serverAvatarUrl;
   final int version;
 
@@ -19,6 +19,7 @@ class UserProfile {
     this.avatarColorIndex = 0,
     this.avatarEmoji,
     this.avatarPath,
+    this.avatarValue,
     this.serverAvatarUrl,
     this.version = 1,
   });
@@ -33,7 +34,8 @@ class UserProfile {
 
   bool get hasCustomAvatar => avatarPath != null && avatarPath!.isNotEmpty;
 
-  bool get hasServerAvatar => serverAvatarUrl != null && serverAvatarUrl!.isNotEmpty;
+  bool get hasServerAvatar =>
+      serverAvatarUrl != null && serverAvatarUrl!.isNotEmpty;
 
   Map<String, dynamic> toJson() => {
     'name': name,
@@ -42,6 +44,7 @@ class UserProfile {
     'avatarColorIndex': avatarColorIndex,
     'avatarEmoji': avatarEmoji,
     'avatarPath': avatarPath,
+    'avatarValue': avatarValue,
     'serverAvatarUrl': serverAvatarUrl,
     'version': version,
   };
@@ -53,6 +56,7 @@ class UserProfile {
     avatarColorIndex: json['avatarColorIndex'] ?? 0,
     avatarEmoji: json['avatarEmoji'],
     avatarPath: json['avatarPath'],
+    avatarValue: json['avatarValue'],
     serverAvatarUrl: json['serverAvatarUrl'],
     version: json['version'] ?? 1,
   );
@@ -64,6 +68,7 @@ class UserProfile {
     int? avatarColorIndex,
     String? avatarEmoji,
     String? avatarPath,
+    String? avatarValue,
     String? serverAvatarUrl,
     bool clearAvatar = false,
     bool clearServerAvatar = false,
@@ -73,9 +78,12 @@ class UserProfile {
       email: email ?? this.email,
       phone: phone ?? this.phone,
       avatarColorIndex: avatarColorIndex ?? this.avatarColorIndex,
-      avatarEmoji: avatarEmoji ?? this.avatarEmoji,
+      avatarEmoji: clearAvatar ? null : (avatarEmoji ?? this.avatarEmoji),
       avatarPath: clearAvatar ? null : (avatarPath ?? this.avatarPath),
-      serverAvatarUrl: clearServerAvatar ? null : (serverAvatarUrl ?? this.serverAvatarUrl),
+      avatarValue: clearAvatar ? null : (avatarValue ?? this.avatarValue),
+      serverAvatarUrl: clearServerAvatar
+          ? null
+          : (serverAvatarUrl ?? this.serverAvatarUrl),
       version: version + 1,
     );
   }
@@ -93,20 +101,25 @@ class ProfileNotifier extends Notifier<UserProfile> {
 
   Future<void> _loadFromCache() async {
     try {
-      final cached = await ApiClient.storageRead(_keyProfile);
+      final cached = await ref
+          .read(datasourceProvider)
+          .getAppSettingJson('user_profile', _keyProfile);
       if (cached != null && cached.isNotEmpty) {
-        final json = Map<String, dynamic>.from(
-          jsonDecode(cached) as Map,
-        );
-        state = UserProfile.fromJson(json);
+        state = UserProfile.fromJson(cached);
       }
     } catch (_) {}
   }
 
   Future<void> _saveToCache() async {
     try {
-      final json = state.toJson();
-      await ApiClient.storageWrite(_keyProfile, jsonEncode(json));
+      await ref
+          .read(datasourceProvider)
+          .upsertAppSettingJson(
+            module: 'profile',
+            dataType: 'user_profile',
+            id: _keyProfile,
+            payload: state.toJson(),
+          );
     } catch (_) {}
   }
 
@@ -121,7 +134,20 @@ class ProfileNotifier extends Notifier<UserProfile> {
   }
 
   void setAvatarPath(String path) {
-    state = state.copyWith(avatarPath: path);
+    state = state.copyWith(avatarPath: path, avatarValue: 'file:$path');
+    _saveToCache();
+  }
+
+  void setAvatarValue(String value) {
+    final normalized = value.trim();
+    final filePath = normalized.startsWith('file:')
+        ? normalized.replaceFirst('file:', '')
+        : null;
+    state = state.copyWith(
+      avatarValue: normalized,
+      avatarPath: filePath,
+      clearServerAvatar: true,
+    );
     _saveToCache();
   }
 
@@ -138,16 +164,30 @@ class ProfileNotifier extends Notifier<UserProfile> {
   void updateFromServer(Map<String, dynamic> data) {
     final nickname = data['nickname'] as String? ?? '';
     final username = data['username'] as String? ?? '';
-    final avatar = data['avatar'] as String?;
-    state = state.copyWith(
+    final avatar = (data['avatar'] as String? ?? '').trim();
+    final isCatalogAvatar =
+        avatar.startsWith('preset:') ||
+        avatar.startsWith('emoji:') ||
+        avatar.startsWith('file:');
+    state = UserProfile(
       name: nickname.isNotEmpty ? nickname : username,
       email: data['email'] as String? ?? state.email,
       phone: data['phone'] as String? ?? state.phone,
-      serverAvatarUrl: avatar?.isNotEmpty == true ? avatar : null,
-      clearServerAvatar: avatar == null || avatar.isEmpty,
+      avatarColorIndex: state.avatarColorIndex,
+      avatarEmoji: avatar.startsWith('emoji:')
+          ? avatar.replaceFirst('emoji:', '')
+          : null,
+      avatarPath: avatar.startsWith('file:')
+          ? avatar.replaceFirst('file:', '')
+          : null,
+      avatarValue: isCatalogAvatar ? avatar : null,
+      serverAvatarUrl: !isCatalogAvatar && avatar.isNotEmpty ? avatar : null,
+      version: state.version + 1,
     );
     _saveToCache();
   }
 }
 
-final profileProvider = NotifierProvider<ProfileNotifier, UserProfile>(ProfileNotifier.new);
+final profileProvider = NotifierProvider<ProfileNotifier, UserProfile>(
+  ProfileNotifier.new,
+);

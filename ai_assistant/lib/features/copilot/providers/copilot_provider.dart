@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
+import '../../../core/database/database.dart' hide CopilotSession;
 import '../../../core/providers/core_providers.dart';
 import '../../ai_settings/ai_model_provider.dart';
 import '../copilot_settings.dart';
@@ -21,6 +21,7 @@ class ChatMessage {
   final String content;
   final ChatMessageType type;
   final DateTime timestamp;
+  final List<String> attachmentIds;
 
   const ChatMessage({
     required this.id,
@@ -28,6 +29,7 @@ class ChatMessage {
     required this.content,
     required this.type,
     required this.timestamp,
+    this.attachmentIds = const [],
   });
 
   Map<String, dynamic> toJson() => {
@@ -36,6 +38,7 @@ class ChatMessage {
     'content': content,
     'type': type.name,
     'timestamp': timestamp.toIso8601String(),
+    'attachmentIds': attachmentIds,
   };
 
   static ChatMessage fromJson(Map<String, dynamic> json) {
@@ -54,6 +57,9 @@ class ChatMessage {
       timestamp: json['timestamp'] != null
           ? DateTime.tryParse(json['timestamp'] as String) ?? now
           : now,
+      attachmentIds: (json['attachmentIds'] as List? ?? const [])
+          .whereType<String>()
+          .toList(),
     );
   }
 }
@@ -291,39 +297,63 @@ class CopilotNotifier extends Notifier<CopilotState> {
         : '${normalized.substring(0, 18)}...';
   }
 
-  Future<File> _sessionsFile() async {
-    final dir = await getApplicationSupportDirectory();
-    final aiDir = Directory('${dir.path}/ai');
-    if (!await aiDir.exists()) {
-      await aiDir.create(recursive: true);
-    }
-    return File('${aiDir.path}/copilot_sessions.json');
-  }
-
   Future<List<CopilotSession>> _readSessions() async {
-    try {
-      final file = await _sessionsFile();
-      if (!await file.exists()) return [];
-      final content = await file.readAsString();
-      if (content.trim().isEmpty) return [];
-      final json = jsonDecode(content) as Map<String, dynamic>;
-      return (json['sessions'] as List<dynamic>? ?? const [])
-          .whereType<Map<String, dynamic>>()
-          .map(CopilotSession.fromJson)
-          .where((item) => item.messages.isNotEmpty)
-          .toList();
-    } catch (_) {
-      return [];
-    }
+    final db = ref.read(databaseProvider);
+    final rows = await (db.select(
+      db.copilotSessions,
+    )..where((t) => t.isDeleted.equals(false))).get();
+    return rows
+        .map(
+          (row) => CopilotSession.fromJson({
+            'id': row.id,
+            'title': row.title,
+            'messages': jsonDecode(row.messages),
+            'createdAt': row.createdAt.toIso8601String(),
+            'updatedAt': row.updatedAt.toIso8601String(),
+          }),
+        )
+        .where((item) => item.messages.isNotEmpty)
+        .toList();
   }
 
   Future<void> _writeSessions(List<CopilotSession> sessions) async {
-    final file = await _sessionsFile();
-    await file.writeAsString(
-      const JsonEncoder.withIndent('  ').convert({
-        'sessions': sessions.take(50).map((item) => item.toJson()).toList(),
-      }),
-    );
+    final db = ref.read(databaseProvider);
+    final current = await db.select(db.copilotSessions).get();
+    final ids = sessions.map((item) => item.id).toSet();
+    for (final session in sessions.take(50)) {
+      final old = current.where((row) => row.id == session.id).firstOrNull;
+      await db
+          .into(db.copilotSessions)
+          .insertOnConflictUpdate(
+            CopilotSessionsCompanion(
+              id: Value(session.id),
+              title: Value(session.title),
+              messages: Value(
+                jsonEncode(
+                  session.messages.map((item) => item.toJson()).toList(),
+                ),
+              ),
+              createdAt: Value(session.createdAt),
+              updatedAt: Value(session.updatedAt),
+              version: Value((old?.version ?? 0) + 1),
+              archived: const Value(false),
+              isDeleted: const Value(false),
+            ),
+          );
+    }
+    for (final row in current) {
+      if (!ids.contains(row.id) && !row.isDeleted) {
+        await (db.update(
+          db.copilotSessions,
+        )..where((t) => t.id.equals(row.id))).write(
+          CopilotSessionsCompanion(
+            updatedAt: Value(DateTime.now()),
+            version: Value(row.version + 1),
+            isDeleted: const Value(true),
+          ),
+        );
+      }
+    }
   }
 }
 

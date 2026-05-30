@@ -4,148 +4,184 @@
 
 **Created**: 2026-05-21
 
-**Status**: Draft
+**Revised**: 2026-05-29
 
-**Input**: User description: "当前的同步数据的策略有问题。请参照多文件+按Key分片方式重新实现。代办例行的数据同步也需要设计。"
+**Status**: In Progress
+
+## Summary
+
+同步模块作为独立数据层能力存在，不依赖待办、记账、随手记、Copilot、Profile 等具体业务模块主动调用。业务表发生新增、更新、删除时，由本地数据库触发器/表变化监控自动写入 `sync_data` 队列；同步引擎统一消费上传/下载任务。同步引擎自己执行云端下载合并时必须进入静默上下文，避免远端覆盖本地记录时再次产生上传任务。
+
+用户配置 WebDAV 时必须手动指定远端同步数据存放目录。本地保存该目录地址，后续所有云端操作都基于：
+
+```text
+用户指定目录/MyAssistant/
+```
+
+首次配置 WebDAV 后立即同步；每次本地业务表变化后自动同步；应用使用中每 10 分钟检测一次；每次打开应用执行一次同步。
 
 ## Clarifications
 
-### Session 2026-05-21
+### Session 2026-05-29
 
-- Q: 冲突解决策略选择？ → A: Last-Write-Wins（updatedAt 更大自动覆盖），且本地每次修改自动触发同步（先 check 再修改，乐观锁模式），无需用户干预冲突
-- Q: 本地版本追踪存储在哪？ → A: Drift 本地数据库字段（todo/routine 表的 version+updatedAt+deleted 列），无需额外本地索引文件
-- Q: 自动同步时网络不可用怎么处理？ → A: 静默忽略失败，本地修改照常保存，下次有网络时自动重试
-- Q: 删除同步策略？ → A: 软删除+延期清理 — 云端保留 deleted=true 文件30天，索引标记 deleted，拉取端本地删除，30天后物理清理
-- Q: 断点续传策略？ → A: 整体重试 — 每次同步是完整拉取+推送流程，失败则整体重试；索引差分本身保证传输量小，无需断点机制
-- Q: 例行存储路径结构？ → A: 例行是规则元数据，不属于具体日期，扁平存储为 routines/{uuid}.json（无日期层级）；待办仍按日期分片为 todos/{year}/{month}/{day}/{uuid}.json
-- Q: 云端路径中的用户标识？ → A: 使用具体用户名替换硬编码的 "user"，路径格式为 MyAssistant/{username}/，与现有 CloudPathBuilder 一致
-- Q: 云端目录结构？ → A: MyAssistant/{username}/ 下有6个一级目录：index、todos、bills、notes、copilot、profile。routines 归属在 todos/ 下（todos/routines/{uuid}.json），索引按功能模块在 index/ 下分目录（index/todos/、index/bills/等）
+- Q: WebDAV 云端根目录如何确定？ -> A: 配置 WebDAV 时由用户手动填写/选择同步数据存放目录，本地持久保存，后续统一在该目录下创建或复用 `MyAssistant/`。
+- Q: 同步是否由具体模块调用？ -> A: 否。同步模块监控可同步表的数据变化，排除同步模块自己的写入，自动插入 `sync_data`。
+- Q: 本地同步任务如何记录？ -> A: 使用 `sync_data` 队列表，操作类型只区分 `upload` 和 `download`，完成/异常状态在队列表内记录。
+- Q: 冲突策略？ -> A: 以 `last_modified_at`/`updatedAt` 最新者胜出；本地和云端都变更时，保留失败/覆盖前记录的备份能力作为后续任务。
 
-## User Scenarios & Testing *(mandatory)*
+## Cloud Directory Contract
 
-### User Story 1 - 双向增量同步待办数据 (Priority: P1)
+```text
+用户指定目录/MyAssistant/
+├── sync/
+│   └── sync_index.json
+├── index/
+│   ├── todos/
+│   │   ├── todos_index.json
+│   │   └── routine_index.json
+│   ├── bills/
+│   │   ├── bills_index.json
+│   │   └── category_index.json
+│   ├── notes/
+│   │   ├── notes_index.json
+│   │   ├── diary_index.json
+│   │   └── archive_index.json
+│   ├── copilot/
+│   │   ├── chat_index.json
+│   │   ├── archive_chat_index.json
+│   │   └── memory_index.json
+│   ├── profile/
+│   │   └── profile_index.json
+│   └── attachments/
+│       └── attachments_index.json
+├── todos/
+│   ├── {YYYY}/{YYYY-MM}/{YYYY-MM-DD}/todo_{uuid}.json
+│   └── routine/routine_{uuid}.json
+├── bills/
+│   ├── {YYYY}/{YYYY-MM}/{YYYY-MM-DD}/bill_{uuid}.json
+│   └── category/category_{uuid}.json
+├── notes/
+│   ├── {YYYY}/{YYYY-MM}/{YYYY-MM-DD}/diary_{uuid}.json
+│   ├── notes/note_{uuid}.json
+│   └── archive/{category}/archive_{uuid}.json
+├── copilot/
+│   ├── chat/chat_{uuid}.json
+│   ├── archive_chat/archive_chat_{uuid}.json
+│   └── memory.json
+├── profile/
+    ├── user_profile.json
+    ├── theme_setting.json
+    ├── copilot_setting.json
+    ├── data_setting.json
+    ├── tags_setting.json
+    └── feedback.json
+└── attachments/
+    └── {YYYY}/{YYYY-MM}/attachment_{uuid}.json
+```
 
-用户在设备 A 创建/修改/删除待办后，在设备 B 点击同步按钮，待办列表自动合并两端的变更（新增、修改、删除），最终两端数据一致。同理例行的重复规则也能同步。
+`sync/sync_index.json` 存储 `index/` 下每个索引文件的云端路径和最后修改时间。`index/` 下各文件存储实体摘要列表，列表项必须包含：实体 UUID、最后修改设备、最后修改时间戳、实体云端路径、软删除状态。
 
-**Why this priority**: 核心数据同步是最基础的能力，没有它多设备使用场景不存在。
+附件是跨模块实体。随手记中的日记、文档、归档，以及 Copilot 聊天记录中出现的图片、普通附件、录音等，都必须写入统一 `attachments` 表；日记/文档/归档/聊天消息表只保存对应 `attachmentIds`，不保存附件内容。附件云端文件使用 base64 内容同步，单个附件原始大小不得超过 20MB。
 
-**Independent Test**: 在两个设备上分别创建不同待办，点击同步后两端都能看到对方的待办；在一端删除一个待办后同步，另一端也消失。
+## User Stories
 
-**Acceptance Scenarios**:
+### US1 - 用户指定 WebDAV 同步目录 (P1)
 
-1. **Given** 设备 A 有待办 "买牛奶"(未完成), **When** 设备 A 同步到 WebDAV, **Then** 待办 JSON 和索引文件成功上传，索引中包含该条目的 id、version、updatedAt
-2. **Given** 设备 A 已同步, **When** 设备 B 拉取同步, **Then** 设备 B 本地新增 "买牛奶" 且内容和设备 A 一致
-3. **Given** 两端都有 "买牛奶", **When** 设备 A 完成该待办并同步, **Then** 设备 B 同步后该待办也变为已完成（updatedAt 更大的版本覆盖）
-4. **Given** 设备 A 删除了某个待办, **When** 同步, **Then** 设备 B 同步后该待办从本地删除（云端文件标记 deleted=true 或直接移除）
+用户配置 WebDAV 时选择同步数据存放目录。保存后应用立即在该目录下检查 `MyAssistant/` 是否存在：存在则拉取数据，不存在则创建完整目录结构并上传本地数据。
 
----
+**Acceptance**:
 
-### User Story 2 - 例行规则同步 (Priority: P2)
+1. 保存 WebDAV 配置时必须保存同步目录。
+2. 首次保存配置后立即触发一次同步。
+3. 远端不存在 `MyAssistant/` 时创建 `sync/`、`index/` 和所有实体目录。
+4. 远端已存在 `MyAssistant/` 时先拉取远端索引和实体数据。
 
-用户在设备 A 创建一条例行规则（如"每个工作日早上9点写周报"），在设备 B 同步后能看到这条规则，且该规则在设备 B 也能根据日期自动生成待办。
+### US2 - 表变化自动入队 (P1)
 
-**Why this priority**: 例行是待办的核心衍生功能，但依赖待办同步基础先完成。
+任意可同步业务表发生新增、更新、删除时，同步模块自动写入 `sync_data` 上传任务；业务模块不需要调用同步 API。
 
-**Independent Test**: 在设备 A 创建一条"每天早上8点跑步"的例行规则，同步后设备 B 也能看到该规则，且当日自动生成了对应待办。
+**Acceptance**:
 
-**Acceptance Scenarios**:
+1. 修改 `todos`、`routines`、可同步配置表后，本地自动插入 `sync_data(operation_type=upload)`。
+2. 同步引擎下载远端数据并写入本地表时，不产生新的上传任务。
+3. `sync_data` 中未完成任务会在下一次同步周期继续执行。
 
-1. **Given** 设备 A 创建例行 "每天8点跑步" (repeatRule=daily), **When** 同步到 WebDAV, **Then** routines 目录下出现该例行 JSON 文件，索引更新
-2. **Given** 设备 B 同步后获得该例行, **When** 当天打开 App, **Then** 自动生成一条 "跑步" 待办（来源=routine）
-3. **Given** 设备 A 修改例行的重复规则为"仅工作日", **When** 同步后, **Then** 设备 B 的规则也变为"仅工作日"
+### US3 - 索引差分下载 (P1)
 
----
+同步开始时先拉取 `sync/sync_index.json`，对比本地 `sync` 表，找出需要更新的 index 文件；再解析 index 文件，对比本地 `sync_index` 表，生成下载任务。
 
-### User Story 3 - 同步状态可见 (Priority: P3)
+**Acceptance**:
 
-用户在设置页能看到上次同步时间、同步方向（拉取N条/推送N条）。冲突自动以 Last-Write-Wins 策略解决，无需用户干预。
+1. 云端 index 文件更新时间晚于本地 `sync` 记录时，下载该 index 文件。
+2. index 条目的更新时间晚于本地 `sync_index` 记录时，插入 `sync_data(operation_type=download)`。
+3. 下载实体文件成功后，静默覆盖/更新本地实体表，并更新 `sync` 与 `sync_index`。
+4. 云端实体文件不存在时，任务标记为异常，不影响其他任务。
 
-**Why this priority**: 提升用户体验和信任度，但不阻塞基本同步功能。
+### US4 - 上传队列与索引刷新 (P1)
 
-**Independent Test**: 同步完成后设置页显示"上次同步: 3分钟前, 拉取2条, 推送5条"。
+同步上传阶段扫描 `sync_data` 中未完成的上传任务，读取对应本地实体表，将记录写为云端 JSON 文件，再刷新实体索引和 `sync/sync_index.json`。
 
-**Acceptance Scenarios**:
+**Acceptance**:
 
-1. **Given** 同步完成, **When** 用户查看设置页, **Then** 显示上次同步时间、拉取数量、推送数量
+1. 本地新增/修改/软删除后，只上传对应实体文件。
+2. 上传成功后更新实体 index 文件。
+3. index 文件上传成功后更新 `sync/sync_index.json`。
+4. `sync_data` 对应任务标记完成。
 
----
+### US5 - 全量同步范围覆盖 (P2)
 
-### Edge Cases
+所有可修改的数据表和配置表都必须能同步，包括待办、例行、账单、分类、随手记、日记、归档、聊天、归档聊天、记忆、用户资料、主题、Copilot 设置、数据设置、标签设置、反馈。
 
-- 同步过程中网络断开：整体重试，无需断点续传；索引差分保证重试成本低
-- 自动同步失败（无网络等）：静默忽略，不弹提示，不阻断操作，下次有网络时自动重试
-- 索引文件损坏或不存在：回退到全量拉取
-- 同一数据在两端被删除：删除优先（deleted=true 标记），不产生幽灵数据；两端都修改时 Last-Write-Wins 自动解决
-- 首次使用（云端无数据）：直接上传本地全部数据，在 `MyAssistant/{username}/` 下创建完整目录结构和索引文件
-- 大量数据同步（1000+待办）：索引差分机制确保只传输变更部分
-- 时区差异：全部使用 UTC ISO8601 格式，显示时转为本地时区
+**Acceptance**:
 
-## Requirements *(mandatory)*
+1. 每个可修改实体都有本地表、index 条目和云端实体路径。
+2. 文件型旧存储需要迁移到本地表或由同步模块统一托管，不再由业务模块自行同步。
+3. 配置类数据按新表格式导入并保留本地备份。
 
-### Functional Requirements
+### US6 - 附件独立同步 (P1)
 
-- **FR-001**: 同步引擎 MUST 采用索引差分机制：客户端先拉取 `MyAssistant/{username}/index/{module}/` 下的索引文件（只含 id、version、updatedAt），对比本地版本号，仅下载有变更的文件
-- **FR-002**: 待办数据 MUST 按日期分片存储，路径为 `MyAssistant/{username}/todos/{year}/{month}/{day}/{uuid}.json`；例行数据作为待办的衍生规则 MUST 归属在 todos 模块下，扁平存储为 `MyAssistant/{username}/todos/routines/{uuid}.json`（无日期层级）。{username} 为登录用户名，非硬编码 "user"
-- **FR-003**: 每条数据文件 MUST 包含统一的信封格式：`{id, type, version, updatedAt, data: {...}, deleted}`
-- **FR-004**: 客户端 MUST 在本地维护每条数据的 version 和 updatedAt 字段，每次修改 version 自增、updatedAt 更新
-- **FR-005**: 推送同步 MUST 仅上传本地 version 大于云端 version 的文件（增量）
-- **FR-006**: 拉取同步 MUST 仅下载云端 updatedAt 晚于本地 updatedAt 的文件（增量）
-- **FR-007**: 删除操作 MUST 采用软删除策略：云端保留 `deleted=true` 标记文件 30 天（防误删恢复），索引中标记该条目 `deleted:true`；拉取端看到 `deleted=true` 后从本地数据库物理删除；30 天后云端标记文件由同步引擎物理清理
-- **FR-008**: 例行规则 MUST 与待办使用相同的同步框架（type=routine，存入 `todos/routines/` 子目录），索引文件在 `index/todos/` 下
-- **FR-009**: 索引文件 MUST 按功能模块分目录存放：`index/todos/`（含 `todos_index.json` 和 `routines_index.json`）、`index/bills/`、`index/notes/`、`index/copilot/`，仅包含摘要字段（id、version、updatedAt、deleted）
-- **FR-010**: 同步过程 MUST 在设置页显示上次同步时间、拉取条数、推送条数
-- **FR-011**: 同步操作 MUST 同时执行拉取（先拉）和推送（后推），确保双向数据一致性
-- **FR-012**: 设备首次同步（云端无数据）时 MUST 执行全量上传，建立索引文件
-- **FR-013**: 同步失败时 MUST 整体重试（无需断点续传）；每次同步是完整的拉取+推送流程，索引差分保证传输量小，失败后下次触发时重新执行全流程
-- **FR-014**: 用户数据（待办、例行）的 version MUST 从 1 开始，每次本地修改自增+1
-- **FR-015**: 本地每次修改（创建/更新/删除待办或例行）MUST 自动触发同步流程：先拉取远端索引检查版本（乐观锁 check-then-write），再推送本地变更
-- **FR-016**: 冲突解决 MUST 采用 Last-Write-Wins 策略（updatedAt 更大的版本自动覆盖），无需用户手动选择
-- **FR-017**: 自动同步因网络不可用而失败时 MUST 静默忽略，本地修改照常保存不阻断用户操作，待下次网络恢复时（手动同步或下次自动触发）自动重试
+日记、文档、归档和 Copilot 聊天记录中的图片、普通附件、录音统一进入附件表，并在主实体同步完成后最后同步附件。
 
-### Key Entities
+**Acceptance**:
 
-- **Todo (待办)**: id、title、description、source、type、time、date、completed、createdAt、updatedAt、version、deleted
-- **Routine (例行)**: id、title、description、type、time、repeatRule、repeatDays、createdAt、updatedAt、version、deleted
-- **SyncIndex (同步索引)**: 远端索引文件（`MyAssistant/{username}/index/{todos|routines}_index.json`），仅包含摘要字段（id、version、updatedAt、deleted）。本地版本追踪直接使用 Drift 数据库字段，不维护独立本地索引文件
-- **WebDAV 文件结构**: `MyAssistant/{username}/` 下有6个一级目录：
-  ```
-  MyAssistant/{username}/
-  ├── index/           # 索引（按功能模块分子目录）
-  │   ├── todos/       # 含 todos_index.json 和 routines_index.json
-  │   ├── bills/       # 含 bills_index.json
-  │   ├── notes/       # 含 notes_index.json
-  │   └── copilot/     # 含 copilot_index.json
-  ├── todos/           # 待办数据（按日期分片）
-  │   ├── {year}/{month}/{day}/{uuid}.json
-  │   └── routines/    # 例行数据（扁平，无日期层级）
-  │       └── {uuid}.json
-  ├── bills/           # 账单数据
-  ├── notes/           # 随手记数据
-  ├── copilot/         # AI Copilot 数据
-  └── profile/        # 用户资料
-  ```
+1. 日记/文档/归档/聊天消息表只记录 `attachmentIds`。
+2. 附件表记录归属实体、附件类型、文件名、MIME、大小、base64 内容、软删除和时间戳。
+3. 单个附件超过 20MB 时不得进入同步队列，任务标记异常或 UI 拒绝。
+4. 同步执行顺序中附件上传/下载排在其他实体之后。
 
-## Success Criteria *(mandatory)*
+## Functional Requirements
 
-### Measurable Outcomes
+- **FR-001**: WebDAV 配置 MUST 保存用户指定同步目录，目录为空不得保存。
+- **FR-002**: 同步根 MUST 为 `用户指定目录/MyAssistant/`，不得再使用 `MyAssistant/{username}/` 作为固定根。
+- **FR-003**: 首次配置 WebDAV 后 MUST 立即执行同步。
+- **FR-004**: 应用启动时 MUST 执行一次同步。
+- **FR-005**: 应用运行中 MUST 每 10 分钟检测一次同步。
+- **FR-006**: 本地可同步表变化后 MUST 自动插入 `sync_data` 上传任务并触发同步。
+- **FR-007**: 同步模块自己的下载合并写入 MUST 不触发表变化上传任务。
+- **FR-008**: 本地 MUST 维护 `sync` 表，结构和数据语义与云端 `sync/sync_index.json` 一致。
+- **FR-009**: 本地 MUST 维护 `sync_index` 表，结构和云端 index 条目一致。
+- **FR-010**: 本地 MUST 维护 `sync_data` 队列表，包含 ID、sync_index ID、数据实体 ID、本地表名、云端实体文件路径、操作类型、完成状态、最后更新时间戳。
+- **FR-011**: 所有实体文件 MUST 包含统一固定字段：实体 ID、`is_deleted`、`created_at`、`updated_at`；展示时间字段必须与创建时间分离。
+- **FR-012**: 删除 MUST 使用 `is_deleted` 软删除字段同步。
+- **FR-013**: 冲突 MUST 采用最后修改时间优先，并保留扩展点用于冲突备份/恢复。
+- **FR-014**: 下载流程 MUST 先比较 `sync/sync_index.json`，再比较实体 index，最后下载实体文件。
+- **FR-015**: 上传流程 MUST 先消费上传任务，再刷新实体 index，最后刷新 `sync/sync_index.json`。
+- **FR-016**: 附件 MUST 使用独立 `attachments` 表同步，主实体只保存 `attachmentIds`。
+- **FR-017**: 附件云端 JSON MUST 使用 base64 保存文件内容，单个附件原始大小 MUST <= 20MB。
+- **FR-018**: 同步任务执行时附件 MUST 最后上传、最后下载。
 
-- **SC-001**: 用户点击同步按钮后，1000 条待办中仅有变更部分被传输，同步完成时间 < 5 秒（索引差分生效）
-- **SC-002**: 双向同步后，两端待办列表完全一致，无数据丢失或重复
-- **SC-003**: 设置页清晰展示上次同步时间、拉取/推送条数
-- **SC-004**: 例行规则同步后，设备端能正确生成当日待办
-- **SC-005**: 网络断开后重连，同步能自动恢复，不丢失已完成的传输
-- **SC-006**: 首次使用场景：空云端 → 上传所有本地数据 + 建立索引，耗时 < 10 秒（100 条数据内）
+## Key Entities
 
-## Assumptions
+- **Sync**: 本地 `sync` 表，对应云端 `sync/sync_index.json`，记录 index 文件路径、模块、索引名、最后修改设备、最后修改时间。
+- **SyncIndex**: 本地实体索引表，对应云端 `index/**.json`，记录实体 ID、实体类型/表名、最后修改设备、最后修改时间、云端实体路径、软删除状态。
+- **SyncData**: 本地同步任务队列，记录上传/下载任务执行状态。
+- **SyncControl**: 本地同步静默控制，标记同步模块正在写库，触发器据此跳过自动入队。
+- **Attachment**: 跨随手记和 Copilot 的附件实体，保存 ownerType、ownerId、attachmentType、fileName、mimeType、sizeBytes、contentBase64、createdAt、updatedAt、isDeleted。
 
-- 用户提供有效的 WebDAV 凭据（通过服务器 profile 接口自动同步到本地 Keychain）
-- WebDAV 服务支持 PROPFIND/LIST/MKCOL/PUT/GET/DELETE 操作
-- 所有时间戳使用 UTC ISO8601 格式存储，显示时转为本地时区
-- 每个数据条目的 id 为 UUID v4，全局唯一，无冲突
-- 版本号（version）使用简单递增整数，不做分布式版本向量
-- 冲突策略采用"最后修改胜出"（Last-Write-Wins），即 updatedAt 更新的版本自动覆盖旧版本，无需用户干预
-- 本地每次修改（创建/更新/删除）自动触发同步：先拉取远端最新版本检查（乐观锁），再推送本地变更，确保数据一致性
-- 手动同步按钮保留，用于首次同步或网络恢复后的手动触发
-- 例行规则在设备间同步后，各设备独立根据规则生成当日待办（内容一致但 id 不同）。例行的云端路径归属在 `todos/routines/` 子目录下，因为例行是待办的衍生规则
-- macOS 平台优先实现，Android 和鸿蒙 NEXT 后续跟进
-- 索引文件大小控制在 100KB 以内（1000 条数据约 50KB）
+## Success Criteria
+
+- **SC-001**: 配置 WebDAV 并保存目录后，立即创建/复用 `用户指定目录/MyAssistant/` 并完成一次同步。
+- **SC-002**: 修改待办或例行后，无需 repository 调用同步 API，`sync_data` 自动出现上传任务。
+- **SC-003**: 同步下载远端数据时不会产生新的上传任务。
+- **SC-004**: 1000 条实体中只有 10 条变更时，只传输相关 index 和 10 个实体文件。
+- **SC-005**: `flutter analyze` 和现有 `flutter test` 通过。

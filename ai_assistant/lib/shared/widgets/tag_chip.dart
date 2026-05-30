@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/platform/app_performance.dart';
 import '../../../domain/models/tag.dart';
 
 class TagChip extends StatelessWidget {
@@ -55,6 +56,8 @@ class TagChip extends StatelessWidget {
           return AppColors.routineBg;
         case 'message':
           return AppColors.messageBg;
+        case 'sms':
+          return AppColors.healthBg;
         case 'calendar':
           return AppColors.calendarBg;
         default:
@@ -88,6 +91,8 @@ class TagChip extends StatelessWidget {
           return AppColors.warning;
         case 'message':
           return AppColors.success;
+        case 'sms':
+          return AppColors.healthText;
         case 'calendar':
           return AppColors.calendarText;
         default:
@@ -121,51 +126,58 @@ class TagChip extends StatelessWidget {
             scheme.appSurface,
           )
         : (selected ? fg.withValues(alpha: 0.16) : bg.withValues(alpha: 0.62));
+    final reduceMotion = AppPerformance.shouldReduceMotion(context);
+    final padding = EdgeInsets.fromLTRB(selected ? 8 : 10, 5, 10, 5);
+    final decoration = BoxDecoration(
+      color: fill,
+      borderRadius: BorderRadius.circular(999),
+      border: Border.all(
+        color: selected
+            ? fg.withValues(alpha: 0.72)
+            : fg.withValues(alpha: 0.14),
+        width: selected ? 1.4 : 1,
+      ),
+      boxShadow: selected && !reduceMotion
+          ? [
+              BoxShadow(
+                color: fg.withValues(alpha: 0.12),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ]
+          : null,
+    );
+    final child = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (selected) ...[
+          Icon(Icons.check_rounded, size: 13, color: fg),
+          const SizedBox(width: 3),
+        ],
+        Text(
+          label,
+          style: TextStyle(
+            fontFamily: 'PingFang SC',
+            fontFamilyFallback: const [
+              '.SF Pro Text',
+              'system-ui',
+              'sans-serif',
+            ],
+            fontSize: 12,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+            color: fg.withValues(alpha: selected ? 1 : 0.86),
+          ),
+        ),
+      ],
+    );
+    if (reduceMotion) {
+      return Container(padding: padding, decoration: decoration, child: child);
+    }
     return AnimatedContainer(
       duration: AppAnimations.shortDuration,
-      padding: EdgeInsets.fromLTRB(selected ? 8 : 10, 5, 10, 5),
-      decoration: BoxDecoration(
-        color: fill,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: selected
-              ? fg.withValues(alpha: 0.72)
-              : fg.withValues(alpha: 0.14),
-          width: selected ? 1.4 : 1,
-        ),
-        boxShadow: selected
-            ? [
-                BoxShadow(
-                  color: fg.withValues(alpha: 0.12),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ]
-            : null,
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (selected) ...[
-            Icon(Icons.check_rounded, size: 13, color: fg),
-            const SizedBox(width: 3),
-          ],
-          Text(
-            label,
-            style: TextStyle(
-              fontFamily: 'PingFang SC',
-              fontFamilyFallback: const [
-                '.SF Pro Text',
-                'system-ui',
-                'sans-serif',
-              ],
-              fontSize: 12,
-              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-              color: fg.withValues(alpha: selected ? 1 : 0.86),
-            ),
-          ),
-        ],
-      ),
+      padding: padding,
+      decoration: decoration,
+      child: child,
     );
   }
 }

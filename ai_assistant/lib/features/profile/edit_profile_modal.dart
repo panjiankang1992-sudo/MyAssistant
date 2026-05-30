@@ -1,9 +1,9 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:file_picker/file_picker.dart';
 import '../../core/theme/app_theme.dart';
+import '../copilot/copilot_avatar.dart';
+import '../copilot/copilot_avatar_picker.dart';
 import 'profile_provider.dart';
 
 void showEditProfileModal(BuildContext context) {
@@ -37,6 +37,8 @@ class _EditProfileContentState extends ConsumerState<_EditProfileContent> {
   late TextEditingController _emailCtrl;
   late TextEditingController _phoneCtrl;
   final _formKey = GlobalKey<FormState>();
+  bool _saving = false;
+  String? _saveError;
 
   static const _avatarColors = [
     [Color(0xFF667EEA), Color(0xFF764BA2)],
@@ -64,8 +66,12 @@ class _EditProfileContentState extends ConsumerState<_EditProfileContent> {
     super.dispose();
   }
 
-  void _save() {
+  Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
+    setState(() {
+      _saving = true;
+      _saveError = null;
+    });
     ref
         .read(profileProvider.notifier)
         .updateProfile(
@@ -73,19 +79,40 @@ class _EditProfileContentState extends ConsumerState<_EditProfileContent> {
           email: _emailCtrl.text.trim(),
           phone: _phoneCtrl.text.trim(),
         );
+    if (!mounted) return;
     Navigator.of(context).pop();
   }
 
-  Future<void> _pickImage() async {
-    final result = await FilePicker.platform.pickFiles(type: FileType.image);
-    if (result != null && result.files.single.path != null) {
-      ref
-          .read(profileProvider.notifier)
-          .setAvatarPath(result.files.single.path!);
+  Future<void> _openAvatarPicker() async {
+    final profile = ref.read(profileProvider);
+    final value = await showDialog<String>(
+      context: context,
+      builder: (context) => CopilotAvatarPickerDialog(
+        value: _avatarValueOf(profile),
+        title: '选择个人头像',
+      ),
+    );
+    if (value == null || value.trim().isEmpty) return;
+    ref.read(profileProvider.notifier).setAvatarValue(value);
+  }
+
+  String _avatarValueOf(UserProfile p) {
+    final saved = p.avatarValue?.trim() ?? '';
+    if (saved.isNotEmpty) return saved;
+    if ((p.avatarPath ?? '').trim().isNotEmpty) {
+      return CopilotAvatarCatalog.fileValue(p.avatarPath!);
     }
+    if ((p.avatarEmoji ?? '').trim().isNotEmpty) {
+      return 'emoji:${p.avatarEmoji}';
+    }
+    return CopilotAvatarCatalog.defaultValue;
   }
 
   Widget _avatarWidget(UserProfile p) {
+    final saved = p.avatarValue?.trim() ?? '';
+    if (saved.isNotEmpty) {
+      return CopilotAvatarView(value: saved, size: 72);
+    }
     if (p.hasServerAvatar) {
       final url = p.serverAvatarUrl!;
       if (url.startsWith('data:')) {
@@ -116,17 +143,15 @@ class _EditProfileContentState extends ConsumerState<_EditProfileContent> {
       );
     }
     if (p.hasCustomAvatar) {
-      return ClipOval(
-        child: Image.file(
-          File(p.avatarPath!),
-          width: 72,
-          height: 72,
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) => _gradientAvatar(p),
-        ),
+      return CopilotAvatarView(
+        value: CopilotAvatarCatalog.fileValue(p.avatarPath!),
+        size: 72,
       );
     }
-    return _gradientAvatar(p);
+    return const CopilotAvatarView(
+      value: CopilotAvatarCatalog.defaultValue,
+      size: 72,
+    );
   }
 
   Widget _gradientAvatar(UserProfile p) {
@@ -180,7 +205,7 @@ class _EditProfileContentState extends ConsumerState<_EditProfileContent> {
               children: [
                 Center(
                   child: GestureDetector(
-                    onTap: _pickImage,
+                    onTap: _openAvatarPicker,
                     child: Consumer(
                       builder: (context, ref, child) =>
                           _avatarWidget(ref.watch(profileProvider)),
@@ -190,9 +215,9 @@ class _EditProfileContentState extends ConsumerState<_EditProfileContent> {
                 const SizedBox(height: 10),
                 Center(
                   child: OutlinedButton.icon(
-                    onPressed: _pickImage,
-                    icon: const Icon(Icons.image_outlined, size: 16),
-                    label: const Text('选择图片'),
+                    onPressed: _openAvatarPicker,
+                    icon: const Icon(Icons.face_retouching_natural, size: 16),
+                    label: const Text('更换头像'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.textSecondary,
                       side: const BorderSide(color: AppColors.border),
@@ -255,7 +280,9 @@ class _EditProfileContentState extends ConsumerState<_EditProfileContent> {
                   children: [
                     Expanded(
                       child: OutlinedButton(
-                        onPressed: () => Navigator.pop(context),
+                        onPressed: _saving
+                            ? null
+                            : () => Navigator.pop(context),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppColors.text,
                           side: const BorderSide(color: AppColors.border),
@@ -271,7 +298,7 @@ class _EditProfileContentState extends ConsumerState<_EditProfileContent> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: ElevatedButton(
-                        onPressed: _save,
+                        onPressed: _saving ? null : _save,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primary,
                           foregroundColor: Colors.white,
@@ -281,11 +308,33 @@ class _EditProfileContentState extends ConsumerState<_EditProfileContent> {
                           ),
                           padding: const EdgeInsets.symmetric(vertical: 14),
                         ),
-                        child: const Text('保存'),
+                        child: _saving
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text('保存'),
                       ),
                     ),
                   ],
                 ),
+                if (_saveError != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 10),
+                    child: Text(
+                      _saveError!,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: AppColors.danger,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),

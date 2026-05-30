@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/providers/core_providers.dart';
 import '../../domain/models/ai_model_config.dart';
 import 'ai_model_store.dart';
 
@@ -41,7 +42,7 @@ class AiModelNotifier extends Notifier<AiModelState> {
 
   @override
   AiModelState build() {
-    _store = AiModelStore();
+    _store = AiModelStore(ref.read(databaseProvider));
     Future.microtask(load);
     return const AiModelState(loading: true);
   }

@@ -1,9 +1,9 @@
-import 'dart:convert';
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:path_provider/path_provider.dart';
+
+import '../../data/datasources/local_datasource.dart';
+import '../database/database.dart';
+import '../providers/core_providers.dart';
 
 enum AppThemeMode {
   system('system', '跟随系统', '随设备外观自动切换', Icons.settings_suggest_rounded),
@@ -169,24 +169,15 @@ class ThemeSettings {
 }
 
 class ThemeSettingsStore {
-  static const _fileName = 'theme_settings.json';
+  static const _id = 'theme_settings';
+  final AppDatabase _db;
 
-  Future<File> _file() async {
-    final dir = await getApplicationSupportDirectory();
-    final settingsDir = Directory('${dir.path}/settings');
-    if (!await settingsDir.exists()) {
-      await settingsDir.create(recursive: true);
-    }
-    return File('${settingsDir.path}/$_fileName');
-  }
+  ThemeSettingsStore(this._db);
 
   Future<ThemeSettings> load() async {
     try {
-      final file = await _file();
-      if (!await file.exists()) return const ThemeSettings();
-      final raw = await file.readAsString();
-      if (raw.trim().isEmpty) return const ThemeSettings();
-      final json = jsonDecode(raw) as Map<String, Object?>;
+      final json = await LocalDatasource(_db).getAppSettingJson('theme', _id);
+      if (json == null) return const ThemeSettings();
       return ThemeSettings.fromJson(json);
     } catch (_) {
       return const ThemeSettings();
@@ -194,16 +185,21 @@ class ThemeSettingsStore {
   }
 
   Future<void> save(ThemeSettings settings) async {
-    final file = await _file();
-    await file.writeAsString(jsonEncode(settings.toJson()));
+    await LocalDatasource(_db).upsertAppSettingJson(
+      module: 'profile',
+      dataType: 'theme',
+      id: _id,
+      payload: settings.toJson(),
+    );
   }
 }
 
 class ThemeSettingsNotifier extends AsyncNotifier<ThemeSettings> {
-  final _store = ThemeSettingsStore();
+  late final ThemeSettingsStore _store;
 
   @override
   Future<ThemeSettings> build() async {
+    _store = ThemeSettingsStore(ref.read(databaseProvider));
     return _store.load();
   }
 

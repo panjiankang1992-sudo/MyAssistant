@@ -1,7 +1,12 @@
+import 'dart:convert';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/api/auth_service.dart';
 import '../../data/api/api_client.dart';
 import '../../core/security/keychain_service.dart';
+import '../../data/api/profile_service.dart';
+import '../profile/profile_provider.dart';
+import '../sync/sync_identity.dart';
 
 class AuthState {
   final bool isLoggedIn;
@@ -21,8 +26,12 @@ class AuthState {
   });
 
   AuthState copyWith({
-    bool? isLoggedIn, bool? isLoading, String? username,
-    String? nickname, String? token, String? error,
+    bool? isLoggedIn,
+    bool? isLoading,
+    String? username,
+    String? nickname,
+    String? token,
+    String? error,
   }) {
     return AuthState(
       isLoggedIn: isLoggedIn ?? this.isLoggedIn,
@@ -36,9 +45,6 @@ class AuthState {
 }
 
 class AuthNotifier extends Notifier<AuthState> {
-  static const _keyUsername = 'auth_username';
-  static const _keyNickname = 'auth_nickname';
-
   @override
   AuthState build() => const AuthState();
 
@@ -47,9 +53,13 @@ class AuthNotifier extends Notifier<AuthState> {
     final result = await AuthService.login(account, password);
     if (result.success) {
       await _saveUserInfo(result.username, result.nickname);
+      _updateProfileFromAuth(result);
       state = state.copyWith(
-        isLoggedIn: true, isLoading: false,
-        username: result.username, nickname: result.nickname, token: result.token,
+        isLoggedIn: true,
+        isLoading: false,
+        username: result.username,
+        nickname: result.nickname,
+        token: result.token,
       );
       return true;
     }
@@ -57,37 +67,109 @@ class AuthNotifier extends Notifier<AuthState> {
     return false;
   }
 
-  void logout() {
-    ApiClient.setToken(null);
-    _clearUserInfo();
-    _clearWebdavCredentials();
+  Future<bool> sendRegisterCode({
+    required String username,
+    required String email,
+    required String phone,
+  }) async {
+    state = state.copyWith(error: null);
+    final result = await AuthService.sendRegisterCode(
+      username: username,
+      email: email,
+      phone: phone,
+    );
+    if (!result.success) {
+      state = state.copyWith(error: result.error);
+      return false;
+    }
+    return true;
+  }
+
+  Future<bool> register({
+    required String username,
+    required String password,
+    required String email,
+    required String phone,
+    required String verificationCode,
+  }) async {
+    state = state.copyWith(isLoading: true, error: null);
+    final result = await AuthService.register(
+      username: username,
+      password: password,
+      email: email,
+      phone: phone,
+      verificationCode: verificationCode,
+    );
+    if (result.success) {
+      await _saveUserInfo(result.username, result.nickname);
+      _updateProfileFromAuth(result);
+      state = state.copyWith(
+        isLoggedIn: true,
+        isLoading: false,
+        username: result.username,
+        nickname: result.nickname,
+        token: result.token,
+      );
+      return true;
+    }
+    state = state.copyWith(isLoading: false, error: result.error);
+    return false;
+  }
+
+  Future<void> logout() async {
+    await ApiClient.clearAuthTokens();
+    await _clearUserInfo();
+    await _clearWebdavCredentials();
     state = const AuthState();
   }
 
-  void restoreSession(String token) {
-    ApiClient.setToken(token);
-    _loadUserInfo().then((info) {
+  Future<bool> restoreSession(String? token) async {
+    if (token != null && token.isNotEmpty) {
+      ApiClient.setToken(token);
+    }
+    final info = await _loadUserInfo();
+    final refreshToken = await ApiClient.loadSavedRefreshToken();
+    if (refreshToken != null && refreshToken.isNotEmpty) {
+      final refreshed = await AuthService.refreshSession();
+      if (refreshed.success && refreshed.token != null) {
+        final profile = await _loadAndSaveLatestProfile();
+        final username = profile?.username.isNotEmpty == true
+            ? profile!.username
+            : info.$1;
+        final nickname = profile?.nickname.isNotEmpty == true
+            ? profile!.nickname
+            : info.$2;
+        state = state.copyWith(
+          isLoggedIn: true,
+          isLoading: false,
+          token: refreshed.token,
+          username: username,
+          nickname: nickname,
+        );
+        return true;
+      }
+    }
+    if (token != null && token.isNotEmpty && !_isJwtExpired(token)) {
       state = state.copyWith(
         isLoggedIn: true,
+        isLoading: false,
         token: token,
         username: info.$1,
         nickname: info.$2,
       );
-    });
+      return true;
+    }
+    await ApiClient.clearAuthTokens();
+    state = const AuthState();
+    return false;
   }
 
   Future<void> _saveUserInfo(String? username, String? nickname) async {
-    if (username != null) {
-      await ApiClient.storageWrite(_keyUsername, username);
-    }
-    if (nickname != null) {
-      await ApiClient.storageWrite(_keyNickname, nickname);
-    }
+    await SyncIdentity.saveUserInfo(username, nickname);
   }
 
   Future<void> _clearUserInfo() async {
-    await ApiClient.storageDelete(_keyUsername);
-    await ApiClient.storageDelete(_keyNickname);
+    await SyncIdentity.clearUserInfo();
   }
 
   Future<void> _clearWebdavCredentials() async {
@@ -100,10 +182,46 @@ class AuthNotifier extends Notifier<AuthState> {
   }
 
   Future<(String?, String?)> _loadUserInfo() async {
-    final username = await ApiClient.storageRead(_keyUsername);
-    final nickname = await ApiClient.storageRead(_keyNickname);
-    return (username, nickname);
+    return SyncIdentity.loadUserInfo();
+  }
+
+  void _updateProfileFromAuth(LoginResult result) {
+    ref.read(profileProvider.notifier).updateFromServer({
+      'username': result.username,
+      'nickname': result.nickname,
+      'avatar': result.avatar,
+      'email': result.email,
+      'phone': result.phone,
+    });
+  }
+
+  Future<ProfileData?> _loadAndSaveLatestProfile() async {
+    final profile = await ProfileService.getProfile();
+    if (profile == null) return null;
+    await _saveUserInfo(profile.username, profile.nickname);
+    ref.read(profileProvider.notifier).updateFromServer(profile.toProfileMap());
+    return profile;
+  }
+
+  bool _isJwtExpired(String token) {
+    try {
+      final parts = token.split('.');
+      if (parts.length != 3) return true;
+      final payload =
+          jsonDecode(
+                utf8.decode(base64Url.decode(base64Url.normalize(parts[1]))),
+              )
+              as Map<String, dynamic>;
+      final exp = payload['exp'];
+      if (exp is! num) return true;
+      final expiry = DateTime.fromMillisecondsSinceEpoch(exp.toInt() * 1000);
+      return !expiry.isAfter(DateTime.now().add(const Duration(seconds: 30)));
+    } catch (_) {
+      return true;
+    }
   }
 }
 
-final authProvider = NotifierProvider<AuthNotifier, AuthState>(AuthNotifier.new);
+final authProvider = NotifierProvider<AuthNotifier, AuthState>(
+  AuthNotifier.new,
+);

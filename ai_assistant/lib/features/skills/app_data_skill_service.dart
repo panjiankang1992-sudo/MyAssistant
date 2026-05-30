@@ -16,8 +16,9 @@ class AppDataSkillService {
     required this.profile,
     BookkeepingStore? bookkeepingStore,
     NotesStore? notesStore,
-  }) : bookkeepingStore = bookkeepingStore ?? BookkeepingStore(),
-       notesStore = notesStore ?? NotesStore();
+  }) : bookkeepingStore =
+           bookkeepingStore ?? BookkeepingStore(datasource.database),
+       notesStore = notesStore ?? NotesStore(datasource.database);
 
   Future<AppDataSkillResult> buildFor(String input) async {
     final todos = await datasource.getAllTodos();
@@ -331,6 +332,7 @@ class AppDataSkillService {
       '' || 'none' => '无',
       'bookkeeping' => '记账',
       'open_app' => '打开应用',
+      final value when value.startsWith('open_app:') => '打开应用',
       'call' => '拨打电话',
       'message' => '发消息',
       _ => action,

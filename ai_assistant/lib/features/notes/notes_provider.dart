@@ -1,6 +1,10 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../domain/models/app_attachment.dart';
 import '../../domain/models/quick_note.dart';
 import '../../domain/models/tag.dart';
 import '../../core/providers/core_providers.dart';
@@ -9,11 +13,27 @@ import '../skills/note_analysis_skill.dart';
 import '../sync/data_sync_service.dart';
 import 'notes_store.dart';
 
-final notesStoreProvider = Provider<NotesStore>((ref) => NotesStore());
+final notesStoreProvider = Provider<NotesStore>(
+  (ref) => NotesStore(ref.watch(databaseProvider)),
+);
 
 final notesNotifierProvider = NotifierProvider<NotesNotifier, List<QuickNote>>(
   NotesNotifier.new,
 );
+
+class NoteAttachmentDraft {
+  final String path;
+  final String fileName;
+  final String attachmentType;
+  final String? mimeType;
+
+  const NoteAttachmentDraft({
+    required this.path,
+    required this.fileName,
+    required this.attachmentType,
+    this.mimeType,
+  });
+}
 
 class NotesNotifier extends Notifier<List<QuickNote>> {
   @override
@@ -67,21 +87,53 @@ class NotesNotifier extends Notifier<List<QuickNote>> {
     required String content,
     required DateTime date,
     required List<Tag> tags,
+    List<NoteAttachmentDraft> attachments = const [],
   }) async {
     final now = DateTime.now();
+    final noteId = initial?.id ?? const Uuid().v4();
+    final inferredType =
+        initial?.noteType ??
+        (looksLikeDiaryTitle(title)
+            ? QuickNoteType.diary
+            : QuickNoteType.document);
+    final attachmentIds = [...?initial?.attachmentIds];
+    for (final draft in attachments) {
+      final file = File(draft.path);
+      if (!await file.exists()) continue;
+      final bytes = await file.readAsBytes();
+      if (bytes.length > AppAttachment.maxSizeBytes) {
+        throw ArgumentError('附件不能超过 20MB：${draft.fileName}');
+      }
+      final attachment = AppAttachment(
+        id: const Uuid().v4(),
+        ownerType: initial?.archived == true
+            ? 'archive'
+            : inferredType == QuickNoteType.diary
+            ? 'diary'
+            : 'note',
+        ownerId: noteId,
+        attachmentType: draft.attachmentType,
+        fileName: draft.fileName,
+        mimeType: draft.mimeType,
+        sizeBytes: bytes.length,
+        contentBase64: base64Encode(bytes),
+        createdAt: now,
+        updatedAt: now,
+      );
+      await ref.read(datasourceProvider).upsertAttachment(attachment);
+      attachmentIds.add(attachment.id);
+    }
     final note =
         (initial ??
                 QuickNote(
-                  id: const Uuid().v4(),
+                  id: noteId,
                   title: title,
                   content: content,
                   summary: _summaryOf(content),
                   date: DateTime(date.year, date.month, date.day),
                   createdAt: now,
                   updatedAt: now,
-                  noteType: looksLikeDiaryTitle(title)
-                      ? QuickNoteType.diary
-                      : QuickNoteType.document,
+                  noteType: inferredType,
                 ))
             .copyWith(
               title: title,
@@ -95,16 +147,13 @@ class NotesNotifier extends Notifier<List<QuickNote>> {
               date: DateTime(date.year, date.month, date.day),
               updatedAt: now,
               analyzed: initial?.isAnalysis == true ? true : false,
-              noteType:
-                  initial?.noteType ??
-                  (looksLikeDiaryTitle(title)
-                      ? QuickNoteType.diary
-                      : QuickNoteType.document),
+              noteType: inferredType,
               category: initial?.isAnalysis == true
                   ? initial!.category
                   : looksLikeDiaryTitle(title)
                   ? '日记'
                   : _inferCategory(title, content, tags),
+              attachmentIds: attachmentIds,
             );
     final next = [
       for (final item in state)
@@ -177,13 +226,37 @@ class NotesNotifier extends Notifier<List<QuickNote>> {
   }
 
   Future<void> archive(QuickNote note) async {
+    final now = DateTime.now();
     await _persist([
       for (final item in state)
         if (item.id == note.id)
-          item.copyWith(archived: true, updatedAt: DateTime.now())
+          item.copyWith(archived: true, updatedAt: now)
         else
           item,
     ]);
+    for (final attachmentId in note.attachmentIds) {
+      final attachment = await ref
+          .read(datasourceProvider)
+          .getAttachmentById(attachmentId);
+      if (attachment == null) continue;
+      await ref
+          .read(datasourceProvider)
+          .upsertAttachment(
+            AppAttachment(
+              id: attachment.id,
+              ownerType: 'archive',
+              ownerId: note.id,
+              attachmentType: attachment.attachmentType,
+              fileName: attachment.fileName,
+              mimeType: attachment.mimeType,
+              sizeBytes: attachment.sizeBytes,
+              contentBase64: attachment.contentBase64,
+              createdAt: attachment.createdAt,
+              updatedAt: now,
+              isDeleted: attachment.isDeleted,
+            ),
+          );
+    }
     await ref
         .read(dataSyncServiceProvider)
         .markDirty(DataSyncType.note, note.id, operation: 'archive');

@@ -1,8 +1,6 @@
-import 'dart:convert';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../data/api/api_client.dart';
+import '../../core/providers/core_providers.dart';
 import 'copilot_avatar.dart';
 
 class CopilotPersonaPreset {
@@ -186,11 +184,12 @@ class CopilotSettingsNotifier extends Notifier<CopilotSettings> {
   }
 
   Future<void> _load() async {
-    final cached = await ApiClient.storageRead(_storageKey);
-    if (cached == null || cached.trim().isEmpty) return;
+    final cached = await ref
+        .read(datasourceProvider)
+        .getAppSettingJson('copilot_setting', _storageKey);
+    if (cached == null || cached.isEmpty) return;
     try {
-      final json = jsonDecode(cached) as Map<String, dynamic>;
-      state = CopilotSettings.fromJson(json);
+      state = CopilotSettings.fromJson(cached);
     } catch (_) {
       state = const CopilotSettings();
     }
@@ -198,7 +197,14 @@ class CopilotSettingsNotifier extends Notifier<CopilotSettings> {
 
   Future<void> update(CopilotSettings settings) async {
     state = settings;
-    await ApiClient.storageWrite(_storageKey, jsonEncode(settings.toJson()));
+    await ref
+        .read(datasourceProvider)
+        .upsertAppSettingJson(
+          module: 'profile',
+          dataType: 'copilot_setting',
+          id: _storageKey,
+          payload: settings.toJson(),
+        );
   }
 }
 

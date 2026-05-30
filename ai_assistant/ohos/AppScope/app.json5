@@ -1,7 +1,7 @@
 {
   "app": {
-    "bundleName": "com.example.ai_assistant",
-    "vendor": "example",
+    "bundleName": "com.yuyutian.assistant",
+    "vendor": "yuyutian",
     "versionCode": 1000000,
     "versionName": "1.0.0",
     "icon": "$media:app_icon",

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../core/platform/app_performance.dart';
 import '../../core/theme/app_theme.dart';
 
 const double appControlHeight = 54;
@@ -79,6 +80,10 @@ ButtonStyle appControlButtonStyle({
     foregroundColor: foreground,
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
     textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+  ).copyWith(
+    animationDuration: AppPerformance.lowLatencyMode
+        ? Duration.zero
+        : AppAnimations.shortDuration,
   );
 }
 
@@ -178,10 +183,10 @@ class _AppDropdownFieldState<T> extends State<AppDropdownField<T>> {
     final textColor = Theme.of(context).colorScheme.onSurface;
     return CompositedTransformTarget(
       link: _layerLink,
-      child: InkWell(
+      child: GestureDetector(
         key: _fieldKey,
         onTap: _toggleMenu,
-        borderRadius: BorderRadius.circular(18),
+        behavior: HitTestBehavior.opaque,
         child: InputDecorator(
           decoration: appInputDecoration(
             context: context,
@@ -234,13 +239,15 @@ class _DropdownOverlay<T> extends StatelessWidget {
         color: scheme.surface,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: scheme.outline.withValues(alpha: 0.46)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 22,
-            offset: const Offset(0, 10),
-          ),
-        ],
+        boxShadow: AppPerformance.lowLatencyMode
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 22,
+                  offset: const Offset(0, 10),
+                ),
+              ],
       ),
       child: ListView.builder(
         shrinkWrap: true,
@@ -249,8 +256,9 @@ class _DropdownOverlay<T> extends StatelessWidget {
         itemBuilder: (context, index) {
           final option = options[index];
           final selected = option.value == value;
-          return InkWell(
+          return GestureDetector(
             onTap: () => onSelected(option.value),
+            behavior: HitTestBehavior.opaque,
             child: Container(
               height: 42,
               padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -381,21 +389,47 @@ class AppFloatingActionBar extends StatelessWidget {
           color: scheme.appElevatedSurface.withValues(alpha: 0.96),
           borderRadius: BorderRadius.circular(28),
           border: Border.all(color: scheme.appBorder.withValues(alpha: 0.72)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.12),
-              blurRadius: 24,
-              offset: const Offset(0, 10),
-            ),
-          ],
+          boxShadow: AppPerformance.lowLatencyMode
+              ? null
+              : [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.12),
+                    blurRadius: 24,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
         ),
-        child: Row(
-          children: [
-            for (var i = 0; i < actions.length; i++) ...[
-              if (i > 0) const SizedBox(width: 10),
-              Expanded(child: AppPillActionButton(action: actions[i])),
-            ],
-          ],
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return Listener(
+              behavior: HitTestBehavior.opaque,
+              onPointerUp: (event) {
+                if (actions.isEmpty) return;
+                final gapTotal = 10.0 * (actions.length - 1);
+                final itemWidth =
+                    (constraints.maxWidth - gapTotal) / actions.length;
+                for (var i = 0; i < actions.length; i++) {
+                  final start = i * (itemWidth + 10);
+                  final end = start + itemWidth;
+                  if (event.localPosition.dx >= start &&
+                      event.localPosition.dx <= end) {
+                    actions[i].onPressed();
+                    return;
+                  }
+                }
+              },
+              child: IgnorePointer(
+                child: Row(
+                  children: [
+                    for (var i = 0; i < actions.length; i++) ...[
+                      if (i > 0) const SizedBox(width: 10),
+                      Expanded(child: AppPillActionButton(action: actions[i])),
+                    ],
+                  ],
+                ),
+              ),
+            );
+          },
         ),
       ),
     );
@@ -449,6 +483,10 @@ class _AppVoiceInputFabState extends State<AppVoiceInputFab>
   }
 
   void _syncPulse() {
+    if (AppPerformance.lowLatencyMode) {
+      _pulseController.stop();
+      return;
+    }
     if (_shouldPulse) {
       if (!_pulseController.isAnimating) {
         _pulseController.repeat(reverse: true);
@@ -473,6 +511,7 @@ class _AppVoiceInputFabState extends State<AppVoiceInputFab>
   Widget build(BuildContext context) {
     final text = widget.transcript.trim();
     final scheme = Theme.of(context).colorScheme;
+    final reduceMotion = AppPerformance.shouldReduceMotion(context);
     return Transform.translate(
       offset: const Offset(0, -12),
       child: Column(
@@ -494,13 +533,17 @@ class _AppVoiceInputFabState extends State<AppVoiceInputFab>
               animation: _pulseController,
               builder: (context, child) {
                 final pulse = _pulseController.value;
-                final scale = (_armed ? 1.06 : 1.0) + pulse * 0.08;
+                final scale = reduceMotion
+                    ? 1.0
+                    : (_armed ? 1.06 : 1.0) + pulse * 0.08;
                 return Stack(
                   alignment: Alignment.center,
                   children: [
                     AnimatedOpacity(
-                      opacity: _shouldPulse ? 1 : 0,
-                      duration: const Duration(milliseconds: 160),
+                      opacity: reduceMotion ? 0 : (_shouldPulse ? 1 : 0),
+                      duration: reduceMotion
+                          ? Duration.zero
+                          : const Duration(milliseconds: 160),
                       child: Transform.scale(
                         scale: 1.05 + pulse * 0.38,
                         child: Container(
@@ -529,20 +572,24 @@ class _AppVoiceInputFabState extends State<AppVoiceInputFab>
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: widget.gradientColors.last.withValues(alpha: 0.26),
-                      blurRadius: 18,
-                      offset: const Offset(0, 8),
-                    ),
-                    BoxShadow(
-                      color: widget.gradientColors.first.withValues(
-                        alpha: 0.16,
-                      ),
-                      blurRadius: 10,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
+                  boxShadow: reduceMotion
+                      ? null
+                      : [
+                          BoxShadow(
+                            color: widget.gradientColors.last.withValues(
+                              alpha: 0.26,
+                            ),
+                            blurRadius: 18,
+                            offset: const Offset(0, 8),
+                          ),
+                          BoxShadow(
+                            color: widget.gradientColors.first.withValues(
+                              alpha: 0.16,
+                            ),
+                            blurRadius: 10,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
                 ),
                 child: Icon(
                   widget.listening || _armed
@@ -555,7 +602,9 @@ class _AppVoiceInputFabState extends State<AppVoiceInputFab>
             ),
           ),
           AnimatedSwitcher(
-            duration: const Duration(milliseconds: 180),
+            duration: reduceMotion
+                ? Duration.zero
+                : const Duration(milliseconds: 180),
             switchInCurve: Curves.easeOut,
             switchOutCurve: Curves.easeIn,
             child: _active
@@ -573,13 +622,15 @@ class _AppVoiceInputFabState extends State<AppVoiceInputFab>
                           border: Border.all(
                             color: scheme.appBorder.withValues(alpha: 0.78),
                           ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.08),
-                              blurRadius: 18,
-                              offset: const Offset(0, 8),
-                            ),
-                          ],
+                          boxShadow: reduceMotion
+                              ? null
+                              : [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.08),
+                                    blurRadius: 18,
+                                    offset: const Offset(0, 8),
+                                  ),
+                                ],
                         ),
                         child: Padding(
                           padding: const EdgeInsets.symmetric(
@@ -646,43 +697,65 @@ class AppPillActionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final background = _background(scheme);
+    final foreground = _foreground(scheme);
+    final side = action.tone == AppActionButtonTone.neutral
+        ? BorderSide(color: scheme.appBorder.withValues(alpha: 0.8))
+        : BorderSide.none;
+    final style = ButtonStyle(
+      minimumSize: WidgetStateProperty.all(Size(0, height)),
+      fixedSize: WidgetStateProperty.all(Size.fromHeight(height)),
+      padding: WidgetStateProperty.all(
+        const EdgeInsets.symmetric(horizontal: 12),
+      ),
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      elevation: WidgetStateProperty.all(0),
+      animationDuration: AppPerformance.lowLatencyMode
+          ? Duration.zero
+          : AppAnimations.shortDuration,
+      backgroundColor: WidgetStateProperty.all(background),
+      foregroundColor: WidgetStateProperty.all(foreground),
+      overlayColor: WidgetStateProperty.all(
+        foreground.withValues(
+          alpha: action.tone == AppActionButtonTone.neutral ? 0.08 : 0.14,
+        ),
+      ),
+      side: WidgetStateProperty.all(side),
+      shape: WidgetStateProperty.all(
+        RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      ),
+    );
     return SizedBox(
       height: height,
-      child: ElevatedButton(
-        onPressed: action.onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: _background(scheme),
-          foregroundColor: _foreground(scheme),
-          elevation: 0,
-          shadowColor: Colors.transparent,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-            side: action.tone == AppActionButtonTone.neutral
-                ? BorderSide(color: scheme.appBorder.withValues(alpha: 0.8))
-                : BorderSide.none,
-          ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (action.icon != null) ...[
-              Icon(action.icon, size: 19),
-              const SizedBox(width: 6),
-            ],
-            Flexible(
-              child: Text(
-                action.label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w900,
+      child: Semantics(
+        button: true,
+        label: action.label,
+        excludeSemantics: true,
+        child: FilledButton(
+          onPressed: action.onPressed,
+          style: style,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (action.icon != null) ...[
+                Icon(action.icon, size: 19, color: foreground),
+                const SizedBox(width: 6),
+              ],
+              Flexible(
+                child: Text(
+                  action.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                    color: foreground,
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

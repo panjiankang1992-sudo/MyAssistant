@@ -1,15 +1,19 @@
 import '../../core/security/keychain_service.dart';
 import '../../data/api/profile_service.dart';
 import '../../data/api/webdav_decrypt.dart';
+import 'sync_identity.dart';
 
 /// WebDAV 凭据同步结果。
 enum WebDavSyncStatus {
   /// 服务器未配置 WebDAV
   notConfigured,
+
   /// 密码解密失败（密钥不匹配或密文损坏）
   decryptFailed,
+
   /// 凭据保存到 Keychain 失败
   keychainFailed,
+
   /// 同步成功
   success,
 }
@@ -46,19 +50,24 @@ class WebDavProvisioner {
     }
 
     // 未配置 WebDAV
-    if (profile.webdavUrl == null || profile.webdavUsername == null || !profile.webdavPasswordSet) {
+    if (profile.webdavUrl == null ||
+        profile.webdavUsername == null ||
+        !profile.webdavPasswordSet) {
       return const WebDavSyncResult(WebDavSyncStatus.notConfigured);
     }
 
     // 解密密码
     final decryptedPwd = WebDavDecrypt.decrypt(profile.webdavEncryptedPassword);
     if (decryptedPwd == null) {
-      return WebDavSyncResult(WebDavSyncStatus.decryptFailed,
-        'webdavUrl=${profile.webdavUrl}, encryptedPwd 长度=${profile.webdavEncryptedPassword?.length ?? 0}');
+      return WebDavSyncResult(
+        WebDavSyncStatus.decryptFailed,
+        'webdavUrl=${profile.webdavUrl}, encryptedPwd 长度=${profile.webdavEncryptedPassword?.length ?? 0}',
+      );
     }
 
     // 保存到 Keychain
     try {
+      await SyncIdentity.saveUserInfo(profile.username, profile.nickname);
       final keychain = KeychainService();
       await keychain.saveCredentials(
         profile.webdavUrl!,
@@ -70,7 +79,10 @@ class WebDavProvisioner {
       // 回读验证
       final saved = await keychain.getCredentials(profile.webdavUrl!);
       if (saved == null) {
-        return const WebDavSyncResult(WebDavSyncStatus.keychainFailed, '保存后回读为空');
+        return const WebDavSyncResult(
+          WebDavSyncStatus.keychainFailed,
+          '保存后回读为空',
+        );
       }
 
       return const WebDavSyncResult(WebDavSyncStatus.success);
@@ -86,6 +98,10 @@ class WebDavProvisioner {
     if (lastUrl == null) return null;
     final creds = await keychain.getCredentials(lastUrl);
     if (creds == null) return null;
-    return {'url': lastUrl, 'username': creds['username']!, 'password': creds['password']!};
+    return {
+      'url': lastUrl,
+      'username': creds['username']!,
+      'password': creds['password']!,
+    };
   }
 }

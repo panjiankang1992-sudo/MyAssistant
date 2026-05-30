@@ -1,28 +1,22 @@
-import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/providers/core_providers.dart';
 import '../../domain/models/todo.dart';
 import '../ai_settings/ai_model_provider.dart';
 import '../copilot/services/openai_compatible_client.dart';
 import 'bookkeeping_page.dart';
 
 class BookkeepingActionService {
-  late final BookkeepingStore _store;
-  late final ExchangeService _exchangeService;
-  late final BookkeepingCloudSync _cloudSync;
+  final BookkeepingStore? _store;
+  final ExchangeService? _exchangeService;
 
   BookkeepingActionService({
     BookkeepingStore? store,
     ExchangeService? exchangeService,
-    BookkeepingCloudSync? cloudSync,
-  }) {
-    final resolvedStore = store ?? BookkeepingStore();
-    _store = resolvedStore;
-    _exchangeService = exchangeService ?? ExchangeService(resolvedStore);
-    _cloudSync = cloudSync ?? BookkeepingCloudSync();
-  }
+  }) : _store = store,
+       _exchangeService = exchangeService;
 
   Future<bool> createExpenseFromTodo({
     required Ref ref,
@@ -35,7 +29,9 @@ class BookkeepingActionService {
     ].join(' ');
     if (text.trim().isEmpty) return false;
 
-    final customCategories = await _store.loadCustomCategories();
+    final store = _store ?? BookkeepingStore(ref.read(databaseProvider));
+    final exchangeService = _exchangeService ?? ExchangeService(store);
+    final customCategories = await store.loadCustomCategories();
     final localParsed = _localParse(text, customCategories);
     final parsed = _isConfidentLocalParse(localParsed)
         ? localParsed
@@ -44,7 +40,7 @@ class BookkeepingActionService {
     if (parsed.amount <= 0) return false;
 
     final category = _categoryByName(parsed.categoryName, customCategories);
-    final rates = await _exchangeService.getRates();
+    final rates = await exchangeService.getRates();
     final amount = parsed.amount;
     final cny = amount * (rates.toCny[parsed.currency] ?? 1);
     final createdAt = DateTime.now();
@@ -64,11 +60,10 @@ class BookkeepingActionService {
       createdAt: createdAt,
     );
 
-    final entries = await _store.loadEntries();
+    final entries = await store.loadEntries();
     final next = [entry, ...entries.where((item) => item.id != entry.id)]
       ..sort((a, b) => b.date.compareTo(a.date));
-    await _store.saveEntries(next);
-    unawaited(_cloudSync.sync(_store).catchError((_) {}));
+    await store.saveEntries(next);
     return true;
   }
 
@@ -176,6 +171,9 @@ class BookkeepingActionService {
     }
     if (RegExp('书|课程|学习|培训').hasMatch(text)) {
       return findDefaultLedgerCategory('学习');
+    }
+    if (RegExp('水费|电费|燃气|煤气|物业|话费|宽带|生活缴费').hasMatch(text)) {
+      return findDefaultLedgerCategory('生活缴费');
     }
     return findDefaultLedgerCategory('其他');
   }

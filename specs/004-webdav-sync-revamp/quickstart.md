@@ -1,97 +1,87 @@
 # Quickstart: WebDAV 同步策略重构
 
-**Phase 1 output for spec 004**
+**Revised**: 2026-05-29
 
-## 前置条件
-
-1. Flutter 3.27+ 已安装
-2. macOS 环境 + Homebrew
-3. 后端 MyTools 服务已运行（提供 WebDAV 凭据）
-4. WebDAV 服务器可访问
-
-## 数据库迁移
-
-首次运行 v4 版本时，Drift 自动执行迁移：
+## Build & Verify
 
 ```bash
 cd ai_assistant
-flutter clean
-SQLITE3_LIB_DIR="/opt/homebrew/opt/sqlite/lib" flutter pub get
-SQLITE3_LIB_DIR="/opt/homebrew/opt/sqlite/lib" flutter pub run build_runner build --delete-conflicting-outputs
+flutter pub run build_runner build
+flutter analyze
+flutter test
 ```
 
-迁移内容（自动）：
-- `todos` 表新增 `version`, `deleted` 列
-- `routines` 表新增 `uuid`, `version`, `updated_at`, `deleted` 列
-- 现有例行记录自动生成 UUID
+## WebDAV 配置验证
 
-## 关键文件改动
+1. 打开设置页。
+2. 填写 WebDAV 服务器、用户名、密码/授权码。
+3. 填写同步目录，例如 `Documents/MyAssistantData`。
+4. 点击验证。
+5. 保存后应用应立即触发一次同步。
 
-| 文件 | 操作 | 说明 |
-|------|------|------|
-| `domain/models/todo.dart` | 新增字段 | `version`, `deleted` |
-| `domain/models/routine.dart` | 新增字段 | `uuid`, `version`, `updatedAt`, `deleted` |
-| `core/database/tables/todos_table.dart` | 新增列 | `version`, `deleted` |
-| `core/database/tables/routines_table.dart` | 新增列 | `uuid`, `version`, `updatedAt`, `deleted` |
-| `core/database/database.dart` | schemaVersion→4 | 新增 v4 迁移代码 |
-| `data/repositories/todo_repository.dart` | 新增 | CUD 后触发同步 |
-| `data/repositories/routine_repository.dart` | 新增 | CUD 后触发同步 |
-| `features/sync/cloud_path_builder.dart` | 修正 | 路径格式对齐新规范 |
-| `features/sync/sync_engine.dart` | **重写** | 索引差分增量同步 |
-| `features/sync/index_manager.dart` | **重写** | 模块化索引 |
-| `features/sync/sync_scheduler.dart` | **重写** | Repository 驱动 |
-| `features/sync/providers/sync_provider.dart` | **重写** | SyncState 状态暴露 |
-| `features/settings/settings_page.dart` | 更新 | 同步状态展示 |
+远端目录应为：
 
-## 验证步骤
-
-### 1. 数据库迁移验证
-
-```bash
-# 启动 app 后检查数据库
-ls ~/Library/Containers/com.example.aiAssistant/Data/Documents/ai_assistant_db
+```text
+Documents/MyAssistantData/MyAssistant/
 ```
 
-使用 SQLite 客户端检查新列：
+## 首次同步验证
+
+保存 WebDAV 配置后检查远端目录：
+
+```text
+{root}/MyAssistant/sync/sync_index.json
+{root}/MyAssistant/index/todos/todos_index.json
+{root}/MyAssistant/index/todos/routine_index.json
+{root}/MyAssistant/index/attachments/attachments_index.json
+{root}/MyAssistant/todos/{YYYY}/{YYYY-MM}/{YYYY-MM-DD}/todo_{uuid}.json
+{root}/MyAssistant/todos/routine/routine_{uuid}.json
+{root}/MyAssistant/attachments/{YYYY}/{YYYY-MM}/attachment_{uuid}.json
+```
+
+## 表变化自动入队验证
+
+使用 SQLite 客户端查看：
+
 ```sql
-PRAGMA table_info(todos);
-PRAGMA table_info(routines);
+SELECT * FROM sync_data WHERE is_completed = 0 ORDER BY id DESC;
 ```
 
-### 2. 首次同步验证
+验证步骤：
 
-1. 登录后创建一条待办
-2. 自动触发同步 → 检查 WebDAV 远端是否有新文件：
-   ```
-   MyAssistant/{username}/todos/{YYYY}/{YYYYMM}/{YYYYMMDD}/{uuid}.json
-   MyAssistant/{username}/index/todos/todos_index.json
-   ```
+1. 新增待办。
+2. `sync_data` 自动出现 `local_table='todos'`、`operation_type='upload'`。
+3. 修改例行。
+4. `sync_data` 自动出现 `local_table='routines'`、`operation_type='upload'`。
+5. 同步完成后任务 `is_completed=1`。
 
-### 3. 双向同步验证
+## 附件同步验证
 
-1. 创建设备 A 待办 "测试A"
-2. 等待自动同步完成
-3. 在设备 B（或同一设备重新创建）创建待办 "测试B"
-4. 点击设置页手动同步
-5. 验证两端都可见 "测试A" 和 "测试B"
+使用 SQLite 客户端查看附件任务：
 
-### 4. 例行同步验证
+```sql
+SELECT id, owner_type, owner_id, size_bytes FROM attachments ORDER BY updated_at DESC;
+SELECT * FROM sync_data WHERE local_table = 'attachments' ORDER BY id DESC;
+```
 
-1. 创建例行 "每天8点跑步" (daily)
-2. 检查远端 `MyAssistant/{username}/todos/routines/{uuid}.json`
-3. 检查远端 `MyAssistant/{username}/index/todos/routines_index.json`
-4. 修改重复规则为 "仅工作日"
-5. 同步后验证规则已更新
+验证步骤：
 
-### 5. 离线行为验证
+1. 为日记、文档或归档添加图片/录音/文件附件；Copilot chat 接入附件输入后复用同一验证流程。
+2. 随手记保存后正文只保留文字/网页快照，图片和文件转为 `attachmentIds`。
+3. `sync_data` 自动出现 `local_table='attachments'`、`operation_type='upload'`。
+4. 同步时先上传普通实体，最后上传附件文件和 `index/attachments/attachments_index.json`。
+5. 单个附件超过 20MB 时，上传任务应进入 error 状态。
 
-1. 断开网络
-2. 创建/修改/删除待办 → 操作正常完成，不报错
-3. 恢复网络 → 自动同步新变更到云端
+## 静默下载验证
 
-## 已知限制
+1. 在 WebDAV 上准备更新时间更新的实体文件和 index。
+2. 触发同步。
+3. 本地实体被更新。
+4. 同步下载写入本地期间不新增 `operation_type='upload'` 的任务。
 
-- 仅实现 `todos` 模块同步（bills/notes/copilot/profile 目录已预留，实现延后）
-- 手动同步按钮保留，用于首次同步或网络恢复后手动触发
-- 30天软删除清理功能在后续版本实现
-- macOS 专属功能，Android/鸿蒙同步延后
+## Current Limitations
+
+- 当前代码触发器已覆盖 `todos`、`routines`、`tags`、`metadata_options`、`attachments`。
+- `bills`、`notes`、`copilot`、`profile` 仍有 JSON/本地存储路径，后续需要迁移为同步模块托管的本地表。
+- 随手记编辑器已接入附件表写入流程；Copilot chat 附件输入仍需接入，模型和同步层已支持 `attachmentIds`。
+- 冲突备份表尚未落地；当前基础策略仍以最后修改时间优先。

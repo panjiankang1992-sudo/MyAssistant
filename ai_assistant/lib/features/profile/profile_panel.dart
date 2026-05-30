@@ -1,16 +1,16 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
-import '../auth/auth_provider.dart';
+import '../copilot/copilot_avatar.dart';
 import '../copilot/copilot_settings_page.dart';
 import '../settings/settings_page.dart';
 import '../settings/theme_settings_page.dart';
 import '../tags/tag_manage_page.dart';
 import '../help/help_feedback_page.dart';
+import '../permissions/permission_management_page.dart';
+import 'about_page.dart';
 import 'edit_profile_modal.dart';
-import 'password_change_modal.dart';
 import 'profile_provider.dart';
 
 class ProfilePanel extends StatefulWidget {
@@ -62,6 +62,11 @@ class _ProfilePanelState extends State<ProfilePanel>
   }
 
   Widget _buildAvatar(UserProfile profile) {
+    final saved = profile.avatarValue?.trim() ?? '';
+    if (saved.isNotEmpty) {
+      return CopilotAvatarView(value: saved, size: 80);
+    }
+
     if (profile.hasServerAvatar) {
       final avatarUrl = profile.serverAvatarUrl!;
       // 后端返回 data:image/...;base64,... 格式的数据URI
@@ -111,26 +116,15 @@ class _ProfilePanelState extends State<ProfilePanel>
       );
     }
     if (profile.hasCustomAvatar) {
-      return Container(
-        width: 80,
-        height: 80,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(color: AppColors.border, width: 2),
-        ),
-        child: ClipOval(
-          child: Image.file(
-            File(profile.avatarPath!),
-            width: 80,
-            height: 80,
-            fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) =>
-                _buildGradientAvatar(profile),
-          ),
-        ),
+      return CopilotAvatarView(
+        value: CopilotAvatarCatalog.fileValue(profile.avatarPath!),
+        size: 80,
       );
     }
-    return _buildGradientAvatar(profile);
+    return const CopilotAvatarView(
+      value: CopilotAvatarCatalog.defaultValue,
+      size: 80,
+    );
   }
 
   Widget _buildGradientAvatar(UserProfile profile) {
@@ -222,7 +216,12 @@ class _ProfilePanelState extends State<ProfilePanel>
                               style: const TextStyle(
                                 decoration: TextDecoration.none,
                               ),
-                              child: Column(
+                              child: ListView(
+                                padding: EdgeInsets.only(
+                                  bottom:
+                                      MediaQuery.of(context).padding.bottom +
+                                      20,
+                                ),
                                 children: [
                                   Padding(
                                     padding: const EdgeInsets.fromLTRB(
@@ -263,34 +262,54 @@ class _ProfilePanelState extends State<ProfilePanel>
                                     ),
                                   ),
                                   const SizedBox(height: 18),
-                                  GestureDetector(
-                                    onTap: () => _afterClose(
-                                      () => showEditProfileModal(context),
+                                  Center(
+                                    child: GestureDetector(
+                                      onTap: () => _afterClose(
+                                        () => showEditProfileModal(context),
+                                      ),
+                                      child: _buildAvatar(profile),
                                     ),
-                                    child: _buildAvatar(profile),
                                   ),
                                   const SizedBox(height: 14),
-                                  Text(
-                                    profile.name.isEmpty
-                                        ? '未设置昵称'
-                                        : profile.name,
-                                    style: TextStyle(
-                                      fontFamily: 'PingFang SC',
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.w700,
-                                      color: scheme.onSurface,
-                                      decoration: TextDecoration.none,
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 24,
+                                    ),
+                                    child: Text(
+                                      profile.name.isEmpty
+                                          ? '未设置昵称'
+                                          : profile.name,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontFamily: 'PingFang SC',
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.w700,
+                                        color: scheme.onSurface,
+                                        decoration: TextDecoration.none,
+                                      ),
                                     ),
                                   ),
                                   const SizedBox(height: 4),
-                                  Text(
-                                    profile.email.isEmpty ? '' : profile.email,
-                                    style: TextStyle(
-                                      fontFamily: 'PingFang SC',
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w400,
-                                      color: scheme.onSurfaceVariant,
-                                      decoration: TextDecoration.none,
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 24,
+                                    ),
+                                    child: Text(
+                                      profile.email.isEmpty
+                                          ? ''
+                                          : profile.email,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontFamily: 'PingFang SC',
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w400,
+                                        color: scheme.onSurfaceVariant,
+                                        decoration: TextDecoration.none,
+                                      ),
                                     ),
                                   ),
                                   const SizedBox(height: 22),
@@ -318,32 +337,12 @@ class _ProfilePanelState extends State<ProfilePanel>
                                           ),
                                         ),
                                         _MenuItemCard(
-                                          icon: Icons.lock_outline_rounded,
-                                          label: '修改密码',
-                                          onTap: () => _afterClose(
-                                            () => showPasswordChangeModal(
-                                              context,
-                                            ),
-                                          ),
-                                        ),
-                                        _MenuItemCard(
                                           icon: Icons.palette_outlined,
                                           label: '主题设置',
                                           onTap: () => _afterClose(() {
                                             Navigator.of(context).push(
                                               profileSidePageRoute(
                                                 const ThemeSettingsPage(),
-                                              ),
-                                            );
-                                          }),
-                                        ),
-                                        _MenuItemCard(
-                                          icon: Icons.auto_awesome_rounded,
-                                          label: 'Copilot 设置',
-                                          onTap: () => _afterClose(() {
-                                            Navigator.of(context).push(
-                                              profileSidePageRoute(
-                                                const CopilotSettingsPage(),
                                               ),
                                             );
                                           }),
@@ -360,12 +359,34 @@ class _ProfilePanelState extends State<ProfilePanel>
                                           }),
                                         ),
                                         _MenuItemCard(
+                                          icon: Icons.verified_user_outlined,
+                                          label: '权限管理',
+                                          onTap: () => _afterClose(() {
+                                            Navigator.of(context).push(
+                                              profileSidePageRoute(
+                                                const PermissionManagementPage(),
+                                              ),
+                                            );
+                                          }),
+                                        ),
+                                        _MenuItemCard(
                                           icon: Icons.sell_outlined,
                                           label: '标签管理',
                                           onTap: () => _afterClose(() {
                                             Navigator.of(context).push(
                                               profileSidePageRoute(
                                                 const TagManagePage(),
+                                              ),
+                                            );
+                                          }),
+                                        ),
+                                        _MenuItemCard(
+                                          icon: Icons.auto_awesome_rounded,
+                                          label: 'Copilot 设置',
+                                          onTap: () => _afterClose(() {
+                                            Navigator.of(context).push(
+                                              profileSidePageRoute(
+                                                const CopilotSettingsPage(),
                                               ),
                                             );
                                           }),
@@ -381,64 +402,21 @@ class _ProfilePanelState extends State<ProfilePanel>
                                             );
                                           }),
                                         ),
+                                        _MenuItemCard(
+                                          icon: Icons.info_outline_rounded,
+                                          label: '关于',
+                                          onTap: () => _afterClose(() {
+                                            Navigator.of(context).push(
+                                              profileSidePageRoute(
+                                                const AboutPage(),
+                                              ),
+                                            );
+                                          }),
+                                        ),
                                       ],
                                     ),
                                   ),
-                                  const Spacer(),
-                                  Container(
-                                    margin: const EdgeInsets.symmetric(
-                                      horizontal: 18,
-                                    ),
-                                    height: 1,
-                                    color: scheme.outline.withValues(
-                                      alpha: 0.36,
-                                    ),
-                                  ),
-                                  Padding(
-                                    padding: const EdgeInsets.only(
-                                      bottom: 40,
-                                      top: 16,
-                                    ),
-                                    child: GestureDetector(
-                                      onTap: () {
-                                        _closePanel();
-                                        ref
-                                            .read(authProvider.notifier)
-                                            .logout();
-                                      },
-                                      child: Container(
-                                        height: 40,
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 18,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: AppColors.danger.withValues(
-                                            alpha: 0.08,
-                                          ),
-                                          borderRadius: BorderRadius.circular(
-                                            20,
-                                          ),
-                                          border: Border.all(
-                                            color: AppColors.danger.withValues(
-                                              alpha: 0.14,
-                                            ),
-                                          ),
-                                        ),
-                                        child: const Center(
-                                          child: Text(
-                                            '退出登录',
-                                            style: TextStyle(
-                                              fontFamily: 'PingFang SC',
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w600,
-                                              color: AppColors.danger,
-                                              decoration: TextDecoration.none,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
+                                  const SizedBox(height: 40),
                                 ],
                               ),
                             );

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/services.dart';
 import 'package:uuid/uuid.dart';
 
@@ -71,7 +73,9 @@ class CalendarTodoService {
 
   Future<bool> openCalendarApp() async {
     try {
-      final opened = await _channel.invokeMethod<bool>('openCalendar');
+      final opened = await _channel
+          .invokeMethod<bool>('openCalendar')
+          .timeout(const Duration(seconds: 2), onTimeout: () => false);
       return opened ?? false;
     } on MissingPluginException {
       return false;
@@ -85,10 +89,15 @@ class CalendarTodoService {
     required DateTime end,
   }) async {
     try {
-      final raw = await _channel.invokeMethod<List<dynamic>>('fetchEvents', {
-        'startMillis': start.millisecondsSinceEpoch,
-        'endMillis': end.millisecondsSinceEpoch,
-      });
+      final raw = await _channel
+          .invokeMethod<List<dynamic>>('fetchEvents', {
+            'startMillis': start.millisecondsSinceEpoch,
+            'endMillis': end.millisecondsSinceEpoch,
+          })
+          .timeout(
+            const Duration(seconds: 2),
+            onTimeout: () => const <dynamic>[],
+          );
       return (raw ?? const [])
           .whereType<Map>()
           .map((item) => CalendarEvent.fromMap(item.cast<String, Object?>()))

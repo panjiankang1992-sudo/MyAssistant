@@ -1,26 +1,19 @@
-import 'dart:convert';
-import 'dart:io';
-import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
+
+import '../../core/database/database.dart';
+import '../../data/datasources/local_datasource.dart';
 import '../../domain/models/ai_model_config.dart';
 
 class AiModelStore {
-  static Future<File> _file() async {
-    final dir = await getApplicationSupportDirectory();
-    final configDir = Directory('${dir.path}/ai');
-    if (!await configDir.exists()) {
-      await configDir.create(recursive: true);
-    }
-    return File('${configDir.path}/models.json');
-  }
+  static const _id = 'ai_models';
+  final AppDatabase _db;
+
+  AiModelStore(this._db);
 
   Future<List<AiModelConfig>> getAll() async {
     try {
-      final file = await _file();
-      if (!await file.exists()) return [];
-      final content = await file.readAsString();
-      if (content.trim().isEmpty) return [];
-      final json = jsonDecode(content) as Map<String, dynamic>;
+      final json = await LocalDatasource(_db).getAppSettingJson('data', _id);
+      if (json == null) return [];
       final items = json['models'] as List<dynamic>? ?? const [];
       return items
           .whereType<Map<String, dynamic>>()
@@ -32,11 +25,11 @@ class AiModelStore {
   }
 
   Future<void> saveAll(List<AiModelConfig> configs) async {
-    final file = await _file();
-    await file.writeAsString(
-      const JsonEncoder.withIndent(
-        '  ',
-      ).convert({'models': configs.map((item) => item.toJson()).toList()}),
+    await LocalDatasource(_db).upsertAppSettingJson(
+      module: 'profile',
+      dataType: 'data',
+      id: _id,
+      payload: {'models': configs.map((item) => item.toJson()).toList()},
     );
   }
 

@@ -8,6 +8,7 @@ import 'widgets/add_todo_modal.dart';
 import 'widgets/todo_detail_modal.dart';
 import 'widgets/todo_list.dart';
 import 'widgets/week_calendar_strip.dart';
+import '../../core/platform/app_performance.dart';
 import '../../core/providers/core_providers.dart';
 import '../../core/theme/app_theme.dart';
 import '../../domain/models/todo.dart';
@@ -45,6 +46,7 @@ class _TodoPageState extends ConsumerState<TodoPage>
   bool _fabSpeechReady = false;
   bool _fabListening = false;
   String _fabVoiceText = '';
+  Map<DateTime, int> _todoDateCounts = {};
 
   @override
   void initState() {
@@ -53,19 +55,22 @@ class _TodoPageState extends ConsumerState<TodoPage>
     Future.microtask(() {
       if (mounted) {
         ref.read(todoNotifierProvider.notifier).loadSelectedDateTodos();
+        _loadTodoDateCounts();
       }
     });
-    _poetryTimer = Timer.periodic(const Duration(seconds: 8), (_) {
-      setState(() => _poetryVisible = false);
-      Future.delayed(const Duration(milliseconds: 300), () {
-        if (mounted) {
-          setState(() {
-            _poetryIndex = (_poetryIndex + 1) % _poetryLines.length;
-            _poetryVisible = true;
-          });
-        }
+    if (!AppPerformance.lowLatencyMode) {
+      _poetryTimer = Timer.periodic(const Duration(seconds: 8), (_) {
+        setState(() => _poetryVisible = false);
+        Future.delayed(const Duration(milliseconds: 300), () {
+          if (mounted) {
+            setState(() {
+              _poetryIndex = (_poetryIndex + 1) % _poetryLines.length;
+              _poetryVisible = true;
+            });
+          }
+        });
       });
-    });
+    }
   }
 
   @override
@@ -144,6 +149,7 @@ class _TodoPageState extends ConsumerState<TodoPage>
             duration: const Duration(milliseconds: 1400),
           ),
         );
+      await _loadTodoDateCounts();
     } catch (_) {
       if (!mounted) return;
       messenger
@@ -158,6 +164,7 @@ class _TodoPageState extends ConsumerState<TodoPage>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       ref.read(todoNotifierProvider.notifier).loadSelectedDateTodos();
+      _loadTodoDateCounts();
     }
   }
 
@@ -186,6 +193,12 @@ class _TodoPageState extends ConsumerState<TodoPage>
     return counts;
   }
 
+  Future<void> _loadTodoDateCounts() async {
+    final allTodos = await ref.read(datasourceProvider).getAllTodos();
+    if (!mounted) return;
+    setState(() => _todoDateCounts = _todoCountsByDate(allTodos));
+  }
+
   void _displayBookkeepingFeedback({required bool success}) {
     _bookkeepingFeedbackTimer?.cancel();
     setState(() {
@@ -205,10 +218,15 @@ class _TodoPageState extends ConsumerState<TodoPage>
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<List<Todo>>(todoNotifierProvider, (previous, next) {
+      if (previous == next) return;
+      Future.microtask(_loadTodoDateCounts);
+    });
     final selectedDate = ref.watch(selectedDateProvider);
     final todos = ref.watch(todoNotifierProvider);
     final isToday = _isToday(selectedDate);
     final scheme = Theme.of(context).colorScheme;
+    final reduceMotion = AppPerformance.shouldReduceMotion(context);
 
     return Scaffold(
       backgroundColor: scheme.appPage,
@@ -228,24 +246,11 @@ class _TodoPageState extends ConsumerState<TodoPage>
                           children: [
                             Row(
                               children: [
-                                AnimatedSwitcher(
-                                  duration: const Duration(milliseconds: 200),
-                                  child: Text(
-                                    _titleForDate(selectedDate),
-                                    key: ValueKey(selectedDate),
-                                    style: TextStyle(
-                                      fontFamily: 'PingFang SC',
-                                      fontFamilyFallback: const [
-                                        '.SF Pro Text',
-                                        'system-ui',
-                                        'sans-serif',
-                                      ],
-                                      fontSize: 30,
-                                      fontWeight: FontWeight.w700,
-                                      letterSpacing: -0.3,
-                                      color: scheme.appText,
-                                    ),
-                                  ),
+                                _TodoPageTitle(
+                                  title: _titleForDate(selectedDate),
+                                  selectedDate: selectedDate,
+                                  reduceMotion: reduceMotion,
+                                  color: scheme.appText,
                                 ),
                                 const SizedBox(width: 6),
                                 GestureDetector(
@@ -309,26 +314,11 @@ class _TodoPageState extends ConsumerState<TodoPage>
                               ],
                             ),
                             const SizedBox(height: 2),
-                            AnimatedOpacity(
-                              opacity: _poetryVisible ? 1.0 : 0.0,
-                              duration: const Duration(milliseconds: 300),
-                              child: Text(
-                                _poetryLines[_poetryIndex],
-                                style: TextStyle(
-                                  fontFamily: 'PingFang SC',
-                                  fontFamilyFallback: const [
-                                    '.SF Pro Text',
-                                    'system-ui',
-                                    'sans-serif',
-                                  ],
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w400,
-                                  fontStyle: FontStyle.italic,
-                                  color: scheme.appMutedText,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
+                            _PoetryLine(
+                              text: _poetryLines[_poetryIndex],
+                              visible: _poetryVisible,
+                              reduceMotion: reduceMotion,
+                              color: scheme.appMutedText,
                             ),
                           ],
                         ),
@@ -340,6 +330,11 @@ class _TodoPageState extends ConsumerState<TodoPage>
                 ),
                 WeekCalendarStrip(
                   selectedDate: selectedDate,
+                  badgeBuilder: (date) {
+                    final count = _todoDateCounts[_dateOnly(date)] ?? 0;
+                    return count > 0 ? '$count' : null;
+                  },
+                  badgeColorBuilder: (_) => AppColors.primary,
                   onDateSelected: (date) {
                     ref.read(selectedDateProvider.notifier).date = date;
                   },
@@ -378,18 +373,33 @@ class _TodoPageState extends ConsumerState<TodoPage>
                       if (todo.action == 'bookkeeping') {
                         _displayBookkeepingFeedback(success: false);
                       }
-                      final created = await ref
+                      final actionHandled = await ref
                           .read(todoNotifierProvider.notifier)
                           .executeTodoAction(todo);
-                      if (!mounted || todo.action != 'bookkeeping') return;
-                      if (created) {
+                      if (!mounted) return;
+                      if (todo.action == 'bookkeeping') {
+                        if (actionHandled) {
+                          _displayBookkeepingFeedback(success: true);
+                          _hideBookkeepingFeedback();
+                        } else {
+                          setState(() => _showBookkeepingFeedback = false);
+                          messenger.showSnackBar(
+                            const SnackBar(content: Text('未识别到金额，未记账')),
+                          );
+                        }
+                        return;
+                      }
+                      if (todo.action.startsWith('open_app')) {
+                        if (!actionHandled) {
+                          messenger.showSnackBar(
+                            const SnackBar(content: Text('未能打开目标应用')),
+                          );
+                        }
+                        return;
+                      }
+                      if (actionHandled) {
                         _displayBookkeepingFeedback(success: true);
                         _hideBookkeepingFeedback();
-                      } else {
-                        setState(() => _showBookkeepingFeedback = false);
-                        messenger.showSnackBar(
-                          const SnackBar(content: Text('未识别到金额，未记账')),
-                        );
                       }
                     },
                     onComplete: (todo) {
@@ -428,6 +438,78 @@ class _TodoPageState extends ConsumerState<TodoPage>
         onLongPressEnd: () => _finishFabVoiceInput(selectedDate),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+    );
+  }
+}
+
+class _TodoPageTitle extends StatelessWidget {
+  final String title;
+  final DateTime selectedDate;
+  final bool reduceMotion;
+  final Color color;
+
+  const _TodoPageTitle({
+    required this.title,
+    required this.selectedDate,
+    required this.reduceMotion,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Text(
+      title,
+      key: ValueKey(selectedDate),
+      style: TextStyle(
+        fontFamily: 'PingFang SC',
+        fontFamilyFallback: const ['.SF Pro Text', 'system-ui', 'sans-serif'],
+        fontSize: 30,
+        fontWeight: FontWeight.w700,
+        letterSpacing: -0.3,
+        color: color,
+      ),
+    );
+    if (reduceMotion) return text;
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 200),
+      child: text,
+    );
+  }
+}
+
+class _PoetryLine extends StatelessWidget {
+  final String text;
+  final bool visible;
+  final bool reduceMotion;
+  final Color color;
+
+  const _PoetryLine({
+    required this.text,
+    required this.visible,
+    required this.reduceMotion,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final child = Text(
+      text,
+      style: TextStyle(
+        fontFamily: 'PingFang SC',
+        fontFamilyFallback: const ['.SF Pro Text', 'system-ui', 'sans-serif'],
+        fontSize: 12,
+        fontWeight: FontWeight.w400,
+        fontStyle: FontStyle.italic,
+        color: color,
+      ),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    );
+    if (reduceMotion) return child;
+    return AnimatedOpacity(
+      opacity: visible ? 1.0 : 0.0,
+      duration: const Duration(milliseconds: 300),
+      child: child,
     );
   }
 }

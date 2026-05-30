@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
@@ -466,6 +465,8 @@ class _UserAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final fallback = _gradientAvatar(profile.avatarLetter);
+    final saved = profile.avatarValue?.trim() ?? '';
+    if (saved.isNotEmpty) return CopilotAvatarView(value: saved, size: 36);
     if (profile.hasServerAvatar) {
       final url = profile.serverAvatarUrl!;
       if (url.startsWith('data:')) {
@@ -495,17 +496,15 @@ class _UserAvatar extends StatelessWidget {
       );
     }
     if (profile.hasCustomAvatar) {
-      return ClipOval(
-        child: Image.file(
-          File(profile.avatarPath!),
-          width: 36,
-          height: 36,
-          fit: BoxFit.cover,
-          errorBuilder: (_, _, _) => fallback,
-        ),
+      return CopilotAvatarView(
+        value: CopilotAvatarCatalog.fileValue(profile.avatarPath!),
+        size: 36,
       );
     }
-    return fallback;
+    return const CopilotAvatarView(
+      value: CopilotAvatarCatalog.defaultValue,
+      size: 36,
+    );
   }
 
   Widget _gradientAvatar(String text) {

@@ -38,6 +38,7 @@ class QuickNote {
   final String category;
   final String subcategory;
   final List<String> sourceNoteIds;
+  final List<String> attachmentIds;
 
   const QuickNote({
     required this.id,
@@ -57,6 +58,7 @@ class QuickNote {
     this.category = '未分类',
     this.subcategory = '未归类',
     this.sourceNoteIds = const [],
+    this.attachmentIds = const [],
   });
 
   QuickNote copyWith({
@@ -77,6 +79,7 @@ class QuickNote {
     String? category,
     String? subcategory,
     List<String>? sourceNoteIds,
+    List<String>? attachmentIds,
   }) {
     return QuickNote(
       id: id ?? this.id,
@@ -96,6 +99,7 @@ class QuickNote {
       category: category ?? this.category,
       subcategory: subcategory ?? this.subcategory,
       sourceNoteIds: sourceNoteIds ?? this.sourceNoteIds,
+      attachmentIds: attachmentIds ?? this.attachmentIds,
     );
   }
 
@@ -129,6 +133,7 @@ class QuickNote {
     'category': category,
     'subcategory': subcategory,
     'sourceNoteIds': sourceNoteIds,
+    'attachmentIds': attachmentIds,
   };
 
   factory QuickNote.fromJson(Map<String, dynamic> json) {
@@ -171,6 +176,9 @@ class QuickNote {
       category: json['category'] as String? ?? '未分类',
       subcategory: json['subcategory'] as String? ?? '未归类',
       sourceNoteIds: (json['sourceNoteIds'] as List? ?? const [])
+          .whereType<String>()
+          .toList(),
+      attachmentIds: (json['attachmentIds'] as List? ?? const [])
           .whereType<String>()
           .toList(),
     );

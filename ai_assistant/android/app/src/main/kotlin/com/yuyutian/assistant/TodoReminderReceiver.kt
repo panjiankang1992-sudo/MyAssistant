@@ -1,4 +1,4 @@
-package com.example.ai_assistant
+package com.yuyutian.assistant
 
 import android.Manifest
 import android.app.NotificationChannel

@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.ai_assistant"
+    namespace = "com.yuyutian.assistant"
     compileSdk = 36
     ndkVersion = "27.0.12077973"
 
@@ -19,7 +19,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.ai_assistant"
+        applicationId = "com.yuyutian.assistant"
         minSdk = 24
         targetSdk = 36
         versionCode = 1

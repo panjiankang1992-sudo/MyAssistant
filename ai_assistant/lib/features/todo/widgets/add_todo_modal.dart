@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 
@@ -92,7 +93,10 @@ class _AddTodoPageShell extends StatelessWidget {
 }
 
 class _AddTodoHeader extends StatelessWidget {
-  const _AddTodoHeader();
+  final VoidCallback? onSave;
+  final bool saving;
+
+  const _AddTodoHeader({required this.onSave, required this.saving});
 
   @override
   Widget build(BuildContext context) {
@@ -135,6 +139,13 @@ class _AddTodoHeader extends StatelessWidget {
               ),
             ),
           ),
+          AppRoundIconButton(
+            tooltip: saving ? '保存中' : '保存',
+            onPressed: onSave,
+            icon: saving ? Icons.hourglass_top_rounded : Icons.check_rounded,
+            foregroundColor: AppColors.primary,
+          ),
+          const SizedBox(width: 8),
           AppRoundIconButton(
             tooltip: '关闭',
             onPressed: () => Navigator.of(context).pop(),
@@ -197,6 +208,7 @@ class _AddTodoModalContentState extends ConsumerState<_AddTodoModalContent>
   int _reminderMinutesBefore = Todo.defaultReminderMinutesForPriority(0);
   bool _reminderCustomized = false;
   bool _aiParsing = false;
+  bool _saving = false;
   bool _speechReady = false;
   bool _isListening = false;
 
@@ -351,15 +363,23 @@ class _AddTodoModalContentState extends ConsumerState<_AddTodoModalContent>
   }
 
   Future<void> _saveManual() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (_saving) return;
+    final title = _titleController.text.trim();
+    if (title.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('请输入标题')));
+      return;
+    }
+    FocusScope.of(context).unfocus();
+    setState(() => _saving = true);
 
     final now = DateTime.now();
+    final description = _descriptionController.text.trim();
     final todo = Todo(
       id: const Uuid().v4(),
-      title: _titleController.text.trim(),
-      description: _descriptionController.text.trim().isEmpty
-          ? null
-          : _descriptionController.text.trim(),
+      title: title,
+      description: description.isEmpty ? null : description,
       source: _source,
       type: _tags.isNotEmpty ? _tags.first.name : 'personal',
       tags: _tags,
@@ -378,6 +398,7 @@ class _AddTodoModalContentState extends ConsumerState<_AddTodoModalContent>
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
       if (mounted) {
+        setState(() => _saving = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('添加失败: $e'),
@@ -556,205 +577,200 @@ class _AddTodoModalContentState extends ConsumerState<_AddTodoModalContent>
           ),
           child: Column(
             children: [
-              const _AddTodoHeader(),
+              _AddTodoHeader(
+                onSave: _saving ? null : () => unawaited(_saveManual()),
+                saving: _saving,
+              ),
               _AddTodoTabBar(
                 controller: _tabController,
                 itemBuilder: _buildTabItem,
               ),
               const SizedBox(height: 20),
               Expanded(
-                child: Stack(
+                child: TabBarView(
+                  controller: _tabController,
                   children: [
-                    TabBarView(
-                      controller: _tabController,
-                      children: [
-                        SingleChildScrollView(
-                          padding: const EdgeInsets.fromLTRB(20, 0, 20, 110),
-                          child: Form(
-                            key: _formKey,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                _buildFormField(
-                                  label: '标题',
-                                  child: TextFormField(
-                                    controller: _titleController,
-                                    decoration: appInputDecoration(
-                                      context: context,
-                                      label: '',
-                                      hintText: '输入待办事项…',
-                                      suffixIcon: IconButton(
-                                        tooltip: '使用当前 AI 分析',
-                                        onPressed: _aiParsing
-                                            ? null
-                                            : _applyAiParse,
-                                        icon: _aiParsing
-                                            ? const SizedBox(
-                                                width: 16,
-                                                height: 16,
-                                                child:
-                                                    CircularProgressIndicator(
-                                                      strokeWidth: 2,
-                                                    ),
-                                              )
-                                            : const Icon(
-                                                Icons.auto_awesome_rounded,
-                                                size: 18,
-                                                color: AppColors.primary,
-                                              ),
-                                      ),
-                                    ),
-                                    validator: (value) {
-                                      if (value == null ||
-                                          value.trim().isEmpty) {
-                                        return '请输入标题';
-                                      }
-                                      return null;
-                                    },
+                    SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 18),
+                      child: Form(
+                        key: _formKey,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _buildFormField(
+                              label: '标题',
+                              child: TextFormField(
+                                controller: _titleController,
+                                decoration: appInputDecoration(
+                                  context: context,
+                                  label: '',
+                                  hintText: '输入待办事项…',
+                                  suffixIcon: IconButton(
+                                    tooltip: '使用当前 AI 分析',
+                                    onPressed: _aiParsing
+                                        ? null
+                                        : _applyAiParse,
+                                    icon: _aiParsing
+                                        ? const SizedBox(
+                                            width: 16,
+                                            height: 16,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                            ),
+                                          )
+                                        : const Icon(
+                                            Icons.auto_awesome_rounded,
+                                            size: 18,
+                                            color: AppColors.primary,
+                                          ),
                                   ),
                                 ),
-                                const SizedBox(height: 16),
-                                _buildFormField(
-                                  label: '详情',
-                                  child: TextFormField(
-                                    controller: _descriptionController,
-                                    decoration: appInputDecoration(
-                                      context: context,
-                                      label: '',
-                                      hintText: '添加详细描述…',
-                                    ),
-                                    maxLines: 3,
-                                    minLines: 2,
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  '标签',
-                                  style: TextStyle(
-                                    fontFamily: 'PingFang SC',
-                                    fontFamilyFallback: const [
-                                      '.SF Pro Text',
-                                      'system-ui',
-                                      'sans-serif',
-                                    ],
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.appMutedText,
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                TagSelector(
-                                  selectedTags: _tags,
-                                  onChanged: (tags) =>
-                                      setState(() => _tags = tags),
-                                ),
-                                const SizedBox(height: 16),
-                                LayoutBuilder(
-                                  builder: (context, constraints) {
-                                    final compact = constraints.maxWidth < 560;
-                                    final dateField = _buildFormField(
-                                      label: '日期时间',
-                                      child: _DateInputButton(
-                                        value:
-                                            '${DateFormat('MM-dd').format(_date)} $_time',
-                                        onTap: _pickDateTime,
-                                      ),
-                                    );
-                                    final quickField = _buildFormField(
-                                      label: '快捷时间',
-                                      child: _QuickTimeChips(
-                                        selected: _quickTime,
-                                        onSelected: _applyQuickTime,
-                                      ),
-                                    );
-                                    if (compact) {
-                                      return Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.stretch,
-                                        children: [
-                                          dateField,
-                                          const SizedBox(height: 12),
-                                          quickField,
-                                        ],
-                                      );
-                                    }
-                                    return Row(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Expanded(flex: 3, child: dateField),
-                                        const SizedBox(width: 12),
-                                        Expanded(flex: 7, child: quickField),
-                                      ],
-                                    );
-                                  },
-                                ),
-                                const SizedBox(height: 16),
-                                _buildFormField(
-                                  label: '动作',
-                                  child: ActionSelector(
-                                    value: _action,
-                                    onChanged: (value) =>
-                                        setState(() => _action = value),
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                _buildFormField(
-                                  label: '来源',
-                                  child: SourceSelector(
-                                    value: _source,
-                                    onChanged: (value) =>
-                                        setState(() => _source = value),
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                _buildFormField(
-                                  label: '优先级',
-                                  child: Row(
-                                    children: [
-                                      _buildPriorityChip(0, '普通'),
-                                      const SizedBox(width: 8),
-                                      _buildPriorityChip(1, '重要'),
-                                      const SizedBox(width: 8),
-                                      _buildPriorityChip(2, '紧急'),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                _buildFormField(
-                                  label: '提醒',
-                                  child: TodoReminderSelector(
-                                    enabled: _reminderEnabled,
-                                    minutesBefore: _reminderMinutesBefore,
-                                    onEnabledChanged: (value) {
-                                      setState(() {
-                                        _reminderEnabled = value;
-                                        _reminderCustomized = true;
-                                      });
-                                    },
-                                    onMinutesChanged: (value) {
-                                      setState(() {
-                                        _reminderMinutesBefore = value;
-                                        _reminderCustomized = true;
-                                      });
-                                    },
-                                  ),
-                                ),
-                                const SizedBox(height: 32),
-                              ],
+                                validator: (value) {
+                                  if (value == null || value.trim().isEmpty) {
+                                    return '请输入标题';
+                                  }
+                                  return null;
+                                },
+                              ),
                             ),
-                          ),
+                            const SizedBox(height: 16),
+                            _buildFormField(
+                              label: '详情',
+                              child: TextFormField(
+                                controller: _descriptionController,
+                                decoration: appInputDecoration(
+                                  context: context,
+                                  label: '',
+                                  hintText: '添加详细描述…',
+                                ),
+                                maxLines: 3,
+                                minLines: 2,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              '标签',
+                              style: TextStyle(
+                                fontFamily: 'PingFang SC',
+                                fontFamilyFallback: const [
+                                  '.SF Pro Text',
+                                  'system-ui',
+                                  'sans-serif',
+                                ],
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.appMutedText,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            TagSelector(
+                              selectedTags: _tags,
+                              onChanged: (tags) => setState(() => _tags = tags),
+                            ),
+                            const SizedBox(height: 16),
+                            LayoutBuilder(
+                              builder: (context, constraints) {
+                                final compact = constraints.maxWidth < 560;
+                                final dateField = _buildFormField(
+                                  label: '日期时间',
+                                  child: _DateInputButton(
+                                    value:
+                                        '${DateFormat('MM-dd').format(_date)} $_time',
+                                    onTap: _pickDateTime,
+                                  ),
+                                );
+                                final quickField = _buildFormField(
+                                  label: '快捷时间',
+                                  child: _QuickTimeChips(
+                                    selected: _quickTime,
+                                    onSelected: _applyQuickTime,
+                                  ),
+                                );
+                                if (compact) {
+                                  return Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      dateField,
+                                      const SizedBox(height: 12),
+                                      quickField,
+                                    ],
+                                  );
+                                }
+                                return Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(flex: 3, child: dateField),
+                                    const SizedBox(width: 12),
+                                    Expanded(flex: 7, child: quickField),
+                                  ],
+                                );
+                              },
+                            ),
+                            const SizedBox(height: 16),
+                            _buildFormField(
+                              label: '动作',
+                              child: ActionSelector(
+                                value: _action,
+                                onChanged: (value) =>
+                                    setState(() => _action = value),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            _buildFormField(
+                              label: '来源',
+                              child: SourceSelector(
+                                value: _source,
+                                onChanged: (value) =>
+                                    setState(() => _source = value),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            _buildFormField(
+                              label: '优先级',
+                              child: Row(
+                                children: [
+                                  _buildPriorityChip(0, '普通'),
+                                  const SizedBox(width: 8),
+                                  _buildPriorityChip(1, '重要'),
+                                  const SizedBox(width: 8),
+                                  _buildPriorityChip(2, '紧急'),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            _buildFormField(
+                              label: '提醒',
+                              child: TodoReminderSelector(
+                                enabled: _reminderEnabled,
+                                minutesBefore: _reminderMinutesBefore,
+                                onEnabledChanged: (value) {
+                                  setState(() {
+                                    _reminderEnabled = value;
+                                    _reminderCustomized = true;
+                                  });
+                                },
+                                onMinutesChanged: (value) {
+                                  setState(() {
+                                    _reminderMinutesBefore = value;
+                                    _reminderCustomized = true;
+                                  });
+                                },
+                              ),
+                            ),
+                            const SizedBox(height: 32),
+                          ],
                         ),
-                        const RoutineTab(),
-                      ],
+                      ),
                     ),
-                    _buildBottomActions(),
+                    const RoutineTab(),
                   ],
                 ),
               ),
+              _buildBottomActions(),
             ],
           ),
         ),
@@ -844,26 +860,15 @@ class _AddTodoModalContentState extends ConsumerState<_AddTodoModalContent>
       listenable: _tabController,
       builder: (context, child) {
         if (_tabController.index != 0) return const SizedBox.shrink();
-        return Positioned(
-          left: 0,
-          right: 0,
-          bottom: 0,
-          child: AppFloatingActionBar(
-            actions: [
-              AppBottomAction(
-                label: '取消',
-                icon: Icons.close_rounded,
-                onPressed: () => Navigator.of(context).pop(),
-                tone: AppActionButtonTone.neutral,
-              ),
-              AppBottomAction(
-                label: '保存',
-                icon: Icons.check_rounded,
-                onPressed: _saveManual,
-                tone: AppActionButtonTone.primary,
-              ),
-            ],
-          ),
+        return AppFloatingActionBar(
+          actions: [
+            AppBottomAction(
+              label: _saving ? '保存中' : '保存',
+              icon: _saving ? Icons.hourglass_top_rounded : Icons.check_rounded,
+              onPressed: _saving ? () {} : () => unawaited(_saveManual()),
+              tone: AppActionButtonTone.primary,
+            ),
+          ],
         );
       },
     );

@@ -1,17 +1,20 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:open_filex/open_filex.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/providers/core_providers.dart';
+import '../../core/platform/app_file_picker.dart';
+import '../../core/platform/app_performance.dart';
+import '../../core/storage/app_paths.dart';
 import '../../core/theme/app_theme.dart';
+import '../../domain/models/app_attachment.dart';
 import '../../domain/models/quick_note.dart';
 import '../../domain/models/tag.dart';
 import '../../shared/widgets/edge_swipe_pop.dart';
@@ -27,12 +30,14 @@ class _NoteBlock {
   final String title;
   final String value;
   final String? description;
+  final int? sizeBytes;
 
   const _NoteBlock({
     required this.type,
     required this.title,
     required this.value,
     this.description,
+    this.sizeBytes,
   });
 }
 
@@ -122,6 +127,60 @@ String _serializeNoteContent(String text, List<_NoteBlock> blocks) {
   return parts.join('\n');
 }
 
+List<_NoteBlock> _nonAttachmentBlocks(List<_NoteBlock> blocks) {
+  return blocks
+      .where((block) => block.type == _NoteBlockType.snapshot)
+      .toList();
+}
+
+List<NoteAttachmentDraft> _attachmentDraftsFromBlocks(List<_NoteBlock> blocks) {
+  return blocks
+      .where(
+        (block) =>
+            block.type == _NoteBlockType.image ||
+            block.type == _NoteBlockType.attachment,
+      )
+      .map(
+        (block) => NoteAttachmentDraft(
+          path: block.value,
+          fileName: block.title,
+          attachmentType: block.type == _NoteBlockType.image
+              ? 'image'
+              : _attachmentTypeForFileName(block.title),
+          mimeType: _mimeTypeForFileName(block.title),
+        ),
+      )
+      .toList();
+}
+
+String _attachmentTypeForFileName(String fileName) {
+  final lower = fileName.toLowerCase();
+  if (RegExp(r'\.(png|jpe?g|gif|webp|heic|bmp)$').hasMatch(lower)) {
+    return 'image';
+  }
+  if (RegExp(r'\.(m4a|mp3|wav|aac|flac|ogg)$').hasMatch(lower)) {
+    return 'audio';
+  }
+  return 'file';
+}
+
+String? _mimeTypeForFileName(String fileName) {
+  final lower = fileName.toLowerCase();
+  if (lower.endsWith('.png')) return 'image/png';
+  if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
+  if (lower.endsWith('.gif')) return 'image/gif';
+  if (lower.endsWith('.webp')) return 'image/webp';
+  if (lower.endsWith('.heic')) return 'image/heic';
+  if (lower.endsWith('.mp3')) return 'audio/mpeg';
+  if (lower.endsWith('.m4a')) return 'audio/mp4';
+  if (lower.endsWith('.wav')) return 'audio/wav';
+  if (lower.endsWith('.aac')) return 'audio/aac';
+  if (lower.endsWith('.pdf')) return 'application/pdf';
+  if (lower.endsWith('.txt')) return 'text/plain';
+  if (lower.endsWith('.json')) return 'application/json';
+  return null;
+}
+
 String _plainNoteText(String raw) => _parseNoteContent(raw).text;
 
 String _inferNoteTitle(String content, List<_NoteBlock> blocks) {
@@ -146,7 +205,22 @@ Future<void> _openUrl(String url) async {
 }
 
 Future<void> _openFile(String path) async {
-  await OpenFilex.open(path);
+  await AppFilePicker.openFile(path, mimeType: _mimeTypeForFileName(path));
+}
+
+Future<void> _openAttachmentRecord(AppAttachment attachment) async {
+  final bytes = base64Decode(attachment.contentBase64);
+  final dir = Directory(
+    '${(await getAppSupportDirectory()).path}/attachment_cache',
+  );
+  if (!await dir.exists()) await dir.create(recursive: true);
+  final fileName = attachment.fileName.replaceAll(
+    RegExp(r'[^a-zA-Z0-9._\-\u4e00-\u9fa5]'),
+    '_',
+  );
+  final file = File('${dir.path}/${attachment.id}_$fileName');
+  await file.writeAsBytes(bytes, flush: true);
+  await AppFilePicker.openFile(file.path, mimeType: attachment.mimeType);
 }
 
 class NotesPage extends ConsumerStatefulWidget {
@@ -288,8 +362,8 @@ class _NotesPageState extends ConsumerState<NotesPage> {
           initialText: initialText,
           initialDate: DateTime.now(),
           readOnly: note?.archived == true,
-          onSave: (title, content, date, tags) {
-            ref
+          onSave: (title, content, date, tags, attachments) {
+            return ref
                 .read(notesNotifierProvider.notifier)
                 .upsert(
                   initial: note,
@@ -297,6 +371,7 @@ class _NotesPageState extends ConsumerState<NotesPage> {
                   content: content,
                   date: date,
                   tags: tags,
+                  attachments: attachments,
                 );
           },
         ),
@@ -359,79 +434,15 @@ class _NotesPageState extends ConsumerState<NotesPage> {
           children: [
             Column(
               children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-                  child: Row(
-                    children: [
-                      Text(
-                        '随手记',
-                        style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.w900,
-                          color: scheme.appText,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      _NotesModeSegmented(
-                        value: _mode,
-                        onChanged: (mode) => setState(() => _mode = mode),
-                      ),
-                      if (_mode != _NotesViewMode.analysis) ...[
-                        const SizedBox(width: 10),
-                        InkWell(
-                          onTap: () => _pickDate(notes),
-                          borderRadius: BorderRadius.circular(16),
-                          child: Container(
-                            height: 40,
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            decoration: BoxDecoration(
-                              color: _filterDate == null
-                                  ? scheme.appInput
-                                  : scheme.primary.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color: _filterDate == null
-                                    ? scheme.appBorder
-                                    : scheme.primary.withValues(alpha: 0.25),
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(
-                                  Icons.calendar_month_rounded,
-                                  size: 16,
-                                  color: AppColors.primary,
-                                ),
-                                const SizedBox(width: 5),
-                                Text(
-                                  _filterDate == null
-                                      ? (_mode == _NotesViewMode.diary
-                                            ? '最近30天'
-                                            : '全部文档')
-                                      : DateFormat(
-                                          'MM月dd日',
-                                        ).format(_filterDate!),
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.primary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        _LayoutToggleButton(
-                          value: _layoutMode,
-                          onChanged: (value) =>
-                              setState(() => _layoutMode = value),
-                        ),
-                      ],
-                      const Spacer(),
-                      ProfileAvatarButton(onTap: widget.onAvatarTap),
-                    ],
-                  ),
+                _NotesHeader(
+                  mode: _mode,
+                  filterDate: _filterDate,
+                  layoutMode: _layoutMode,
+                  onModeChanged: (mode) => setState(() => _mode = mode),
+                  onPickDate: () => _pickDate(notes),
+                  onLayoutChanged: (value) =>
+                      setState(() => _layoutMode = value),
+                  onAvatarTap: widget.onAvatarTap,
                 ),
                 if (_filterDate != null && _mode != _NotesViewMode.analysis)
                   Align(
@@ -520,6 +531,126 @@ class _NotesPageState extends ConsumerState<NotesPage> {
 enum _NotesViewMode { diary, document, analysis }
 
 enum _NotesLayoutMode { list, grid }
+
+class _NotesHeader extends StatelessWidget {
+  final _NotesViewMode mode;
+  final DateTime? filterDate;
+  final _NotesLayoutMode layoutMode;
+  final ValueChanged<_NotesViewMode> onModeChanged;
+  final VoidCallback onPickDate;
+  final ValueChanged<_NotesLayoutMode> onLayoutChanged;
+  final VoidCallback onAvatarTap;
+
+  const _NotesHeader({
+    required this.mode,
+    required this.filterDate,
+    required this.layoutMode,
+    required this.onModeChanged,
+    required this.onPickDate,
+    required this.onLayoutChanged,
+    required this.onAvatarTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return Stack(
+            children: [
+              Positioned(
+                top: 0,
+                right: 0,
+                child: ProfileAvatarButton(onTap: onAvatarTap),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(right: 54),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            '随手记',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.w900,
+                              color: scheme.appText,
+                            ),
+                          ),
+                        ),
+                        if (mode != _NotesViewMode.analysis) ...[
+                          const SizedBox(width: 10),
+                          _NotesDateFilterButton(
+                            filterDate: filterDate,
+                            onTap: onPickDate,
+                          ),
+                          const SizedBox(width: 8),
+                          _LayoutToggleButton(
+                            value: layoutMode,
+                            onChanged: onLayoutChanged,
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    _NotesModeSegmented(value: mode, onChanged: onModeChanged),
+                  ],
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _NotesDateFilterButton extends StatelessWidget {
+  final DateTime? filterDate;
+  final VoidCallback onTap;
+
+  const _NotesDateFilterButton({required this.filterDate, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final active = filterDate != null;
+    final tooltip = active ? DateFormat('MM月dd日').format(filterDate!) : '筛选日期';
+    return Tooltip(
+      message: tooltip,
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: active
+                ? scheme.primary.withValues(alpha: 0.1)
+                : scheme.appInput,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: active
+                  ? scheme.primary.withValues(alpha: 0.25)
+                  : scheme.appBorder,
+            ),
+          ),
+          child: const Icon(
+            Icons.calendar_month_rounded,
+            size: 20,
+            color: AppColors.primary,
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 Future<bool?> _confirmDelete(BuildContext context, QuickNote note) {
   return showDialog<bool>(
@@ -1415,11 +1546,12 @@ class _NoteEditorPage extends StatefulWidget {
   final String? initialText;
   final DateTime initialDate;
   final bool readOnly;
-  final void Function(
+  final Future<void> Function(
     String title,
     String content,
     DateTime date,
     List<Tag> tags,
+    List<NoteAttachmentDraft> attachments,
   )
   onSave;
   const _NoteEditorPage({
@@ -1442,6 +1574,8 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
   late DateTime _date;
   late List<Tag> _tags;
   late List<_NoteBlock> _blocks;
+  final ScrollController _scrollController = ScrollController();
+  final GlobalKey _blocksPreviewKey = GlobalKey();
   _NoteInputMode _mode = _NoteInputMode.text;
   bool _listening = false;
   bool _loadingSnapshot = false;
@@ -1471,6 +1605,7 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
   void dispose() {
     _title.dispose();
     _content.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -1501,41 +1636,84 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
 
   Future<void> _insertImage() async {
     if (!_editing || widget.readOnly) return;
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.image,
-      allowMultiple: true,
-    );
-    final files = result?.files.where((file) => file.path != null).toList();
-    if (files == null || files.isEmpty) return;
-    setState(() {
-      _blocks.addAll(
-        files.map(
-          (file) => _NoteBlock(
-            type: _NoteBlockType.image,
-            title: file.name,
-            value: file.path!,
-          ),
-        ),
+    try {
+      final files = await AppFilePicker.pickImages();
+      if (files.isEmpty) return;
+      if (!mounted) return;
+      _appendBlocks(
+        files
+            .map(
+              (file) => _NoteBlock(
+                type: _NoteBlockType.image,
+                title: file.name,
+                value: file.path,
+                sizeBytes: file.size,
+              ),
+            )
+            .toList(),
       );
-    });
+    } catch (e) {
+      _showPickerError('图片选择失败：$e');
+    }
   }
 
   Future<void> _insertAttachment() async {
     if (!_editing || widget.readOnly) return;
-    final result = await FilePicker.platform.pickFiles(allowMultiple: true);
-    final files = result?.files.where((file) => file.path != null).toList();
-    if (files == null || files.isEmpty) return;
-    setState(() {
-      _blocks.addAll(
-        files.map(
-          (file) => _NoteBlock(
-            type: _NoteBlockType.attachment,
-            title: file.name,
-            value: file.path!,
-          ),
-        ),
+    try {
+      final files = await AppFilePicker.pickFiles();
+      if (files.isEmpty) return;
+      if (!mounted) return;
+      _appendBlocks(
+        files
+            .map(
+              (file) => _NoteBlock(
+                type: _NoteBlockType.attachment,
+                title: file.name,
+                value: file.path,
+                sizeBytes: file.size,
+              ),
+            )
+            .toList(),
       );
+    } catch (e) {
+      _showPickerError('附件选择失败：$e');
+    }
+  }
+
+  void _appendBlocks(List<_NoteBlock> blocks) {
+    if (blocks.isEmpty) return;
+    setState(() => _blocks.addAll(blocks));
+    _revealBlocksPreview();
+  }
+
+  void _revealBlocksPreview() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final previewContext = _blocksPreviewKey.currentContext;
+      if (previewContext != null) {
+        Scrollable.ensureVisible(
+          previewContext,
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+          alignment: 0.82,
+        );
+        return;
+      }
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+        );
+      }
     });
+  }
+
+  void _showPickerError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _captureWebSnapshot() async {
@@ -1627,21 +1805,35 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
     });
   }
 
-  void _save() {
+  Future<void> _save() async {
     if (!_editing || widget.readOnly) return;
     if (_strokes.isNotEmpty || _currentStroke.isNotEmpty) _commitHandwriting();
-    final content = _serializeNoteContent(_content.text, _blocks);
+    final attachments = _attachmentDraftsFromBlocks(_blocks);
+    final content = _serializeNoteContent(
+      _content.text,
+      _nonAttachmentBlocks(_blocks),
+    );
     final title = _title.text.trim().isEmpty
         ? _inferNoteTitle(content, _blocks)
         : _title.text.trim();
-    if (title.isEmpty && content.isEmpty) return;
-    widget.onSave(title, content, _date, _tags);
-    Navigator.of(context).pop();
+    if (title.isEmpty && content.isEmpty && attachments.isEmpty) return;
+    try {
+      await widget.onSave(title, content, _date, _tags, attachments);
+      if (!mounted) return;
+      Navigator.of(context).pop();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('保存失败：$e')));
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final size = MediaQuery.sizeOf(context);
+    final horizontalPadding = size.width < 430 ? 24.0 : 38.0;
     return EdgeSwipePop(
       child: Material(
         color: scheme.appPage,
@@ -1649,7 +1841,13 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
           child: Stack(
             children: [
               SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(38, 28, 38, 120),
+                controller: _scrollController,
+                padding: EdgeInsets.fromLTRB(
+                  horizontalPadding,
+                  14,
+                  horizontalPadding,
+                  _editing ? 112 : 44,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -1665,42 +1863,27 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                             icon: Icons.undo_rounded,
                             faded: true,
                           ),
-                          const SizedBox(width: 14),
+                          const SizedBox(width: 10),
                           const _CircleTool(
                             icon: Icons.redo_rounded,
                             faded: true,
                           ),
-                          const SizedBox(width: 14),
-                          _CircleTool(icon: Icons.check_rounded, onTap: _save),
+                          const SizedBox(width: 10),
+                          _CircleTool(
+                            icon: Icons.check_rounded,
+                            onTap: () => _save(),
+                          ),
                         ] else if (!widget.readOnly) ...[
                           _CircleTool(
                             icon: Icons.edit_rounded,
                             onTap: () => setState(() => _editing = true),
                           ),
                         ],
-                        const SizedBox(width: 10),
                       ],
                     ),
-                    const SizedBox(height: 26),
+                    const SizedBox(height: 18),
                     if (_editing)
-                      TextField(
-                        controller: _title,
-                        style: TextStyle(
-                          fontSize: 30,
-                          fontWeight: FontWeight.w800,
-                          color: scheme.appText,
-                        ),
-                        decoration: const InputDecoration(
-                          hintText: '标题',
-                          hintStyle: TextStyle(
-                            fontSize: 30,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFFB9BCC4),
-                          ),
-                          border: InputBorder.none,
-                          isDense: true,
-                        ),
-                      )
+                      _NoteTitleField(controller: _title)
                     else
                       Text(
                         _title.text.trim().isEmpty ? '未命名随手记' : _title.text,
@@ -1735,6 +1918,8 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                     if (!_editing)
                       _ReadOnlyNoteBody(
                         content: _serializeNoteContent(_content.text, _blocks),
+                        attachmentIds:
+                            widget.initial?.attachmentIds ?? const [],
                       )
                     else if (_mode == _NoteInputMode.handwriting)
                       _HandwritingPad(
@@ -1754,26 +1939,19 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
                         }),
                       )
                     else
-                      TextField(
+                      _NoteContentField(
                         controller: _content,
-                        minLines: _blocks.isEmpty ? 16 : 7,
-                        maxLines: null,
-                        style: TextStyle(
-                          fontSize: 18,
-                          height: 1.7,
-                          color: scheme.appText,
-                        ),
-                        decoration: InputDecoration(
-                          hintText: _mode == _NoteInputMode.checklist
-                              ? '输入清单，一行一项...'
-                              : '开始记录...',
-                          border: InputBorder.none,
-                          hintStyle: TextStyle(color: scheme.appSubtleText),
-                        ),
+                        mode: _mode,
+                        blocks: _blocks,
+                        blocksPreviewKey: _blocksPreviewKey,
+                        onRemoveBlock: (block) =>
+                            setState(() => _blocks.remove(block)),
                       ),
-                    if (_blocks.isNotEmpty) ...[
+                    if (_blocks.isNotEmpty &&
+                        _mode == _NoteInputMode.handwriting) ...[
                       const SizedBox(height: 18),
                       _NoteBlocksPreview(
+                        key: _blocksPreviewKey,
                         blocks: _blocks,
                         onRemove: (block) =>
                             setState(() => _blocks.remove(block)),
@@ -1788,9 +1966,9 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
               ),
               if (_editing)
                 Positioned(
-                  left: 70,
-                  right: 70,
-                  bottom: 24,
+                  left: horizontalPadding,
+                  right: horizontalPadding,
+                  bottom: 16,
                   child: _NoteEditorToolbar(
                     mode: _mode,
                     listening: _listening,
@@ -1815,6 +1993,154 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
   }
 }
 
+Color _noteEditorFill(ColorScheme scheme) {
+  return Color.alphaBlend(
+    scheme.primary.withValues(alpha: scheme.isDarkTheme ? 0.035 : 0.012),
+    scheme.appSurface,
+  );
+}
+
+List<BoxShadow>? _noteEditorSoftShadow(ColorScheme scheme) {
+  if (scheme.isDarkTheme || AppPerformance.lowLatencyMode) return null;
+  return [
+    BoxShadow(
+      color: Colors.white.withValues(alpha: 0.72),
+      blurRadius: 0,
+      offset: const Offset(0, -1),
+    ),
+    BoxShadow(
+      color: Colors.black.withValues(alpha: 0.025),
+      blurRadius: 18,
+      offset: const Offset(0, 8),
+    ),
+  ];
+}
+
+class _NoteTitleField extends StatelessWidget {
+  final TextEditingController controller;
+
+  const _NoteTitleField({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: _noteEditorFill(scheme),
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: _noteEditorSoftShadow(scheme),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
+        child: TextField(
+          controller: controller,
+          maxLines: 1,
+          textInputAction: TextInputAction.next,
+          style: TextStyle(
+            fontSize: 24,
+            height: 1.15,
+            fontWeight: FontWeight.w800,
+            color: scheme.appText,
+          ),
+          decoration: InputDecoration(
+            hintText: '标题',
+            hintStyle: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
+              color: scheme.appSubtleText.withValues(alpha: 0.72),
+            ),
+            border: InputBorder.none,
+            enabledBorder: InputBorder.none,
+            focusedBorder: InputBorder.none,
+            disabledBorder: InputBorder.none,
+            errorBorder: InputBorder.none,
+            focusedErrorBorder: InputBorder.none,
+            filled: false,
+            fillColor: Colors.transparent,
+            contentPadding: EdgeInsets.zero,
+            isCollapsed: true,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NoteContentField extends StatelessWidget {
+  final TextEditingController controller;
+  final _NoteInputMode mode;
+  final List<_NoteBlock> blocks;
+  final Key? blocksPreviewKey;
+  final ValueChanged<_NoteBlock> onRemoveBlock;
+
+  const _NoteContentField({
+    required this.controller,
+    required this.mode,
+    required this.blocks,
+    required this.onRemoveBlock,
+    this.blocksPreviewKey,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final hasBlocks = blocks.isNotEmpty;
+    final minHeight = hasBlocks
+        ? (MediaQuery.sizeOf(context).height * 0.24).clamp(170.0, 240.0)
+        : (MediaQuery.sizeOf(context).height * 0.54).clamp(360.0, 560.0);
+    return Container(
+      width: double.infinity,
+      constraints: BoxConstraints(minHeight: minHeight),
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+      decoration: BoxDecoration(
+        color: _noteEditorFill(scheme),
+        borderRadius: BorderRadius.circular(26),
+        boxShadow: _noteEditorSoftShadow(scheme),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            controller: controller,
+            minLines: hasBlocks ? 4 : 14,
+            maxLines: null,
+            keyboardType: TextInputType.multiline,
+            style: TextStyle(fontSize: 17, height: 1.68, color: scheme.appText),
+            decoration: InputDecoration(
+              hintText: mode == _NoteInputMode.checklist
+                  ? '输入清单，一行一项...'
+                  : '开始记录...',
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              disabledBorder: InputBorder.none,
+              errorBorder: InputBorder.none,
+              focusedErrorBorder: InputBorder.none,
+              filled: false,
+              fillColor: Colors.transparent,
+              contentPadding: EdgeInsets.zero,
+              isCollapsed: true,
+              hintStyle: TextStyle(
+                fontSize: 17,
+                height: 1.68,
+                color: scheme.appSubtleText.withValues(alpha: 0.76),
+              ),
+            ),
+          ),
+          if (hasBlocks) ...[
+            const SizedBox(height: 16),
+            _NoteBlocksPreview(
+              key: blocksPreviewKey,
+              blocks: blocks,
+              onRemove: onRemoveBlock,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 class _CircleTool extends StatelessWidget {
   final IconData icon;
   final VoidCallback? onTap;
@@ -1829,16 +2155,16 @@ class _CircleTool extends StatelessWidget {
       onTap: faded ? null : onTap,
       borderRadius: BorderRadius.circular(28),
       child: Container(
-        width: 52,
-        height: 52,
+        width: 44,
+        height: 44,
         decoration: BoxDecoration(
           color: scheme.appInput.withValues(alpha: faded ? 0.45 : 0.95),
           shape: BoxShape.circle,
-          border: Border.all(color: scheme.appBorder.withValues(alpha: 0.55)),
+          border: Border.all(color: scheme.appBorder.withValues(alpha: 0.72)),
         ),
         child: Icon(
           icon,
-          size: 26,
+          size: 23,
           color: faded ? scheme.appDisabledText : scheme.appText,
         ),
       ),
@@ -1890,13 +2216,17 @@ class _TimeText extends StatelessWidget {
   }
 }
 
-class _ReadOnlyNoteBody extends StatelessWidget {
+class _ReadOnlyNoteBody extends ConsumerWidget {
   final String content;
+  final List<String> attachmentIds;
 
-  const _ReadOnlyNoteBody({required this.content});
+  const _ReadOnlyNoteBody({
+    required this.content,
+    this.attachmentIds = const [],
+  });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final parsed = _parseNoteContent(content);
     final markdown = _normalizeNoteMarkdown(parsed.text);
     return Column(
@@ -1912,8 +2242,53 @@ class _ReadOnlyNoteBody extends StatelessWidget {
           if (markdown.trim().isNotEmpty) const SizedBox(height: 18),
           _NoteBlocksPreview(blocks: parsed.blocks),
         ],
+        if (attachmentIds.isNotEmpty) ...[
+          if (markdown.trim().isNotEmpty || parsed.blocks.isNotEmpty)
+            const SizedBox(height: 18),
+          _AttachmentIdsPreview(attachmentIds: attachmentIds),
+        ],
       ],
     );
+  }
+}
+
+class _AttachmentIdsPreview extends ConsumerWidget {
+  final List<String> attachmentIds;
+
+  const _AttachmentIdsPreview({required this.attachmentIds});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return FutureBuilder<List<AppAttachment>>(
+      future: _loadAttachments(ref, attachmentIds),
+      builder: (context, snapshot) {
+        final attachments = snapshot.data ?? const <AppAttachment>[];
+        if (attachments.isEmpty) return const SizedBox.shrink();
+        return Column(
+          children: attachments
+              .map(
+                (attachment) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _AttachmentRecordCard(attachment: attachment),
+                ),
+              )
+              .toList(),
+        );
+      },
+    );
+  }
+
+  Future<List<AppAttachment>> _loadAttachments(
+    WidgetRef ref,
+    List<String> ids,
+  ) async {
+    final datasource = ref.read(datasourceProvider);
+    final result = <AppAttachment>[];
+    for (final id in ids) {
+      final attachment = await datasource.getAttachmentById(id);
+      if (attachment != null && !attachment.isDeleted) result.add(attachment);
+    }
+    return result;
   }
 }
 
@@ -2019,7 +2394,7 @@ class _NoteBlocksPreview extends StatelessWidget {
   final List<_NoteBlock> blocks;
   final ValueChanged<_NoteBlock>? onRemove;
 
-  const _NoteBlocksPreview({required this.blocks, this.onRemove});
+  const _NoteBlocksPreview({super.key, required this.blocks, this.onRemove});
 
   @override
   Widget build(BuildContext context) {
@@ -2055,6 +2430,108 @@ class _NoteBlockCard extends StatelessWidget {
   }
 }
 
+class _AttachmentRecordCard extends StatelessWidget {
+  final AppAttachment attachment;
+
+  const _AttachmentRecordCard({required this.attachment});
+
+  @override
+  Widget build(BuildContext context) {
+    if (attachment.attachmentType == 'image') {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: Stack(
+          children: [
+            Container(
+              constraints: const BoxConstraints(maxHeight: 360),
+              width: double.infinity,
+              color: AppColors.inputBg,
+              child: Image.memory(
+                base64Decode(attachment.contentBase64),
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) => _BrokenBlock(
+                  icon: Icons.broken_image_outlined,
+                  title: attachment.fileName,
+                  subtitle: '图片无法读取',
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return InkWell(
+      onTap: () => _openAttachmentRecord(attachment),
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+        decoration: BoxDecoration(
+          color: AppColors.inputBg,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(
+                attachment.attachmentType == 'audio'
+                    ? Icons.graphic_eq_rounded
+                    : Icons.attach_file_rounded,
+                color: AppColors.primary,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    attachment.fileName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.text,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${_formatAttachmentSize(attachment.sizeBytes)} · 点击打开附件',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textTertiary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+String _formatAttachmentSize(int size) {
+  if (size >= 1024 * 1024) {
+    return '${(size / 1024 / 1024).toStringAsFixed(1)} MB';
+  }
+  if (size >= 1024) {
+    return '${(size / 1024).toStringAsFixed(1)} KB';
+  }
+  return '$size B';
+}
+
 class _ImageBlockCard extends StatelessWidget {
   final _NoteBlock block;
   final ValueChanged<_NoteBlock>? onRemove;
@@ -2065,25 +2542,28 @@ class _ImageBlockCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(18),
-      child: Stack(
-        children: [
-          Container(
-            constraints: const BoxConstraints(maxHeight: 360),
-            width: double.infinity,
-            color: AppColors.inputBg,
-            child: Image.file(
-              File(block.value),
-              fit: BoxFit.contain,
-              errorBuilder: (context, error, stackTrace) => _BrokenBlock(
-                icon: Icons.broken_image_outlined,
-                title: block.title,
-                subtitle: '图片无法读取',
+      child: InkWell(
+        onTap: () => _openFile(block.value),
+        child: Stack(
+          children: [
+            Container(
+              constraints: const BoxConstraints(maxHeight: 360),
+              width: double.infinity,
+              color: AppColors.inputBg,
+              child: Image.file(
+                File(block.value),
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) => _BrokenBlock(
+                  icon: Icons.broken_image_outlined,
+                  title: block.title,
+                  subtitle: '图片无法读取',
+                ),
               ),
             ),
-          ),
-          if (onRemove != null)
-            _RemoveBlockButton(onTap: () => onRemove!(block)),
-        ],
+            if (onRemove != null)
+              _RemoveBlockButton(onTap: () => onRemove!(block)),
+          ],
+        ),
       ),
     );
   }
@@ -2097,6 +2577,10 @@ class _AttachmentBlockCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final type = _attachmentTypeForFileName(block.title);
+    final subtitle = block.sizeBytes == null
+        ? '点击打开附件'
+        : '${_formatAttachmentSize(block.sizeBytes!)} · 点击打开附件';
     return Stack(
       children: [
         InkWell(
@@ -2119,8 +2603,10 @@ class _AttachmentBlockCard extends StatelessWidget {
                     color: AppColors.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(14),
                   ),
-                  child: const Icon(
-                    Icons.insert_drive_file_outlined,
+                  child: Icon(
+                    type == 'audio'
+                        ? Icons.graphic_eq_rounded
+                        : Icons.attach_file_rounded,
                     color: AppColors.primary,
                   ),
                 ),
@@ -2140,9 +2626,9 @@ class _AttachmentBlockCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 4),
-                      const Text(
-                        '点击打开附件',
-                        style: TextStyle(
+                      Text(
+                        subtitle,
+                        style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                           color: AppColors.textTertiary,
@@ -2359,28 +2845,31 @@ class _NoteEditorToolbar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final reduceMotion = AppPerformance.shouldReduceMotion(context);
     return Row(
       children: [
         Expanded(
           child: Container(
-            height: 74,
-            padding: const EdgeInsets.symmetric(horizontal: 18),
+            height: 58,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
               color: scheme.appElevatedSurface.withValues(alpha: 0.96),
-              borderRadius: BorderRadius.circular(37),
+              borderRadius: BorderRadius.circular(29),
               border: Border.all(
                 color: scheme.appBorder.withValues(alpha: 0.72),
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.08),
-                  blurRadius: 24,
-                  offset: const Offset(0, 10),
-                ),
-              ],
+              boxShadow: reduceMotion
+                  ? null
+                  : [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.08),
+                        blurRadius: 20,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
             ),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 _ToolIcon(
                   icon: Icons.text_fields_rounded,
@@ -2404,13 +2893,13 @@ class _NoteEditorToolbar extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(width: 14),
+        const SizedBox(width: 10),
         InkWell(
           onTap: onRecord,
-          borderRadius: BorderRadius.circular(37),
+          borderRadius: BorderRadius.circular(29),
           child: Container(
-            width: 74,
-            height: 74,
+            width: 58,
+            height: 58,
             decoration: BoxDecoration(
               color: listening
                   ? AppColors.danger.withValues(alpha: 0.12)
@@ -2419,17 +2908,19 @@ class _NoteEditorToolbar extends StatelessWidget {
               border: Border.all(
                 color: scheme.appBorder.withValues(alpha: 0.72),
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.06),
-                  blurRadius: 22,
-                  offset: const Offset(0, 9),
-                ),
-              ],
+              boxShadow: reduceMotion
+                  ? null
+                  : [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.06),
+                        blurRadius: 18,
+                        offset: const Offset(0, 7),
+                      ),
+                    ],
             ),
             child: Icon(
               listening ? Icons.stop_rounded : Icons.mic_rounded,
-              size: 34,
+              size: 29,
               color: listening ? AppColors.danger : AppColors.primary,
             ),
           ),
@@ -2453,13 +2944,19 @@ class _ToolIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return InkResponse(
+    return GestureDetector(
       onTap: onTap,
-      radius: 26,
-      child: Icon(
-        icon,
-        size: 30,
-        color: selected ? scheme.primary : scheme.appText,
+      behavior: HitTestBehavior.opaque,
+      child: SizedBox(
+        width: 34,
+        height: 44,
+        child: Center(
+          child: Icon(
+            icon,
+            size: 26,
+            color: selected ? scheme.primary : scheme.appText,
+          ),
+        ),
       ),
     );
   }

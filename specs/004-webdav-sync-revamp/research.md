@@ -39,16 +39,17 @@ ALTER TABLE routines ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0;
 
 ## R3: 自动同步触发机制
 
-**Decision**: 在 Repository 层（TodoRepository, RoutineRepository）的每个 CUD 操作后触发 `SyncScheduler.syncNow()`，而非使用 `ChangeTracker` 记录等价类再批量推送。
+**Decision**: 同步模块通过 SQLite trigger / Drift 表变化监听自动捕获业务表 CUD，并写入 `sync_data`；Repository 不再调用同步队列 API。
 
-**Rationale**: FR-015 要求"本地每次修改自动触发同步"，最简单的实现是 Repository 操作完成后直接调用同步。旧的 `ChangeTracker` 模式（记录变更→批量推送）与实时同步需求冲突，应废弃。
+**Rationale**: 同步是整体数据层能力，不能依赖具体业务模块逐个调用。触发器能保证任何写入路径都进入同步队列；同步模块执行远端下载合并时通过 `sync_control.muted=true` 排除自己的写入，避免形成回环。
 
 **实现方式**:
-1. `TodoRepository.addTodo()` 返回后 → 调用 `syncProvider.triggerSync()`
-2. `RoutineRepository.addRoutine()` 返回后 → 调用 `syncProvider.triggerSync()`
-3. `SyncScheduler.syncNow()` 检查网络 → 在线则执行拉取+推送
+1. 业务表 INSERT/UPDATE/DELETE → trigger 写入 `sync_data(operation_type=upload)`
+2. `DataSyncService` 监听未完成队列数量 → 自动执行同步
+3. 同步下载远端实体 → `LocalSyncDatasource.runMuted()` 静默写库
+4. 应用运行中每 10 分钟额外检测云端变化
 
-**降级**: 网络不可用时静默忽略（FR-017）。
+**降级**: 网络不可用时保留未完成任务，下次自动重试。
 
 ---
 
@@ -65,7 +66,7 @@ ALTER TABLE routines ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0;
 
 ## R5: 索引文件格式设计
 
-**Decision**: Cloud index JSON 格式如下：
+**Decision**: Cloud index JSON 存储实体摘要，`sync/sync_index.json` 存储 index 文件摘要。
 
 ```json
 {
@@ -76,15 +77,17 @@ ALTER TABLE routines ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0;
       "id": "uuid-v4",
       "version": 3,
       "updatedAt": "2026-05-21T10:30:00Z",
+      "lastModifiedDevice": "macos-device-id",
+      "path": "root/MyAssistant/todos/2026/2026-05/2026-05-29/todo_uuid-v4.json",
       "deleted": false
     }
   ]
 }
 ```
 
-**Rationale**: 仅含差分对比所需的最小字段（id, version, updatedAt, deleted），不含 data 内容。索引文件大小控制在 100KB 以内。
+**Rationale**: 仅含差分对比所需的最小字段，不含 data 内容。`sync/sync_index.json` 让客户端先判断哪些 index 文件需要下载，避免扫描全目录。
 
-**拆分策略**: 按功能模块（todos, bills, notes, copilot）分别维护独立索引文件。todos 模块下的例行在 `index/todos/` 中持有独立的 `routines_index.json`。
+**拆分策略**: 按功能模块维护独立索引文件。todos 模块下例行使用 `index/todos/routine_index.json`。
 
 ---
 
@@ -93,18 +96,18 @@ ALTER TABLE routines ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0;
 | 文件 | 操作 | 说明 |
 |------|------|------|
 | `sync_engine.dart` | 重写 | 替换全量同步为索引差分增量同步 |
-| `sync_scheduler.dart` | 重写 | 改为被 Repository 调用触发，非定时器轮询 |
-| `index_manager.dart` | 重写 | 新路径格式 + 模块化索引 |
-| `cloud_path_builder.dart` | 修正 | 用户名参数已正确，确保调用方统一使用 |
-| `change_tracker.dart` | 废弃 | 替换为 Repository 层直接调用 |
+| `data_sync_service.dart` | 重写 | 监听 `sync_data` + 10 分钟周期 |
+| `local_sync_datasource.dart` | 重写 | sync/sync_index/sync_data/sync_control 读写 |
+| `cloud_path_builder.dart` | 修正 | 使用用户指定 WebDAV 目录作为 root |
+| `change_tracker.dart` | 废弃 | 替换为数据库触发器自动入队 |
 | `conflict_resolver.dart` | 重写 | 改为 Last-Write-Wins 自动解决 |
 | `settings_page.dart` | 更新 | 硬编码路径替换 + 同步状态展示 |
 | `todos_table.dart` | 新增列 | version, deleted |
 | `routines_table.dart` | 新增列 | uuid, version, updatedAt, deleted |
 | `todo.dart` | 新增字段 | version, deleted |
 | `routine.dart` | 新增字段 | uuid, version, updatedAt, deleted |
-| `todo_repository.dart` | 更新 | CUD 操作后触发同步 |
-| `routine_repository.dart` | 更新 | CUD 操作后触发同步 |
+| `todo_repository.dart` | 更新 | 移除显式同步依赖 |
+| `routine_repository.dart` | 更新 | 移除显式同步依赖 |
 
 ---
 
@@ -112,26 +115,48 @@ ALTER TABLE routines ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0;
 
 ### 拉取流程（先执行）
 ```
-1. GET MyAssistant/{username}/index/todos/todos_index.json
-2. GET MyAssistant/{username}/index/todos/routines_index.json
-3. 遍历索引 entries，对比本地 version：
-   - 云端 version > 本地 version → 下载对应数据文件
-   - 云端 deleted=true → 本地物理删除（先检查 version）
-   - 本地无记录 → 新数据，下载
-4. 下载后本地 version 更新为云端 version
+1. GET {root}/MyAssistant/sync/sync_index.json
+2. 对比本地 sync 表，找出需要更新的 index 文件
+3. GET 需要更新的 index 文件
+4. 对比本地 sync_index，写入 sync_data(download)
+5. 消费 download 任务，使用 runMuted() 下载实体并写入本地表
+6. 更新 sync 与 sync_index
 ```
 
 ### 推送流程（后执行）
 ```
-1. 遍历本地所有数据（todos + routines），筛选本地 version > SyncIndex 记录的 cloudVersion
-2. 逐条 PUT 到对应路径：
-   - todo: MyAssistant/{username}/todos/{y}/{ym}/{ymd}/{uuid}.json
-   - routine: MyAssistant/{username}/todos/routines/{uuid}.json
-3. 更新云端索引文件（todos_index.json + routines_index.json）
-4. 更新本地 SyncIndex.cloudVersion = 最新 version
+1. 查询 sync_data 中未完成 upload 任务
+2. 按任务 local_table 读取本地实体
+3. PUT 实体文件到 `{root}/MyAssistant/...`
+4. 更新实体 index 文件
+5. 更新 `sync/sync_index.json`
+6. 标记 sync_data 任务完成
 ```
 
 ### 异常处理
 - 索引文件 404：视为首次同步，全量推送
 - 数据文件 404（索引有但文件丢失）：跳过，下次索引重建时修复
 - PUT 失败（网络中断）：静默忽略，下次自动重试
+
+---
+
+## R8: 附件同步策略
+
+**Decision**: 日记、文档、归档、Copilot chat/archive_chat 中出现的图片、录音、文件等附件统一拆入 `attachments` 表，业务实体只保存附件 ID。附件云端文件使用 base64 JSON 信封同步，单个附件限制 20MB，且附件任务在普通实体任务之后执行。
+
+**Rationale**:
+- 附件体积明显大于普通实体，拆表后主实体 index 和内容文件保持轻量。
+- 主实体先同步，附件最后同步，可以让数据引用关系先稳定下来，失败时也只影响附件任务重试。
+- base64 JSON 保持 WebDAV 同步格式一致，不需要引入二进制多部分上传协议。
+
+**Cloud paths**:
+
+```text
+{root}/MyAssistant/index/attachments/attachments_index.json
+{root}/MyAssistant/attachments/{YYYY}/{YYYY-MM}/attachment_{uuid}.json
+```
+
+**Constraints**:
+- 上传和下载都必须校验 `sizeBytes <= 20MB`。
+- 超限附件的 `sync_data` 任务标记为 error，不覆盖本地数据。
+- 后续随手记/Copilot UI 和旧数据迁移需要把内嵌附件内容转为 `attachmentIds`。

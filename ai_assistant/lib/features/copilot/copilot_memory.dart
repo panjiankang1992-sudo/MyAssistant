@@ -1,9 +1,7 @@
-import 'dart:convert';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
-import '../../data/api/api_client.dart';
+import '../../core/providers/core_providers.dart';
 
 enum CopilotMemoryType { shortTerm, longTerm }
 
@@ -127,10 +125,12 @@ class CopilotMemoryNotifier extends Notifier<CopilotMemoryState> {
   }
 
   Future<void> _load() async {
-    final cached = await ApiClient.storageRead(_storageKey);
-    if (cached == null || cached.trim().isEmpty) return;
+    final cached = await ref
+        .read(datasourceProvider)
+        .getAppSettingJson('memory', _storageKey);
+    if (cached == null || cached.isEmpty) return;
     try {
-      final data = jsonDecode(cached) as List<dynamic>;
+      final data = cached['items'] as List<dynamic>? ?? const [];
       state = CopilotMemoryState(
         items: data
             .whereType<Map>()
@@ -227,10 +227,14 @@ class CopilotMemoryNotifier extends Notifier<CopilotMemoryState> {
   }
 
   Future<void> _save() async {
-    await ApiClient.storageWrite(
-      _storageKey,
-      jsonEncode(state.items.map((item) => item.toJson()).toList()),
-    );
+    await ref
+        .read(datasourceProvider)
+        .upsertAppSettingJson(
+          module: 'copilot',
+          dataType: 'memory',
+          id: _storageKey,
+          payload: {'items': state.items.map((item) => item.toJson()).toList()},
+        );
   }
 
   List<CopilotMemoryItem> _prune(List<CopilotMemoryItem> items) {

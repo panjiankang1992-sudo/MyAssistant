@@ -234,9 +234,10 @@ class _CopilotTopBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final scheme = Theme.of(context).colorScheme;
+    final topInset = MediaQuery.paddingOf(context).top;
     return Container(
-      height: 54,
-      padding: const EdgeInsets.symmetric(horizontal: 22),
+      height: topInset + 54,
+      padding: EdgeInsets.fromLTRB(22, topInset, 22, 0),
       decoration: BoxDecoration(
         color: scheme.appPage,
         border: Border(bottom: BorderSide(color: scheme.appBorder, width: 0.5)),

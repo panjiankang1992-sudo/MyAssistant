@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../platform/app_performance.dart';
 import 'theme_settings.dart';
 
 class AppColors {
@@ -95,6 +96,21 @@ class AppAnimations {
   }
 }
 
+class _NoPageTransitionsBuilder extends PageTransitionsBuilder {
+  const _NoPageTransitionsBuilder();
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    return child;
+  }
+}
+
 extension AppThemeSemanticColors on ColorScheme {
   bool get isDarkTheme => brightness == Brightness.dark;
 
@@ -166,9 +182,15 @@ class AppTheme {
           : AppColors.textSecondary,
       outline: isDark ? const Color(0xFF3A3A40) : AppColors.handleBar,
     );
-    final duration = settings.reduceMotion
-        ? Durations.short1
+    final reduceMotion = settings.reduceMotion || AppPerformance.lowLatencyMode;
+    final duration = reduceMotion
+        ? Duration.zero
         : AppAnimations.mediumDuration;
+    final buttonStyle = _interactiveButtonStyle(
+      visualDensity: visualDensity,
+      duration: duration,
+      reduceMotion: reduceMotion,
+    );
     return theme.copyWith(
       colorScheme: colorScheme,
       textTheme: theme.textTheme.apply(
@@ -180,9 +202,36 @@ class AppTheme {
       scaffoldBackgroundColor: isDark
           ? const Color(0xFF0F1014)
           : AppColors.scaffoldBg,
-      splashFactory: settings.reduceMotion
+      splashFactory: reduceMotion
           ? NoSplash.splashFactory
           : InkSparkle.splashFactory,
+      splashColor: reduceMotion ? Colors.transparent : null,
+      highlightColor: reduceMotion ? Colors.transparent : null,
+      hoverColor: reduceMotion ? Colors.transparent : null,
+      focusColor: reduceMotion ? Colors.transparent : null,
+      pageTransitionsTheme: reduceMotion
+          ? PageTransitionsTheme(
+              builders: {
+                for (final platform in TargetPlatform.values)
+                  platform: const _NoPageTransitionsBuilder(),
+              },
+            )
+          : theme.pageTransitionsTheme,
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: _mergeButtonStyle(theme.elevatedButtonTheme.style, buttonStyle),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: _mergeButtonStyle(theme.filledButtonTheme.style, buttonStyle),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: _mergeButtonStyle(theme.outlinedButtonTheme.style, buttonStyle),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: _mergeButtonStyle(theme.textButtonTheme.style, buttonStyle),
+      ),
+      iconButtonTheme: IconButtonThemeData(
+        style: _mergeButtonStyle(theme.iconButtonTheme.style, buttonStyle),
+      ),
       appBarTheme: theme.appBarTheme.copyWith(
         foregroundColor: isDark ? Colors.white : AppColors.text,
         systemOverlayStyle: SystemUiOverlayStyle(
@@ -547,6 +596,27 @@ class AppTheme {
         backgroundColor: const Color(0xFF1D1D1F),
       ),
     );
+  }
+
+  static ButtonStyle _interactiveButtonStyle({
+    required VisualDensity visualDensity,
+    required Duration duration,
+    required bool reduceMotion,
+  }) {
+    return ButtonStyle(
+      visualDensity: visualDensity,
+      animationDuration: duration,
+      overlayColor: reduceMotion
+          ? WidgetStateProperty.all(Colors.transparent)
+          : null,
+    );
+  }
+
+  static ButtonStyle _mergeButtonStyle(
+    ButtonStyle? base,
+    ButtonStyle override,
+  ) {
+    return (base ?? const ButtonStyle()).merge(override);
   }
 
   static ThemeData get _darkTheme {

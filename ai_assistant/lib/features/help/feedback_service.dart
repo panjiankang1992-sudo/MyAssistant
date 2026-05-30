@@ -1,8 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:path_provider/path_provider.dart';
-
+import '../../core/storage/app_paths.dart';
 import '../../data/api/api_client.dart';
 
 enum FeedbackModule {
@@ -171,7 +170,7 @@ class FeedbackService {
   }
 
   Future<File> pendingFile() async {
-    final dir = await getApplicationSupportDirectory();
+    final dir = await getAppSupportDirectory();
     final feedbackDir = Directory('${dir.path}/feedback');
     if (!await feedbackDir.exists()) {
       await feedbackDir.create(recursive: true);

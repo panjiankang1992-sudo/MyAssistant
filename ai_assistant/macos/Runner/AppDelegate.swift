@@ -20,6 +20,49 @@ class AppDelegate: FlutterAppDelegate {
       name: "my_assistant/todo_reminders",
       binaryMessenger: controller.engine.binaryMessenger
     )
+    let smsChannel = FlutterMethodChannel(
+      name: "my_assistant/sms",
+      binaryMessenger: controller.engine.binaryMessenger
+    )
+    let permissionsChannel = FlutterMethodChannel(
+      name: "my_assistant/permissions",
+      binaryMessenger: controller.engine.binaryMessenger
+    )
+    let appLauncherChannel = FlutterMethodChannel(
+      name: "my_assistant/app_launcher",
+      binaryMessenger: controller.engine.binaryMessenger
+    )
+    permissionsChannel.setMethodCallHandler { [weak self] call, result in
+      switch call.method {
+      case "openPermissionSettings":
+        guard
+          let args = call.arguments as? [String: Any],
+          let target = args["target"] as? String
+        else {
+          result(false)
+          return
+        }
+        self?.openPermissionSettings(target: target, result: result)
+      case "openAuthorizationSettings", "openAppSettings":
+        result(self?.openAppPrivacySettings() ?? false)
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
+    appLauncherChannel.setMethodCallHandler { [weak self] call, result in
+      switch call.method {
+      case "listApps":
+        result(self?.listLaunchableApplications() ?? [])
+      case "openApp":
+        guard let args = call.arguments as? [String: Any] else {
+          result(FlutterError(code: "bad_args", message: "缺少应用参数", details: nil))
+          return
+        }
+        result(self?.openLaunchableApplication(args: args) ?? false)
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
     channel.setMethodCallHandler { [weak self] call, result in
       if call.method == "openCalendar" {
         self?.openCalendarApp(result: result)
@@ -41,6 +84,8 @@ class AppDelegate: FlutterAppDelegate {
     }
     reminderChannel.setMethodCallHandler { [weak self] call, result in
       switch call.method {
+      case "ensureNotificationPermission":
+        self?.ensureNotificationPermission(result: result)
       case "schedule":
         guard
           let args = call.arguments as? [String: Any],
@@ -71,6 +116,15 @@ class AppDelegate: FlutterAppDelegate {
       default:
         result(FlutterMethodNotImplemented)
       }
+    }
+    smsChannel.setMethodCallHandler { call, result in
+      guard call.method == "fetchRecent" else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+      // macOS sandboxed apps cannot reliably read Messages/SMS content.
+      // Return an empty list so Flutter can safely fall back without blocking startup.
+      result([])
     }
     super.applicationDidFinishLaunching(notification)
   }
@@ -180,6 +234,110 @@ class AppDelegate: FlutterAppDelegate {
     result(false)
   }
 
+  private func openPermissionSettings(target: String, result: @escaping FlutterResult) {
+    switch target {
+    case "calendar":
+      requestCalendarAccess { [weak self] granted in
+        if granted {
+          result(true)
+        } else {
+          result(self?.openPrivacyPane("Privacy_Calendars") ?? false)
+        }
+      }
+    case "reminders":
+      requestReminderAccess { [weak self] granted in
+        if granted {
+          result(true)
+        } else {
+          result(self?.openPrivacyPane("Privacy_Reminders") ?? false)
+        }
+      }
+    case "notifications":
+      ensureNotificationPermission { [weak self] response in
+        if let granted = response as? Bool, granted {
+          result(true)
+        } else {
+          result(self?.openSystemSettingsURL("x-apple.systempreferences:com.apple.preference.notifications") ?? false)
+        }
+      }
+    case "voice":
+      result(openPrivacyPane("Privacy_Microphone"))
+    default:
+      result(openAppPrivacySettings())
+    }
+  }
+
+  private func openAppPrivacySettings() -> Bool {
+    return openSystemSettingsURL("x-apple.systempreferences:com.apple.preference.security")
+  }
+
+  private func listLaunchableApplications() -> [[String: Any]] {
+    let directories = [
+      "/Applications",
+      "/System/Applications",
+      "/System/Applications/Utilities",
+      "/Applications/Utilities"
+    ]
+    var seen = Set<String>()
+    var apps: [[String: Any]] = []
+    for directory in directories {
+      let url = URL(fileURLWithPath: directory, isDirectory: true)
+      guard let entries = try? FileManager.default.contentsOfDirectory(
+        at: url,
+        includingPropertiesForKeys: [.isDirectoryKey],
+        options: [.skipsHiddenFiles]
+      ) else { continue }
+      for entry in entries where entry.pathExtension == "app" {
+        let bundle = Bundle(url: entry)
+        let bundleId = bundle?.bundleIdentifier ?? entry.path
+        guard !seen.contains(bundleId) else { continue }
+        seen.insert(bundleId)
+        let info = bundle?.infoDictionary
+        let rawLabel = (info?["CFBundleDisplayName"] as? String)
+          ?? (info?["CFBundleName"] as? String)
+        let label = rawLabel?.trimmingCharacters(in: .whitespacesAndNewlines)
+          ?? entry.deletingPathExtension().lastPathComponent
+        apps.append([
+          "platform": "macos",
+          "id": bundleId,
+          "label": label,
+          "subtitle": bundleId,
+          "bundleId": bundleId,
+          "path": entry.path
+        ])
+      }
+    }
+    return apps.sorted {
+      let lhs = ($0["label"] as? String) ?? ""
+      let rhs = ($1["label"] as? String) ?? ""
+      return lhs.localizedCaseInsensitiveCompare(rhs) == .orderedAscending
+    }
+  }
+
+  private func openLaunchableApplication(args: [String: Any]) -> Bool {
+    if
+      let path = args["path"] as? String,
+      !path.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+      return NSWorkspace.shared.open(URL(fileURLWithPath: path))
+    }
+    let bundleId = (args["bundleId"] as? String) ?? (args["id"] as? String)
+    guard
+      let id = bundleId?.trimmingCharacters(in: .whitespacesAndNewlines),
+      !id.isEmpty,
+      let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id)
+    else { return false }
+    return NSWorkspace.shared.open(url)
+  }
+
+  private func openPrivacyPane(_ pane: String) -> Bool {
+    return openSystemSettingsURL("x-apple.systempreferences:com.apple.preference.security?\(pane)")
+  }
+
+  private func openSystemSettingsURL(_ raw: String) -> Bool {
+    guard let url = URL(string: raw) else { return false }
+    return NSWorkspace.shared.open(url)
+  }
+
   private func scheduleTodoReminder(
     id: String,
     title: String,
@@ -225,6 +383,18 @@ class AppDelegate: FlutterAppDelegate {
           } else {
             result(nil)
           }
+        }
+      }
+    }
+  }
+
+  private func ensureNotificationPermission(result: @escaping FlutterResult) {
+    UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
+      DispatchQueue.main.async {
+        if let error = error {
+          result(FlutterError(code: "notification_error", message: error.localizedDescription, details: nil))
+        } else {
+          result(granted)
         }
       }
     }

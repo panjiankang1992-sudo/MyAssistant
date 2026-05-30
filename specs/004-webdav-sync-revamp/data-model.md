@@ -1,165 +1,156 @@
 # Data Model: WebDAV 同步策略重构
 
-**Phase 1 output for spec 004**
+**Revised**: 2026-05-29
 
-## Entity Relationship
+## Local Tables
 
-```
-Todo ───── SyncIndex (dataId, dataType='todo')
-Routine ── SyncIndex (dataId='uuid', dataType='routine')
-SyncIndex ── DeviceSyncState (sync metadata)
-```
+### sync
 
-## Todo (待办)
+本地 `sync` 表与云端 `sync/sync_index.json` 语义一致，记录所有 index 文件的同步摘要。
 
-| 字段 | 类型 | 约束 | 变更 |
-|------|------|------|------|
-| `id` | TEXT | PK, UUID v4 | 现有 |
-| `title` | TEXT | NOT NULL | 现有 |
-| `description` | TEXT | NULLABLE | 现有 |
-| `source` | TEXT | NOT NULL | 现有 |
-| `type` | TEXT | NOT NULL | 现有 |
-| `time` | TEXT | NOT NULL (e.g. "08:00") | 现有 |
-| `date` | DATETIME | NOT NULL | 现有 |
-| `completed` | BOOL | DEFAULT false | 现有 |
-| `createdAt` | DATETIME | DEFAULT now | 现有 |
-| `updatedAt` | DATETIME | DEFAULT now | 现有 |
-| **`version`** | **INT** | **DEFAULT 1** | **新增** |
-| **`deleted`** | **BOOL** | **DEFAULT false** | **新增** |
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `cloud_path` | TEXT PK | index 文件云端路径 |
+| `module` | TEXT | todos / bills / notes / copilot / profile |
+| `index_name` | TEXT | 如 `todos_index.json` |
+| `last_modified_device` | TEXT | 最后修改设备 |
+| `updated_at` | DATETIME | index 文件最后修改时间 |
 
-### 状态转换
+### sync_index
 
-```
-created (version=1, deleted=false)
-   │
-   ├─→ updated (version++, updatedAt=now)
-   │     └─→ updated (version++, updatedAt=now) × N
-   │
-   └─→ deleted (version++, deleted=true, updatedAt=now)
-         └─→ [本地物理删除 after 30 days sync]
-```
+本地实体索引表，与云端 `index/**.json` 条目一致。
 
-## Routine (例行)
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `data_id` | TEXT PK(part) | 实体 UUID |
+| `data_type` | TEXT PK(part) | todo / routine / bill / category / note 等 |
+| `local_version` | INT | 本地版本 |
+| `cloud_version` | INT | 已知云端版本 |
+| `updated_at` | DATETIME | 本地最后修改时间 |
+| `sync_status` | TEXT | synced / pending_upload / conflict |
+| `sync_index_path` | TEXT | 对应 index 文件路径 |
+| `cloud_path` | TEXT | 实体云端文件路径 |
+| `last_modified_device` | TEXT | 最后修改设备 |
+| `cloud_updated_at` | DATETIME | 已知云端最后修改时间 |
+| `is_deleted` | BOOL | 软删除标记 |
 
-| 字段 | 类型 | 约束 | 变更 |
-|------|------|------|------|
-| `id` | INT | PK, 自增 | 现有（保留作本地主键） |
-| **`uuid`** | **TEXT** | **UNIQUE, UUID v4** | **新增（同步标识）** |
-| `title` | TEXT | NOT NULL | 现有 |
-| `description` | TEXT | NULLABLE | 现有 |
-| `type` | TEXT | NOT NULL | 现有 |
-| `time` | TEXT | NOT NULL | 现有 |
-| `repeatRule` | TEXT | DEFAULT 'daily' | 现有 |
-| `repeatDays` | TEXT | NULLABLE | 现有 |
-| `createdAt` | DATETIME | DEFAULT now | 现有 |
-| **`updatedAt`** | **DATETIME** | **DEFAULT now** | **新增** |
-| **`version`** | **INT** | **DEFAULT 1** | **新增** |
-| **`deleted`** | **BOOL** | **DEFAULT false** | **新增** |
+### sync_data
 
-### 同步标识
+同步任务队列。
 
-- `uuid` 为全局唯一同步标识（WebDAV 文件名 = `{uuid}.json`）
-- `id` 保留为本地自增主键，仅用于 Drift 内部关联
-- 多设备同步通过 `uuid` 匹配，非 `id`
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `id` | INTEGER PK | 任务 ID |
+| `sync_index_id` | TEXT | 对应 sync_index 逻辑 ID |
+| `data_id` | TEXT | 实体 ID |
+| `local_table` | TEXT | 本地表名 |
+| `cloud_path` | TEXT | 实体云端文件路径，上传前可为空 |
+| `operation_type` | TEXT | upload / download |
+| `is_completed` | BOOL | 是否完成 |
+| `status` | TEXT | pending / completed / error |
+| `error` | TEXT | 异常信息 |
+| `updated_at` | DATETIME | 最后更新时间 |
 
-## SyncIndex (同步索引 - 本地)
+### sync_control
 
-| 字段 | 类型 | 约束 | 说明 |
-|------|------|------|------|
-| `dataId` | TEXT | PK (composite) | Todo: uuid, Routine: uuid |
-| `dataType` | TEXT | PK (composite) | 'todo' 或 'routine' |
-| `localVersion` | INT | DEFAULT 1 | 本地的 version |
-| `cloudVersion` | INT | DEFAULT 0 | 云端最后一次已知 version |
-| `updatedAt` | DATETIME | DEFAULT now | 最后同步时间 |
-| `syncStatus` | TEXT | DEFAULT 'synced' | 'synced', 'pending_upload' |
+同步模块写库静默控制。
 
-### 用途
-- 差分对比：`localVersion > cloudVersion` → 推送；`cloudVersion on index > cloudVersion` → 拉取
-- 无需本地独立索引文件——直接使用 SyncIndex 表作为版本追踪源
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `id` | TEXT PK | 固定 `default` |
+| `muted` | BOOL | true 时触发器不写入 `sync_data` |
+| `updated_at` | DATETIME | 更新时间 |
 
-## DeviceSyncState (设备同步状态)
+### attachments
 
-| 字段 | 类型 | 约束 | 说明 |
-|------|------|------|------|
-| `deviceId` | TEXT | PK | 设备标识 |
-| `lastSyncTime` | DATETIME | NULLABLE | 上次同步完成时间 |
-| `syncErrors` | INT | NULLABLE | 累计同步错误次数 |
+随手记中的日记、文档、归档，以及 Copilot 聊天记录中的图片、录音、文件等附件统一落到独立附件表。业务实体表只保存附件 ID 列表，不直接保存附件二进制或 base64 内容。
 
-## ChangeRecords (变更记录)
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `id` | TEXT PK | 附件 UUID |
+| `owner_type` | TEXT | diary / note / archive / chat / archive_chat |
+| `owner_id` | TEXT | 所属业务实体 ID |
+| `attachment_type` | TEXT | image / audio / file 等 |
+| `file_name` | TEXT | 原始文件名 |
+| `mime_type` | TEXT NULL | MIME 类型 |
+| `size_bytes` | INT | 原始附件大小，单个附件不得超过 20MB |
+| `content_base64` | TEXT | base64 编码后的附件内容 |
+| `created_at` | DATETIME | 创建时间 |
+| `updated_at` | DATETIME | 最后修改时间 |
+| `is_deleted` | BOOL | 软删除标记 |
 
-> **设计变更**: 此表在 spec 004 中被废弃。同步由 Repository 层直接触发 SyncScheduler，不再需要异步记录待推送变更队列。保留表结构用于向后兼容，但不再写入新数据。
+## Entity Tables
 
-## 云端路径映射
+所有可同步实体/配置表必须包含：
 
-```
-MyAssistant/{username}/
-├── index/
-│   ├── todos/
-│   │   ├── todos_index.json      # 待办索引
-│   │   └── routines_index.json   # 例行索引
-│   ├── bills/
-│   │   └── bills_index.json      # (后续扩展)
-│   ├── notes/
-│   │   └── notes_index.json      # (后续扩展)
-│   └── copilot/
-│       └── copilot_index.json    # (后续扩展)
-├── todos/
-│   ├── {year}/{month}/{day}/{uuid}.json   # 待办数据
-│   └── routines/
-│       └── {uuid}.json                    # 例行数据
-├── bills/
-├── notes/
-├── copilot/
-└── profile/
-```
+| 字段 | 说明 |
+|------|------|
+| 实体 ID | UUID 或雪花 ID |
+| `is_deleted`/`deleted` | 软删除 |
+| `created_at`/`createdAt` | 创建时间 |
+| `updated_at`/`updatedAt` | 最后修改时间 |
 
-### 路径生成规则
+展示时间必须使用单独字段，例如待办 `date`、账单 `date`、日记 `date`，不得复用创建时间。
 
-| 数据类型 | 构建方法 |
-|----------|----------|
-| Todo | `MyAssistant/{username}/todos/{YYYY}/{YYYYMM}/{YYYYMMDD}/{uuid}.json` |
-| Routine | `MyAssistant/{username}/todos/routines/{uuid}.json` |
-| Todo Index | `MyAssistant/{username}/index/todos/todos_index.json` |
-| Routine Index | `MyAssistant/{username}/index/todos/routines_index.json` |
+当前代码已覆盖 Drift 表：`todos`、`routines`、`tags`、`metadata_options`、`attachments`。账单、随手记、Copilot、Profile 中仍使用 JSON 文件/本地存储的部分，需要迁移为表或由同步模块统一托管；日记/文档/归档/Copilot chat 迁移后只记录 `attachmentIds`。
 
-## 数据库迁移 (v3 → v4)
+## Cloud JSON
 
-```sql
--- v3→v4: 同步重构 - 新增 version, deleted, uuid 字段
-ALTER TABLE todos ADD COLUMN version INTEGER NOT NULL DEFAULT 1;
-ALTER TABLE todos ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0;
-
-ALTER TABLE routines ADD COLUMN uuid TEXT;
-ALTER TABLE routines ADD COLUMN version INTEGER NOT NULL DEFAULT 1;
-ALTER TABLE routines ADD COLUMN updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP;
-ALTER TABLE routines ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0;
-
--- 为现有例行记录生成 UUID
-UPDATE routines SET uuid = lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)), 2) || '-' || substr('89ab', abs(random()) % 4 + 1, 1) || substr(hex(randomblob(2)), 2) || '-' || hex(randomblob(6))) WHERE uuid IS NULL;
-```
-
-> 注意：Drift 中 BOOL 列以 INTEGER 存储（0/1），`deleted` 字段需使用 `boolColumn`。
-
-## 云端 JSON 信封格式
+实体文件统一信封：
 
 ```json
 {
-  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "id": "uuid",
   "type": "todo",
   "version": 3,
-  "updatedAt": "2026-05-21T10:30:00.000Z",
+  "is_deleted": false,
+  "created_at": "2026-05-29T10:00:00.000Z",
+  "updated_at": "2026-05-29T11:00:00.000Z",
   "data": {
     "title": "买牛奶",
-    "description": "全脂",
-    "source": "manual",
-    "type": "personal",
-    "time": "18:00",
-    "date": "2026-05-21",
-    "completed": false,
-    "createdAt": "2026-05-20T08:00:00.000Z"
-  },
-  "deleted": false
+    "date": "2026-05-29"
+  }
 }
 ```
 
-<!-- SPECKIT END -->
+现有 Dart 模型仍保留 camelCase 字段，序列化层负责兼容 `createdAt/updatedAt/deleted` 和 `created_at/updated_at/is_deleted`。
+
+附件实体文件也使用同一信封，`data.contentBase64` 保存 base64 内容，下载和上传前都必须校验 `sizeBytes <= 20MB`。
+
+```json
+{
+  "id": "attachment-uuid",
+  "type": "attachment",
+  "version": 1,
+  "is_deleted": false,
+  "created_at": "2026-05-29T10:00:00.000Z",
+  "updated_at": "2026-05-29T11:00:00.000Z",
+  "data": {
+    "ownerType": "diary",
+    "ownerId": "diary-uuid",
+    "attachmentType": "image",
+    "fileName": "receipt.jpg",
+    "mimeType": "image/jpeg",
+    "sizeBytes": 102400,
+    "contentBase64": "..."
+  }
+}
+```
+
+## Cloud Paths
+
+| 类型 | 路径 |
+|------|------|
+| Sync manifest | `{root}/MyAssistant/sync/sync_index.json` |
+| Todo index | `{root}/MyAssistant/index/todos/todos_index.json` |
+| Routine index | `{root}/MyAssistant/index/todos/routine_index.json` |
+| Todo | `{root}/MyAssistant/todos/{YYYY}/{YYYY-MM}/{YYYY-MM-DD}/todo_{uuid}.json` |
+| Routine | `{root}/MyAssistant/todos/routine/routine_{uuid}.json` |
+| Bill | `{root}/MyAssistant/bills/{YYYY}/{YYYY-MM}/{YYYY-MM-DD}/bill_{uuid}.json` |
+| Category | `{root}/MyAssistant/bills/category/category_{uuid}.json` |
+| Note | `{root}/MyAssistant/notes/notes/note_{uuid}.json` |
+| Diary | `{root}/MyAssistant/notes/{YYYY}/{YYYY-MM}/{YYYY-MM-DD}/diary_{uuid}.json` |
+| Attachment index | `{root}/MyAssistant/index/attachments/attachments_index.json` |
+| Attachment | `{root}/MyAssistant/attachments/{YYYY}/{YYYY-MM}/attachment_{uuid}.json` |
+| Copilot memory | `{root}/MyAssistant/copilot/memory.json` |
+| Profile setting | `{root}/MyAssistant/profile/*.json` |

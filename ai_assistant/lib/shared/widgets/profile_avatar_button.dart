@@ -1,9 +1,10 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/platform/app_performance.dart';
+import '../../features/copilot/copilot_avatar.dart';
 import '../../features/profile/profile_provider.dart';
 
 class ProfileAvatarButton extends ConsumerStatefulWidget {
@@ -40,32 +41,45 @@ class _ProfileAvatarButtonState extends ConsumerState<ProfileAvatarButton> {
     final avatarChild = _avatarChild(
       letter: letter,
       gradientColors: gradientColors,
+      avatarValue: profile.avatarValue,
       serverAvatarUrl: profile.serverAvatarUrl,
       localAvatarPath: profile.avatarPath,
     );
+    final reduceMotion = AppPerformance.shouldReduceMotion(context);
 
     return GestureDetector(
-      onTapDown: (_) => setState(() => _pressed = true),
-      onTapUp: (_) {
-        setState(() => _pressed = false);
-        widget.onTap?.call();
-      },
-      onTapCancel: () => setState(() => _pressed = false),
-      child: AnimatedScale(
-        scale: _pressed ? 0.92 : 1.0,
-        duration: const Duration(milliseconds: 120),
-        curve: Curves.easeOut,
-        child: avatarChild,
-      ),
+      onTap: reduceMotion ? widget.onTap : null,
+      onTapDown: reduceMotion ? null : (_) => setState(() => _pressed = true),
+      onTapUp: reduceMotion
+          ? null
+          : (_) {
+              setState(() => _pressed = false);
+              widget.onTap?.call();
+            },
+      onTapCancel: reduceMotion ? null : () => setState(() => _pressed = false),
+      child: reduceMotion
+          ? avatarChild
+          : AnimatedScale(
+              scale: _pressed ? 0.92 : 1.0,
+              duration: const Duration(milliseconds: 120),
+              curve: Curves.easeOut,
+              child: avatarChild,
+            ),
     );
   }
 
   Widget _avatarChild({
     required String letter,
     required List<Color> gradientColors,
+    required String? avatarValue,
     required String? serverAvatarUrl,
     required String? localAvatarPath,
   }) {
+    final saved = avatarValue?.trim() ?? '';
+    if (saved.isNotEmpty) {
+      return CopilotAvatarView(value: saved, size: 40);
+    }
+
     if (serverAvatarUrl != null && serverAvatarUrl.isNotEmpty) {
       if (serverAvatarUrl.startsWith('data:')) {
         try {
@@ -97,19 +111,16 @@ class _ProfileAvatarButtonState extends ConsumerState<ProfileAvatarButton> {
     }
 
     if (localAvatarPath != null && localAvatarPath.isNotEmpty) {
-      return ClipOval(
-        child: Image.file(
-          File(localAvatarPath),
-          width: 40,
-          height: 40,
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) =>
-              _gradientAvatar(letter, gradientColors),
-        ),
+      return CopilotAvatarView(
+        value: CopilotAvatarCatalog.fileValue(localAvatarPath),
+        size: 40,
       );
     }
 
-    return _gradientAvatar(letter, gradientColors);
+    return const CopilotAvatarView(
+      value: CopilotAvatarCatalog.defaultValue,
+      size: 40,
+    );
   }
 
   Widget _gradientAvatar(String letter, List<Color> gradientColors) {
@@ -123,13 +134,15 @@ class _ProfileAvatarButtonState extends ConsumerState<ProfileAvatarButton> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x33764BA2),
-            blurRadius: 8,
-            offset: Offset(0, 2),
-          ),
-        ],
+        boxShadow: AppPerformance.lowLatencyMode
+            ? null
+            : const [
+                BoxShadow(
+                  color: Color(0x33764BA2),
+                  blurRadius: 8,
+                  offset: Offset(0, 2),
+                ),
+              ],
       ),
       child: Center(
         child: Text(

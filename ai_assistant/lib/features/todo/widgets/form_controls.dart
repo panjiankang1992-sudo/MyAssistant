@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import '../../../core/platform/app_launcher_service.dart';
 import '../../../core/theme/app_theme.dart';
 
 class TodoAction {
@@ -38,10 +39,34 @@ class TodoActions {
   ];
 
   static TodoAction byValue(String value) {
+    final target = AppLaunchTarget.fromActionValue(value);
+    if (target != null) {
+      return TodoAction(
+        value,
+        '打开 ${target.label}',
+        Icons.open_in_new_rounded,
+        AppColors.primary,
+      );
+    }
+    if (AppLaunchTarget.isOpenAppAction(value)) {
+      return const TodoAction(
+        'open_app',
+        '打开应用',
+        Icons.open_in_new_rounded,
+        AppColors.primary,
+      );
+    }
     return options.firstWhere(
       (item) => item.value == value,
       orElse: () => options.first,
     );
+  }
+
+  static bool matches(String optionValue, String selectedValue) {
+    if (optionValue == 'open_app') {
+      return AppLaunchTarget.isOpenAppAction(selectedValue);
+    }
+    return optionValue == selectedValue;
   }
 }
 
@@ -70,6 +95,7 @@ class TodoSources {
       Icons.chat_bubble_outline_rounded,
       AppColors.success,
     ),
+    TodoSource('sms', '短信', Icons.sms_rounded, AppColors.healthText),
   ];
 
   static TodoSource byValue(String value) {
@@ -441,16 +467,38 @@ class ActionSelector extends StatelessWidget {
     required this.onChanged,
   });
 
+  Future<void> _selectOpenApp(BuildContext context) async {
+    final selected = await showModalBottomSheet<AppLaunchTarget>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => const _AppLaunchPickerSheet(),
+    );
+    if (selected == null) return;
+    onChanged(selected.actionValue);
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final selectedApp = AppLaunchTarget.fromActionValue(value);
     return Wrap(
       spacing: 8,
       runSpacing: 8,
       children: TodoActions.options.map((action) {
-        final selected = action.value == value;
+        final selected = TodoActions.matches(action.value, value);
+        final label = action.value == 'open_app' && selectedApp != null
+            ? selectedApp.label
+            : action.label;
         return GestureDetector(
-          onTap: () => onChanged(action.value),
+          onTap: () {
+            if (action.value == 'open_app') {
+              _selectOpenApp(context);
+              return;
+            }
+            onChanged(action.value);
+          },
           child: AnimatedContainer(
             duration: AppAnimations.shortDuration,
             padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
@@ -475,12 +523,17 @@ class ActionSelector extends StatelessWidget {
                   color: selected ? action.color : scheme.appSubtleText,
                 ),
                 const SizedBox(width: 5),
-                Text(
-                  action.label,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-                    color: selected ? action.color : scheme.appMutedText,
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 128),
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                      color: selected ? action.color : scheme.appMutedText,
+                    ),
                   ),
                 ),
               ],
@@ -488,6 +541,182 @@ class ActionSelector extends StatelessWidget {
           ),
         );
       }).toList(),
+    );
+  }
+}
+
+class _AppLaunchPickerSheet extends StatefulWidget {
+  const _AppLaunchPickerSheet();
+
+  @override
+  State<_AppLaunchPickerSheet> createState() => _AppLaunchPickerSheetState();
+}
+
+class _AppLaunchPickerSheetState extends State<_AppLaunchPickerSheet> {
+  final _queryController = TextEditingController();
+  late final Future<List<AppLaunchTarget>> _appsFuture;
+  String _query = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _appsFuture = AppLauncherService.listApps();
+    _queryController.addListener(() {
+      setState(() => _query = _queryController.text.trim().toLowerCase());
+    });
+  }
+
+  @override
+  void dispose() {
+    _queryController.dispose();
+    super.dispose();
+  }
+
+  List<AppLaunchTarget> _filter(List<AppLaunchTarget> apps) {
+    if (_query.isEmpty) return apps;
+    return apps.where((app) {
+      final text = [
+        app.label,
+        app.subtitle,
+        app.id,
+        app.platform,
+      ].whereType<String>().join(' ').toLowerCase();
+      return text.contains(_query);
+    }).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    return Padding(
+      padding: EdgeInsets.only(bottom: bottomInset),
+      child: Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.82,
+        ),
+        decoration: BoxDecoration(
+          color: scheme.appSurface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 14, 12, 10),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '选择应用',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        color: scheme.appText,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: '关闭',
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+              child: TextField(
+                controller: _queryController,
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText: '搜索应用名称或包名',
+                  prefixIcon: const Icon(Icons.search_rounded),
+                  filled: true,
+                  fillColor: scheme.appInput,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(color: scheme.appBorder),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(color: scheme.appBorder),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(color: scheme.primary, width: 1.4),
+                  ),
+                ),
+              ),
+            ),
+            Expanded(
+              child: FutureBuilder<List<AppLaunchTarget>>(
+                future: _appsFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState != ConnectionState.done) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  final apps = _filter(snapshot.data ?? const []);
+                  if (apps.isEmpty) {
+                    return Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Text(
+                          _query.isEmpty ? '当前平台暂未返回可打开的应用' : '没有匹配的应用',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: scheme.appMutedText,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    );
+                  }
+                  return ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 18),
+                    itemBuilder: (context, index) {
+                      final app = apps[index];
+                      return ListTile(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        leading: CircleAvatar(
+                          backgroundColor: AppColors.primary.withValues(
+                            alpha: 0.12,
+                          ),
+                          child: const Icon(
+                            Icons.apps_rounded,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                        title: Text(
+                          app.label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            color: scheme.appText,
+                          ),
+                        ),
+                        subtitle: Text(
+                          app.subtitle?.isNotEmpty == true
+                              ? app.subtitle!
+                              : app.id,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(color: scheme.appSubtleText),
+                        ),
+                        onTap: () => Navigator.of(context).pop(app),
+                      );
+                    },
+                    separatorBuilder: (_, _) => const SizedBox(height: 4),
+                    itemCount: apps.length,
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

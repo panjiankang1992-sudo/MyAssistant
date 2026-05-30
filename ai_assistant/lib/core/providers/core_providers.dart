@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../database/database.dart' hide Tag;
+import '../platform/app_performance.dart';
 import '../security/keychain_service.dart';
 import '../../data/datasources/local_datasource.dart';
 import '../../data/datasources/local_sync_datasource.dart';
@@ -39,7 +40,8 @@ final syncEngineProvider = FutureProvider<SyncEngine?>((ref) async {
 
   final localDs = ref.watch(datasourceProvider);
   final localSyncDs = ref.watch(localSyncDsProvider);
-  final pathBuilder = CloudPathBuilder(creds['username']!);
+  final configuredRoot = await keychain.getSyncRootDirectory();
+  final pathBuilder = CloudPathBuilder(configuredRoot);
 
   return SyncEngine(localDs, localSyncDs, webdav, pathBuilder);
 });
@@ -47,6 +49,14 @@ final syncEngineProvider = FutureProvider<SyncEngine?>((ref) async {
 final dataSyncServiceProvider = Provider<DataSyncService>((ref) {
   final service = DataSyncService(
     engineLoader: () => ref.read(syncEngineProvider.future),
+    syncConfigured: () async {
+      final keychain = KeychainService();
+      final lastUrl = await keychain.getLastServerUrl();
+      if (lastUrl == null || lastUrl.trim().isEmpty) return false;
+      final creds = await keychain.getCredentials(lastUrl);
+      final root = await keychain.getSyncRootDirectory();
+      return creds != null && root.trim().isNotEmpty;
+    },
     localSync: ref.watch(localSyncDsProvider),
     notifier: ref.read(syncNotifierProvider.notifier),
   )..start();
@@ -55,24 +65,24 @@ final dataSyncServiceProvider = Provider<DataSyncService>((ref) {
 });
 
 final todoRepoProvider = Provider<TodoRepository>((ref) {
-  return TodoRepository(
-    ref.watch(datasourceProvider),
-    syncService: ref.watch(dataSyncServiceProvider),
-  );
+  if (!AppPerformance.isOhos) {
+    ref.watch(dataSyncServiceProvider);
+  }
+  return TodoRepository(ref.watch(datasourceProvider));
 });
 
 final routineRepoProvider = Provider<RoutineRepository>((ref) {
-  return RoutineRepository(
-    ref.watch(datasourceProvider),
-    syncService: ref.watch(dataSyncServiceProvider),
-  );
+  if (!AppPerformance.isOhos) {
+    ref.watch(dataSyncServiceProvider);
+  }
+  return RoutineRepository(ref.watch(datasourceProvider));
 });
 
 final tagRepoProvider = Provider<TagRepository>((ref) {
-  return TagRepository(
-    ref.watch(datasourceProvider),
-    syncService: ref.watch(dataSyncServiceProvider),
-  );
+  if (!AppPerformance.isOhos) {
+    ref.watch(dataSyncServiceProvider);
+  }
+  return TagRepository(ref.watch(datasourceProvider));
 });
 
 final todoReminderServiceProvider = Provider<TodoReminderService>((ref) {

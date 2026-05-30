@@ -1,10 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:path_provider/path_provider.dart';
+
+import '../storage/app_paths.dart';
 
 class KeychainService {
   static Future<File> _getCredsFile() async {
-    final dir = await getApplicationSupportDirectory();
+    final dir = await getAppSupportDirectory();
     final credsDir = Directory('${dir.path}/credentials');
     if (!await credsDir.exists()) {
       await credsDir.create(recursive: true);
@@ -29,7 +30,11 @@ class KeychainService {
     await file.writeAsString(jsonEncode(data));
   }
 
-  Future<void> saveCredentials(String serverUrl, String username, String password) async {
+  Future<void> saveCredentials(
+    String serverUrl,
+    String username,
+    String password,
+  ) async {
     final data = await _readAll();
     data['webdav:$serverUrl:username'] = username;
     data['webdav:$serverUrl:password'] = password;
@@ -59,6 +64,17 @@ class KeychainService {
   Future<void> setLastServerUrl(String url) async {
     final data = await _readAll();
     data['webdav_last_server'] = url;
+    await _writeAll(data);
+  }
+
+  Future<String> getSyncRootDirectory() async {
+    final data = await _readAll();
+    return (data['webdav_sync_root'] as String?) ?? '';
+  }
+
+  Future<void> setSyncRootDirectory(String path) async {
+    final data = await _readAll();
+    data['webdav_sync_root'] = path;
     await _writeAll(data);
   }
 }

@@ -6,18 +6,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_settings.dart';
 import 'core/providers/core_providers.dart';
-import 'features/auth/auth_provider.dart';
-import 'features/auth/auth_page.dart';
 import 'features/bookkeeping/bookkeeping_page.dart';
+import 'features/permissions/permission_authorization_service.dart';
+import 'features/permissions/permission_guide.dart';
 import 'features/todo/todo_page.dart';
 import 'features/todo/providers/todo_provider.dart';
+import 'features/todo/services/todo_reminder_service.dart';
 import 'features/copilot/copilot_page.dart';
 import 'features/notes/notes_page.dart';
 import 'features/profile/profile_panel.dart';
-import 'features/profile/profile_provider.dart';
-import 'data/api/api_client.dart';
-import 'data/api/profile_service.dart';
-import 'features/sync/webdav_provisioner.dart';
 
 class App extends ConsumerWidget {
   const App({super.key});
@@ -39,46 +36,8 @@ class App extends ConsumerWidget {
       ],
       supportedLocales: const [Locale('zh', 'CN'), Locale('en', 'US')],
       locale: const Locale('zh', 'CN'),
-      home: const AuthWrapper(),
+      home: const HomePage(),
     );
-  }
-}
-
-class AuthWrapper extends ConsumerStatefulWidget {
-  const AuthWrapper({super.key});
-  @override
-  ConsumerState<AuthWrapper> createState() => _AuthWrapperState();
-}
-
-class _AuthWrapperState extends ConsumerState<AuthWrapper> {
-  bool _checking = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _tryAutoLogin();
-  }
-
-  Future<void> _tryAutoLogin() async {
-    final savedToken = await ApiClient.loadSavedToken();
-    if (savedToken != null && mounted) {
-      setState(() => _checking = false);
-      ref.read(authProvider.notifier).restoreSession(savedToken);
-    } else {
-      if (mounted) setState(() => _checking = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_checking) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-    final authState = ref.watch(authProvider);
-    if (!authState.isLoggedIn) {
-      return const AuthPage();
-    }
-    return const HomePage();
   }
 }
 
@@ -90,21 +49,36 @@ class HomePage extends ConsumerStatefulWidget {
 }
 
 class _HomePageState extends ConsumerState<HomePage>
-    with TickerProviderStateMixin, WidgetsBindingObserver {
+    with WidgetsBindingObserver {
   int _currentIndex = 0;
   bool _profileOpen = false;
-  bool _profileFetched = false;
   bool _calendarSyncRunning = false;
+  bool _smsSyncRunning = false;
+  bool _permissionGuideRunning = false;
   Timer? _calendarSyncTimer;
+  Timer? _smsSyncTimer;
+  late final List<Widget> _pages;
 
   @override
   void initState() {
     super.initState();
+    _pages = [
+      TodoPage(onAvatarTap: _openProfile),
+      BookkeepingPage(onAvatarTap: _openProfile),
+      NotesPage(onAvatarTap: _openProfile),
+      CopilotPage(onAvatarTap: _openProfile),
+    ];
     WidgetsBinding.instance.addObserver(this);
-    Future.microtask(() => _syncCalendarTodosSilently(force: true));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _runStartupPermissionFlow();
+    });
     _calendarSyncTimer = Timer.periodic(
       const Duration(minutes: 10),
-      (_) => _syncCalendarTodosSilently(force: true),
+      (_) => _syncExternalSourcesIfAllowed(force: true),
+    );
+    _smsSyncTimer = Timer.periodic(
+      const Duration(minutes: 10),
+      (_) => _syncExternalSourcesIfAllowed(force: true),
     );
   }
 
@@ -112,14 +86,43 @@ class _HomePageState extends ConsumerState<HomePage>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _calendarSyncTimer?.cancel();
+    _smsSyncTimer?.cancel();
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _syncCalendarTodosSilently(force: true);
+      _syncExternalSourcesIfAllowed(force: true);
     }
+  }
+
+  Future<void> _runStartupPermissionFlow() async {
+    if (!mounted || _permissionGuideRunning) return;
+    _permissionGuideRunning = true;
+    try {
+      final hadAccepted = await const PermissionGuideStore().hasAccepted();
+      if (!mounted) return;
+      final accepted = await showAppPermissionGuideIfNeeded(context);
+      if (!accepted || !mounted) return;
+      if (!hadAccepted) {
+        final openedSettings = await const PermissionAuthorizationService()
+            .openPlatformAuthorization();
+        if (!openedSettings) {
+          await const TodoReminderService().ensureNotificationPermission();
+        }
+      }
+      await _syncCalendarTodosSilently(force: true);
+      await _syncSmsTodosSilently(force: true);
+    } finally {
+      _permissionGuideRunning = false;
+    }
+  }
+
+  Future<void> _syncExternalSourcesIfAllowed({required bool force}) async {
+    if (!await const PermissionGuideStore().hasAccepted()) return;
+    await _syncCalendarTodosSilently(force: force);
+    await _syncSmsTodosSilently(force: force);
   }
 
   Future<void> _syncCalendarTodosSilently({required bool force}) async {
@@ -136,12 +139,19 @@ class _HomePageState extends ConsumerState<HomePage>
     }
   }
 
-  List<Widget> _pages() => [
-    TodoPage(onAvatarTap: _openProfile),
-    BookkeepingPage(onAvatarTap: _openProfile),
-    NotesPage(onAvatarTap: _openProfile),
-    CopilotPage(onAvatarTap: _openProfile),
-  ];
+  Future<void> _syncSmsTodosSilently({required bool force}) async {
+    if (_smsSyncRunning) return;
+    _smsSyncRunning = true;
+    try {
+      await ref
+          .read(todoNotifierProvider.notifier)
+          .importSmsTodos(force: force);
+    } catch (_) {
+      // 短信权限或平台不支持时静默降级，下一次打开/定时同步会继续尝试。
+    } finally {
+      _smsSyncRunning = false;
+    }
+  }
 
   void _openProfile() {
     setState(() => _profileOpen = true);
@@ -149,6 +159,11 @@ class _HomePageState extends ConsumerState<HomePage>
 
   void _closeProfile() {
     setState(() => _profileOpen = false);
+  }
+
+  void _selectPage(int index) {
+    if (index == _currentIndex) return;
+    setState(() => _currentIndex = index);
   }
 
   @override
@@ -159,37 +174,12 @@ class _HomePageState extends ConsumerState<HomePage>
         Consumer(
           builder: (context, ref, child) {
             ref.watch(dataSyncServiceProvider);
-            if (!_profileFetched) {
-              _profileFetched = true;
-              Future.microtask(() async {
-                try {
-                  final profileResp = await ProfileService.getProfile();
-                  if (profileResp != null) {
-                    ref.read(profileProvider.notifier).updateFromServer({
-                      'nickname': profileResp.nickname,
-                      'username': profileResp.username,
-                      'email': profileResp.email,
-                      'phone': profileResp.phone,
-                      'avatar': profileResp.avatar,
-                    });
-                  }
-                  final provisioner = WebDavProvisioner();
-                  await provisioner.syncFromServer();
-                } catch (_) {}
-              });
-            }
             return const SizedBox.shrink();
           },
         ),
         Scaffold(
-          body: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 300),
-            switchInCurve: Curves.easeOut,
-            switchOutCurve: Curves.easeIn,
-            child: KeyedSubtree(
-              key: ValueKey(_currentIndex),
-              child: IndexedStack(index: _currentIndex, children: _pages()),
-            ),
+          body: RepaintBoundary(
+            child: IndexedStack(index: _currentIndex, children: _pages),
           ),
           bottomNavigationBar: Container(
             padding: const EdgeInsets.fromLTRB(12, 7, 12, 8),
@@ -219,25 +209,25 @@ class _HomePageState extends ConsumerState<HomePage>
                       icon: Icons.check_circle_outline,
                       label: '待办',
                       selected: _currentIndex == 0,
-                      onTap: () => setState(() => _currentIndex = 0),
+                      onTap: () => _selectPage(0),
                     ),
                     _BottomNavItem(
                       icon: Icons.account_balance_wallet_outlined,
                       label: '记账',
                       selected: _currentIndex == 1,
-                      onTap: () => setState(() => _currentIndex = 1),
+                      onTap: () => _selectPage(1),
                     ),
                     _BottomNavItem(
                       icon: Icons.edit_note,
                       label: '随手记',
                       selected: _currentIndex == 2,
-                      onTap: () => setState(() => _currentIndex = 2),
+                      onTap: () => _selectPage(2),
                     ),
                     _BottomNavItem(
                       icon: Icons.auto_awesome,
                       label: 'Copilot',
                       selected: _currentIndex == 3,
-                      onTap: () => setState(() => _currentIndex = 3),
+                      onTap: () => _selectPage(3),
                     ),
                   ],
                 ),
@@ -271,16 +261,11 @@ class _BottomNavItem extends StatelessWidget {
     return Expanded(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 4),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
+        child: RepaintBoundary(
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
             onTap: onTap,
-            borderRadius: BorderRadius.circular(18),
-            splashColor: scheme.primary.withValues(alpha: 0.04),
-            highlightColor: scheme.primary.withValues(alpha: 0.025),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              curve: Curves.easeOut,
+            child: Container(
               height: 50,
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
               decoration: BoxDecoration(

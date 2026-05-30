@@ -3,10 +3,14 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/providers/core_providers.dart';
+import '../../../core/platform/app_launcher_service.dart';
 import '../../../domain/models/routine.dart';
 import '../../../domain/models/todo.dart';
+import '../../../domain/services/todo_dedupe_service.dart';
+import '../../ai_settings/ai_model_provider.dart';
 import '../../bookkeeping/bookkeeping_action_service.dart';
 import '../../calendar/calendar_todo_service.dart';
+import '../../sms/sms_todo_service.dart';
 import 'selected_date_provider.dart';
 
 class TodoNotifier extends Notifier<List<Todo>> {
@@ -33,6 +37,7 @@ class TodoNotifier extends Notifier<List<Todo>> {
       await _importCalendarTodosIfNeeded();
     }
 
+    await _dedupeGeneratedTodos();
     state = await repo.getTodosByDate(normalizedDate);
     await _rescheduleUpcomingRemindersIfNeeded();
   }
@@ -51,6 +56,20 @@ class TodoNotifier extends Notifier<List<Todo>> {
       todoRepository: ref.read(todoRepoProvider),
     );
     final result = await service.importUpcoming(days: 30);
+    await _dedupeGeneratedTodos();
+    final selectedDate = ref.read(selectedDateProvider);
+    state = await ref.read(todoRepoProvider).getTodosByDate(selectedDate);
+    return result;
+  }
+
+  Future<SmsImportResult> importSmsTodos({bool force = false}) async {
+    final service = SmsTodoService(
+      datasource: ref.read(datasourceProvider),
+      todoRepository: ref.read(todoRepoProvider),
+      aiModelConfig: ref.read(aiModelProvider).selected,
+    );
+    final result = await service.importRecent(days: 7);
+    await _dedupeGeneratedTodos();
     final selectedDate = ref.read(selectedDateProvider);
     state = await ref.read(todoRepoProvider).getTodosByDate(selectedDate);
     return result;
@@ -133,19 +152,25 @@ class TodoNotifier extends Notifier<List<Todo>> {
     await _loadTodosForDate(selectedDate);
   }
 
+  Future<void> _reloadTodosOnly(DateTime date) async {
+    final normalizedDate = DateTime(date.year, date.month, date.day);
+    await _dedupeGeneratedTodos();
+    state = await ref.read(todoRepoProvider).getTodosByDate(normalizedDate);
+  }
+
   Future<void> addTodo(Todo todo) async {
     final repo = ref.read(todoRepoProvider);
     await repo.addTodo(todo);
     unawaited(ref.read(todoReminderServiceProvider).schedule(todo));
     final selectedDate = ref.read(selectedDateProvider);
-    await _loadTodosForDate(selectedDate);
+    await _reloadTodosOnly(selectedDate);
   }
 
   Future<void> toggleComplete(String id) async {
     final repo = ref.read(todoRepoProvider);
     await repo.toggleTodo(id);
     final selectedDate = ref.read(selectedDateProvider);
-    await _loadTodosForDate(selectedDate);
+    await _reloadTodosOnly(selectedDate);
     await _syncReminderForTodoId(id);
   }
 
@@ -154,7 +179,7 @@ class TodoNotifier extends Notifier<List<Todo>> {
     await repo.deleteTodo(id);
     unawaited(ref.read(todoReminderServiceProvider).cancel(id));
     final selectedDate = ref.read(selectedDateProvider);
-    await _loadTodosForDate(selectedDate);
+    await _reloadTodosOnly(selectedDate);
   }
 
   Future<void> updateTodo(Todo todo) async {
@@ -162,7 +187,7 @@ class TodoNotifier extends Notifier<List<Todo>> {
     await repo.updateTodo(todo);
     unawaited(ref.read(todoReminderServiceProvider).schedule(todo));
     final selectedDate = ref.read(selectedDateProvider);
-    await _loadTodosForDate(selectedDate);
+    await _reloadTodosOnly(selectedDate);
   }
 
   Future<bool> executeTodoAction(Todo todo) async {
@@ -178,6 +203,9 @@ class TodoNotifier extends Notifier<List<Todo>> {
         ref: ref,
         todo: todo,
       );
+    }
+    if (AppLaunchTarget.isOpenAppAction(todo.action)) {
+      return AppLauncherService.openAction(todo.action);
     }
     return false;
   }
@@ -263,6 +291,18 @@ class TodoNotifier extends Notifier<List<Todo>> {
     } else {
       await service.schedule(todo);
     }
+  }
+
+  Future<int> _dedupeGeneratedTodos() async {
+    final datasource = ref.read(datasourceProvider);
+    final duplicates = TodoDedupeService.duplicatesToDelete(
+      await datasource.getAllTodos(),
+    );
+    for (final duplicate in duplicates) {
+      await datasource.softDeleteTodo(duplicate.id);
+      unawaited(ref.read(todoReminderServiceProvider).cancel(duplicate.id));
+    }
+    return duplicates.length;
   }
 
   bool _routineTodoAlreadyExists(

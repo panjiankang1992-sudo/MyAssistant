@@ -1,19 +1,19 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:uuid/uuid.dart';
 
+import '../../core/database/database.dart' hide Tag;
 import '../../core/theme/app_theme.dart';
-import '../../core/security/keychain_service.dart';
 import '../../core/providers/core_providers.dart';
-import '../../data/datasources/webdav_datasource.dart';
+import '../../data/datasources/local_datasource.dart';
 import '../../domain/models/tag.dart';
 import '../../shared/widgets/app_controls.dart';
 import '../../shared/widgets/edge_swipe_pop.dart';
@@ -23,6 +23,7 @@ import '../ai_settings/ai_model_provider.dart';
 import '../copilot/services/openai_compatible_client.dart';
 import '../sync/data_sync_service.dart';
 import '../tags/tag_selector.dart';
+import '../profile/profile_provider.dart';
 import '../todo/widgets/week_calendar_strip.dart';
 
 enum LedgerKind { expense, income }
@@ -79,6 +80,8 @@ class LedgerEntry {
   final bool aiGenerated;
   final List<Tag> tags;
   final DateTime createdAt;
+  final DateTime updatedAt;
+  final bool deleted;
 
   const LedgerEntry({
     required this.id,
@@ -94,7 +97,9 @@ class LedgerEntry {
     required this.aiGenerated,
     this.tags = const [],
     required this.createdAt,
-  });
+    DateTime? updatedAt,
+    this.deleted = false,
+  }) : updatedAt = updatedAt ?? createdAt;
 
   LedgerEntry copyWith({
     String? id,
@@ -110,6 +115,8 @@ class LedgerEntry {
     bool? aiGenerated,
     List<Tag>? tags,
     DateTime? createdAt,
+    DateTime? updatedAt,
+    bool? deleted,
   }) {
     return LedgerEntry(
       id: id ?? this.id,
@@ -125,6 +132,8 @@ class LedgerEntry {
       aiGenerated: aiGenerated ?? this.aiGenerated,
       tags: tags ?? this.tags,
       createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deleted: deleted ?? this.deleted,
     );
   }
 
@@ -142,6 +151,8 @@ class LedgerEntry {
     'aiGenerated': aiGenerated,
     'tags': tags.map((tag) => tag.toCompactJson()).toList(),
     'createdAt': createdAt.toIso8601String(),
+    'updatedAt': updatedAt.toIso8601String(),
+    'deleted': deleted,
   };
 
   factory LedgerEntry.fromJson(Map<String, dynamic> json) {
@@ -162,6 +173,11 @@ class LedgerEntry {
       aiGenerated: json['aiGenerated'] as bool? ?? false,
       tags: _decodeLedgerTags(json['tags']),
       createdAt: DateTime.tryParse(json['createdAt'] as String? ?? '') ?? now,
+      updatedAt:
+          DateTime.tryParse(json['updatedAt'] as String? ?? '') ??
+          DateTime.tryParse(json['createdAt'] as String? ?? '') ??
+          now,
+      deleted: json['deleted'] as bool? ?? false,
     );
   }
 }
@@ -206,236 +222,150 @@ class ExchangeCache {
 }
 
 class BookkeepingStore {
-  Future<File> _file(String name) async {
-    final dir = await getApplicationSupportDirectory();
-    final folder = Directory('${dir.path}/bookkeeping');
-    if (!await folder.exists()) await folder.create(recursive: true);
-    return File('${folder.path}/$name');
-  }
+  final AppDatabase _db;
+
+  BookkeepingStore(this._db);
 
   Future<List<LedgerEntry>> loadEntries() async {
-    final file = await _file('entries.json');
-    if (!await file.exists()) return _seedEntries();
-    final data = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
-    final items = data['entries'] as List<dynamic>? ?? const [];
-    return items
-        .whereType<Map<String, dynamic>>()
-        .map(LedgerEntry.fromJson)
+    final rows = await (_db.select(
+      _db.bills,
+    )..where((t) => t.isDeleted.equals(false))).get();
+    return rows
+        .map(
+          (row) => LedgerEntry.fromJson({
+            'id': row.id,
+            'kind': row.kind,
+            'categoryId': row.categoryId,
+            'categoryName': row.categoryName,
+            'categoryEmoji': row.categoryEmoji,
+            'note': row.note,
+            'amount': row.amount,
+            'currency': row.currency,
+            'cnyAmount': row.cnyAmount,
+            'date': row.date.toIso8601String(),
+            'aiGenerated': row.aiGenerated,
+            'tags': jsonDecode(row.tags),
+            'createdAt': row.createdAt.toIso8601String(),
+            'updatedAt': row.updatedAt.toIso8601String(),
+            'deleted': row.isDeleted,
+          }),
+        )
         .toList()
       ..sort((a, b) => b.date.compareTo(a.date));
   }
 
   Future<void> saveEntries(List<LedgerEntry> entries) async {
-    final file = await _file('entries.json');
-    await file.writeAsString(
-      const JsonEncoder.withIndent(
-        '  ',
-      ).convert({'entries': entries.map((item) => item.toJson()).toList()}),
-    );
+    final existing = await _db.select(_db.bills).get();
+    final ids = entries.map((item) => item.id).toSet();
+    for (final entry in entries) {
+      final old = existing.where((row) => row.id == entry.id).firstOrNull;
+      final updatedAt = entry.updatedAt.isBefore(entry.createdAt)
+          ? DateTime.now()
+          : entry.updatedAt;
+      await _db
+          .into(_db.bills)
+          .insertOnConflictUpdate(
+            BillsCompanion(
+              id: Value(entry.id),
+              kind: Value(entry.kind.name),
+              categoryId: Value(entry.categoryId),
+              categoryName: Value(entry.categoryName),
+              categoryEmoji: Value(entry.categoryEmoji),
+              note: Value(entry.note),
+              amount: Value(entry.amount),
+              currency: Value(entry.currency),
+              cnyAmount: Value(entry.cnyAmount),
+              date: Value(entry.date),
+              aiGenerated: Value(entry.aiGenerated),
+              tags: Value(LocalDatasource.encodeTags(entry.tags)),
+              createdAt: Value(entry.createdAt),
+              updatedAt: Value(updatedAt),
+              version: Value((old?.version ?? 0) + 1),
+              isDeleted: Value(entry.deleted),
+            ),
+          );
+    }
+    for (final row in existing) {
+      if (!ids.contains(row.id) && !row.isDeleted) {
+        await (_db.update(_db.bills)..where((t) => t.id.equals(row.id))).write(
+          BillsCompanion(
+            updatedAt: Value(DateTime.now()),
+            version: Value(row.version + 1),
+            isDeleted: const Value(true),
+          ),
+        );
+      }
+    }
   }
 
   Future<List<LedgerCategory>> loadCustomCategories() async {
-    final file = await _file('categories.json');
-    if (!await file.exists()) return const [];
-    final data = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
-    final items = data['categories'] as List<dynamic>? ?? const [];
-    return items
-        .whereType<Map<String, dynamic>>()
-        .map(LedgerCategory.fromJson)
+    final rows = await (_db.select(
+      _db.billCategories,
+    )..where((t) => t.isDeleted.equals(false))).get();
+    return rows
+        .map(
+          (row) => LedgerCategory.fromJson({
+            'id': row.id,
+            'name': row.name,
+            'emoji': row.emoji,
+            'color': row.color,
+            'kind': row.kind,
+          }),
+        )
         .toList();
   }
 
   Future<void> saveCustomCategories(List<LedgerCategory> categories) async {
-    final file = await _file('categories.json');
-    await file.writeAsString(
-      const JsonEncoder.withIndent('  ').convert({
-        'categories': categories.map((item) => item.toJson()).toList(),
-      }),
-    );
+    final existing = await _db.select(_db.billCategories).get();
+    final ids = categories.map((item) => item.id).toSet();
+    final now = DateTime.now();
+    for (final category in categories) {
+      final old = existing.where((row) => row.id == category.id).firstOrNull;
+      await _db
+          .into(_db.billCategories)
+          .insertOnConflictUpdate(
+            BillCategoriesCompanion(
+              id: Value(category.id),
+              name: Value(category.name),
+              emoji: Value(category.emoji),
+              color: Value(category.color.toARGB32()),
+              kind: Value(category.kind.name),
+              createdAt: Value(old?.createdAt ?? now),
+              updatedAt: Value(now),
+              version: Value((old?.version ?? 0) + 1),
+              isDeleted: const Value(false),
+            ),
+          );
+    }
+    for (final row in existing) {
+      if (!ids.contains(row.id) && !row.isDeleted) {
+        await (_db.update(
+          _db.billCategories,
+        )..where((t) => t.id.equals(row.id))).write(
+          BillCategoriesCompanion(
+            updatedAt: Value(now),
+            version: Value(row.version + 1),
+            isDeleted: const Value(true),
+          ),
+        );
+      }
+    }
   }
 
   Future<ExchangeCache?> loadExchange() async {
-    final file = await _file('exchange.json');
-    if (!await file.exists()) return null;
-    return ExchangeCache.fromJson(
-      jsonDecode(await file.readAsString()) as Map<String, dynamic>,
-    );
+    final datasource = LocalDatasource(_db);
+    final data = await datasource.getAppSettingJson('data', 'exchange_cache');
+    return data == null ? null : ExchangeCache.fromJson(data);
   }
 
   Future<void> saveExchange(ExchangeCache cache) async {
-    final file = await _file('exchange.json');
-    await file.writeAsString(
-      const JsonEncoder.withIndent('  ').convert(cache.toJson()),
+    await LocalDatasource(_db).upsertAppSettingJson(
+      module: 'profile',
+      dataType: 'data',
+      id: 'exchange_cache',
+      payload: cache.toJson(),
+      updatedAt: cache.updatedAt,
     );
-  }
-
-  List<LedgerEntry> _seedEntries() {
-    final now = DateTime.now();
-    return [
-      _seed('餐饮', '🍱', 19.9, now, '午餐'),
-      _seed('交通', '🚌', 4.75, now, '地铁'),
-      _seed('购物', '🛍️', 32.38, now.subtract(const Duration(days: 1)), '日用品'),
-    ];
-  }
-
-  LedgerEntry _seed(
-    String category,
-    String emoji,
-    double amount,
-    DateTime date,
-    String note,
-  ) {
-    final now = DateTime.now();
-    return LedgerEntry(
-      id: const Uuid().v4(),
-      kind: LedgerKind.expense,
-      categoryId: category,
-      categoryName: category,
-      categoryEmoji: emoji,
-      note: note,
-      amount: amount,
-      currency: 'CNY',
-      cnyAmount: amount,
-      date: DateTime(date.year, date.month, date.day, now.hour, now.minute),
-      aiGenerated: false,
-      createdAt: now,
-    );
-  }
-}
-
-class BookkeepingCloudSync {
-  Future<void> sync(BookkeepingStore store) async {
-    final client = await _client();
-    if (client == null) return;
-    final (:webdav, :username) = client;
-    try {
-      await webdav.createDirectory('MyAssistant/$username');
-    } catch (_) {}
-    try {
-      await webdav.createDirectory('MyAssistant/$username/bills');
-    } catch (_) {}
-
-    final localEntries = await store.loadEntries();
-    final localCategories = await store.loadCustomCategories();
-    final cloudEntries = await _pullEntries(webdav, username);
-    final cloudCategories = await _pullCategories(webdav, username);
-
-    final mergedEntries = _mergeEntries(localEntries, cloudEntries);
-    final mergedCategories = _mergeCategories(localCategories, cloudCategories);
-    await store.saveEntries(mergedEntries);
-    await store.saveCustomCategories(mergedCategories);
-    await _pushEntries(webdav, username, mergedEntries);
-    await _pushCategories(webdav, username, mergedCategories);
-  }
-
-  Future<({WebDavDatasource webdav, String username})?> _client() async {
-    final keychain = KeychainService();
-    final lastUrl = await keychain.getLastServerUrl();
-    if (lastUrl == null || lastUrl.isEmpty) return null;
-    final creds = await keychain.getCredentials(lastUrl);
-    if (creds == null) return null;
-    final webdav = WebDavDatasource();
-    await webdav.initialize(
-      baseUrl: lastUrl,
-      username: creds['username']!,
-      password: creds['password']!,
-    );
-    return (webdav: webdav, username: creds['username']!);
-  }
-
-  Future<List<LedgerEntry>> _pullEntries(
-    WebDavDatasource webdav,
-    String username,
-  ) async {
-    try {
-      final bytes = await webdav.getFile(
-        'MyAssistant/$username/bills/ledger_entries.json',
-      );
-      final data = jsonDecode(utf8.decode(bytes)) as Map<String, dynamic>;
-      final items = data['entries'] as List<dynamic>? ?? const [];
-      return items
-          .whereType<Map<String, dynamic>>()
-          .map(LedgerEntry.fromJson)
-          .toList();
-    } catch (_) {
-      return const [];
-    }
-  }
-
-  Future<List<LedgerCategory>> _pullCategories(
-    WebDavDatasource webdav,
-    String username,
-  ) async {
-    try {
-      final bytes = await webdav.getFile(
-        'MyAssistant/$username/bills/ledger_categories.json',
-      );
-      final data = jsonDecode(utf8.decode(bytes)) as Map<String, dynamic>;
-      final items = data['categories'] as List<dynamic>? ?? const [];
-      return items
-          .whereType<Map<String, dynamic>>()
-          .map(LedgerCategory.fromJson)
-          .toList();
-    } catch (_) {
-      return const [];
-    }
-  }
-
-  Future<void> _pushEntries(
-    WebDavDatasource webdav,
-    String username,
-    List<LedgerEntry> entries,
-  ) async {
-    final data = jsonEncode({
-      'updatedAt': DateTime.now().toIso8601String(),
-      'entries': entries.map((item) => item.toJson()).toList(),
-    });
-    await webdav.putFile(
-      'MyAssistant/$username/bills/ledger_entries.json',
-      Uint8List.fromList(utf8.encode(data)),
-      contentType: 'application/json',
-    );
-  }
-
-  Future<void> _pushCategories(
-    WebDavDatasource webdav,
-    String username,
-    List<LedgerCategory> categories,
-  ) async {
-    final data = jsonEncode({
-      'updatedAt': DateTime.now().toIso8601String(),
-      'categories': categories.map((item) => item.toJson()).toList(),
-    });
-    await webdav.putFile(
-      'MyAssistant/$username/bills/ledger_categories.json',
-      Uint8List.fromList(utf8.encode(data)),
-      contentType: 'application/json',
-    );
-  }
-
-  List<LedgerEntry> _mergeEntries(
-    List<LedgerEntry> local,
-    List<LedgerEntry> cloud,
-  ) {
-    final byId = <String, LedgerEntry>{};
-    for (final item in [...cloud, ...local]) {
-      final old = byId[item.id];
-      if (old == null || item.createdAt.isAfter(old.createdAt)) {
-        byId[item.id] = item;
-      }
-    }
-    return byId.values.toList()..sort((a, b) => b.date.compareTo(a.date));
-  }
-
-  List<LedgerCategory> _mergeCategories(
-    List<LedgerCategory> local,
-    List<LedgerCategory> cloud,
-  ) {
-    final byId = <String, LedgerCategory>{};
-    for (final item in [...cloud, ...local]) {
-      byId[item.id] = item;
-    }
-    return byId.values.toList();
   }
 }
 
@@ -497,8 +427,29 @@ const _expenseCategories = [
   LedgerCategory(
     id: 'food',
     name: '餐饮',
-    emoji: '🍜',
+    emoji: '🍽️',
     color: Color(0xFFF6EDE8),
+    kind: LedgerKind.expense,
+  ),
+  LedgerCategory(
+    id: 'breakfast',
+    name: '早餐',
+    emoji: '🥣',
+    color: Color(0xFFFFF4E6),
+    kind: LedgerKind.expense,
+  ),
+  LedgerCategory(
+    id: 'takeout',
+    name: '外卖',
+    emoji: '🥡',
+    color: Color(0xFFFFEFE5),
+    kind: LedgerKind.expense,
+  ),
+  LedgerCategory(
+    id: 'coffee',
+    name: '咖啡茶饮',
+    emoji: '☕',
+    color: Color(0xFFF2ECE6),
     kind: LedgerKind.expense,
   ),
   LedgerCategory(
@@ -513,6 +464,13 @@ const _expenseCategories = [
     name: '交通',
     emoji: '🚌',
     color: Color(0xFFEDEBFA),
+    kind: LedgerKind.expense,
+  ),
+  LedgerCategory(
+    id: 'ride_hailing',
+    name: '打车',
+    emoji: '🚗',
+    color: Color(0xFFEAF1FF),
     kind: LedgerKind.expense,
   ),
   LedgerCategory(
@@ -544,6 +502,13 @@ const _expenseCategories = [
     kind: LedgerKind.expense,
   ),
   LedgerCategory(
+    id: 'movie',
+    name: '电影演出',
+    emoji: '🎬',
+    color: Color(0xFFFFF0F7),
+    kind: LedgerKind.expense,
+  ),
+  LedgerCategory(
     id: 'car',
     name: '汽车',
     emoji: '🚕',
@@ -565,6 +530,48 @@ const _expenseCategories = [
     kind: LedgerKind.expense,
   ),
   LedgerCategory(
+    id: 'clothing',
+    name: '服饰',
+    emoji: '👕',
+    color: Color(0xFFF1F4FF),
+    kind: LedgerKind.expense,
+  ),
+  LedgerCategory(
+    id: 'home',
+    name: '家居',
+    emoji: '🛋️',
+    color: Color(0xFFF6F2EA),
+    kind: LedgerKind.expense,
+  ),
+  LedgerCategory(
+    id: 'housing',
+    name: '住房',
+    emoji: '🏠',
+    color: Color(0xFFEFF4FF),
+    kind: LedgerKind.expense,
+  ),
+  LedgerCategory(
+    id: 'utilities',
+    name: '生活缴费',
+    emoji: '💡',
+    color: Color(0xFFFFF7E8),
+    kind: LedgerKind.expense,
+  ),
+  LedgerCategory(
+    id: 'utility_bills',
+    name: '水电燃气',
+    emoji: '💡',
+    color: Color(0xFFFFF7E8),
+    kind: LedgerKind.expense,
+  ),
+  LedgerCategory(
+    id: 'communication',
+    name: '通讯',
+    emoji: '📱',
+    color: Color(0xFFEFF7FF),
+    kind: LedgerKind.expense,
+  ),
+  LedgerCategory(
     id: 'study',
     name: '学习',
     emoji: '📚',
@@ -579,10 +586,66 @@ const _expenseCategories = [
     kind: LedgerKind.expense,
   ),
   LedgerCategory(
+    id: 'fitness',
+    name: '运动健身',
+    emoji: '🏃',
+    color: Color(0xFFEAF8EF),
+    kind: LedgerKind.expense,
+  ),
+  LedgerCategory(
+    id: 'travel',
+    name: '旅行',
+    emoji: '✈️',
+    color: Color(0xFFEAF7FF),
+    kind: LedgerKind.expense,
+  ),
+  LedgerCategory(
+    id: 'digital',
+    name: '数码',
+    emoji: '💻',
+    color: Color(0xFFEFF1FF),
+    kind: LedgerKind.expense,
+  ),
+  LedgerCategory(
+    id: 'social',
+    name: '社交',
+    emoji: '🍻',
+    color: Color(0xFFFFF1EB),
+    kind: LedgerKind.expense,
+  ),
+  LedgerCategory(
+    id: 'gift_expense',
+    name: '礼物',
+    emoji: '🎁',
+    color: Color(0xFFFFEEF3),
+    kind: LedgerKind.expense,
+  ),
+  LedgerCategory(
+    id: 'insurance',
+    name: '保险',
+    emoji: '🛡️',
+    color: Color(0xFFEFF7F2),
+    kind: LedgerKind.expense,
+  ),
+  LedgerCategory(
+    id: 'office',
+    name: '办公',
+    emoji: '🖊️',
+    color: Color(0xFFF2F4F8),
+    kind: LedgerKind.expense,
+  ),
+  LedgerCategory(
     id: 'pet',
     name: '宠物',
     emoji: '🐱',
     color: Color(0xFFFFF0F0),
+    kind: LedgerKind.expense,
+  ),
+  LedgerCategory(
+    id: 'unrecognized',
+    name: '未识别',
+    emoji: '❓',
+    color: Color(0xFFF1F3F5),
     kind: LedgerKind.expense,
   ),
   LedgerCategory(
@@ -638,6 +701,48 @@ const _incomeCategories = [
     kind: LedgerKind.income,
   ),
   LedgerCategory(
+    id: 'reimbursement',
+    name: '报销',
+    emoji: '🧾',
+    color: Color(0xFFEAF7FF),
+    kind: LedgerKind.income,
+  ),
+  LedgerCategory(
+    id: 'side_business',
+    name: '副业',
+    emoji: '🧑‍💻',
+    color: Color(0xFFEFF1FF),
+    kind: LedgerKind.income,
+  ),
+  LedgerCategory(
+    id: 'investment_income',
+    name: '理财收益',
+    emoji: '💹',
+    color: Color(0xFFEAF8EF),
+    kind: LedgerKind.income,
+  ),
+  LedgerCategory(
+    id: 'subsidy',
+    name: '补贴',
+    emoji: '🏷️',
+    color: Color(0xFFFFF4E6),
+    kind: LedgerKind.income,
+  ),
+  LedgerCategory(
+    id: 'rent_income',
+    name: '租金',
+    emoji: '🏘️',
+    color: Color(0xFFEFF4FF),
+    kind: LedgerKind.income,
+  ),
+  LedgerCategory(
+    id: 'transfer_income',
+    name: '转账',
+    emoji: '🔁',
+    color: Color(0xFFEAF1FF),
+    kind: LedgerKind.income,
+  ),
+  LedgerCategory(
     id: 'gift',
     name: '红包',
     emoji: '🧧',
@@ -667,7 +772,7 @@ class BookkeepingPage extends ConsumerStatefulWidget {
 }
 
 class _BookkeepingPageState extends ConsumerState<BookkeepingPage> {
-  final _store = BookkeepingStore();
+  late final BookkeepingStore _store;
   final _fabSpeech = stt.SpeechToText();
   late final ExchangeService _exchangeService;
   var _entries = <LedgerEntry>[];
@@ -679,6 +784,7 @@ class _BookkeepingPageState extends ConsumerState<BookkeepingPage> {
   @override
   void initState() {
     super.initState();
+    _store = BookkeepingStore(ref.read(databaseProvider));
     _exchangeService = ExchangeService(_store);
     _load();
   }
@@ -746,15 +852,23 @@ class _BookkeepingPageState extends ConsumerState<BookkeepingPage> {
   }
 
   Future<void> _addEntry(LedgerEntry entry) async {
-    final next = [entry, ..._entries]..sort((a, b) => b.date.compareTo(a.date));
+    final now = DateTime.now();
+    final next = [entry.copyWith(updatedAt: now), ..._entries]
+      ..sort((a, b) => b.date.compareTo(a.date));
     setState(() => _entries = next);
     await _store.saveEntries(next);
     await _markBillDirty(entry, 'upsert');
   }
 
   Future<void> _updateEntry(LedgerEntry entry) async {
+    final now = DateTime.now();
     final next =
-        _entries.map((item) => item.id == entry.id ? entry : item).toList()
+        _entries
+            .map(
+              (item) =>
+                  item.id == entry.id ? entry.copyWith(updatedAt: now) : item,
+            )
+            .toList()
           ..sort((a, b) => b.date.compareTo(a.date));
     setState(() => _entries = next);
     await _store.saveEntries(next);
@@ -762,7 +876,14 @@ class _BookkeepingPageState extends ConsumerState<BookkeepingPage> {
   }
 
   Future<void> _deleteEntry(LedgerEntry entry) async {
-    final next = _entries.where((item) => item.id != entry.id).toList();
+    final next = _entries
+        .map(
+          (item) => item.id == entry.id
+              ? item.copyWith(deleted: true, updatedAt: DateTime.now())
+              : item,
+        )
+        .where((item) => !item.deleted)
+        .toList();
     setState(() => _entries = next);
     await _store.saveEntries(next);
     await _markBillDirty(entry, 'delete');
@@ -804,7 +925,7 @@ class _BookkeepingPageState extends ConsumerState<BookkeepingPage> {
       .where((item) => item.kind == kind)
       .fold(0.0, (sum, item) => sum + item.cnyAmount);
 
-  double _dailyNet(DateTime date) {
+  ({double income, double expense}) _dailyTotals(DateTime date) {
     final day = _dateOnly(date);
     var income = 0.0;
     var expense = 0.0;
@@ -816,7 +937,31 @@ class _BookkeepingPageState extends ConsumerState<BookkeepingPage> {
         expense += entry.cnyAmount;
       }
     }
+    return (income: income, expense: expense);
+  }
+
+  double _dailyNet(DateTime date) {
+    final totals = _dailyTotals(date);
+    final income = totals.income;
+    final expense = totals.expense;
     return income - expense;
+  }
+
+  String? _dailyAmountBadge(DateTime date) {
+    final totals = _dailyTotals(date);
+    final hasAmount =
+        totals.income.abs() >= 0.005 || totals.expense.abs() >= 0.005;
+    if (!hasAmount) return null;
+    final net = totals.income - totals.expense;
+    if (net.abs() < 0.005) return '0';
+    return _compactAmount(net);
+  }
+
+  Color _dailyAmountColor(DateTime date) {
+    final net = _dailyNet(date);
+    if (net < -0.005) return AppColors.danger;
+    if (net > 0.005) return AppColors.success;
+    return Theme.of(context).colorScheme.appMutedText;
   }
 
   String _compactAmount(double value) {
@@ -855,6 +1000,8 @@ class _BookkeepingPageState extends ConsumerState<BookkeepingPage> {
             ),
             WeekCalendarStrip(
               selectedDate: _selectedDate,
+              badgeBuilder: _dailyAmountBadge,
+              badgeColorBuilder: _dailyAmountColor,
               onDateSelected: (date) {
                 setState(() => _selectedDate = date);
               },
@@ -1277,7 +1424,7 @@ class _LedgerDetailPage extends StatelessWidget {
                     child: _CategoryIcon(
                       category: category,
                       size: 150,
-                      emoji: entry.categoryEmoji,
+                      emoji: _resolvedLedgerEmoji(entry),
                     ),
                   ),
                   const SizedBox(height: 40),
@@ -1358,7 +1505,7 @@ class _LedgerDetailMainCard extends StatelessWidget {
               _CategoryIcon(
                 category: category,
                 size: 42,
-                emoji: entry.categoryEmoji,
+                emoji: _resolvedLedgerEmoji(entry),
               ),
               const SizedBox(width: 12),
               Text(
@@ -1424,14 +1571,16 @@ class _LedgerDetailMainCard extends StatelessWidget {
   }
 }
 
-class _LedgerDetailInfoCard extends StatelessWidget {
+class _LedgerDetailInfoCard extends ConsumerWidget {
   final LedgerEntry entry;
 
   const _LedgerDetailInfoCard({required this.entry});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final scheme = Theme.of(context).colorScheme;
+    final profile = ref.watch(profileProvider);
+    final recorder = profile.name.trim().isEmpty ? '本地用户' : profile.name;
     return Container(
       padding: const EdgeInsets.fromLTRB(22, 22, 22, 24),
       decoration: BoxDecoration(
@@ -1472,7 +1621,7 @@ class _LedgerDetailInfoCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 18),
-          const _LedgerDetailLine(label: '记账人', value: '禹宇天'),
+          _LedgerDetailLine(label: '记账人', value: recorder),
           _LedgerDetailLine(label: '账单分类', value: entry.categoryName),
           _LedgerDetailLine(
             label: '金额',
@@ -2135,7 +2284,7 @@ class _StatsView extends StatelessWidget {
     for (final item in entries.where((e) => e.kind == LedgerKind.expense)) {
       grouped[item.categoryName] =
           (grouped[item.categoryName] ?? 0) + item.cnyAmount;
-      emojis[item.categoryName] = item.categoryEmoji;
+      emojis[item.categoryName] = _resolvedLedgerEmoji(item);
     }
     final rows = grouped.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
@@ -2544,7 +2693,7 @@ class _LedgerRow extends StatelessWidget {
               _CategoryIcon(
                 category: cat,
                 size: 50,
-                emoji: entry.categoryEmoji,
+                emoji: _resolvedLedgerEmoji(entry),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -2652,7 +2801,7 @@ class _CategoryIcon extends StatelessWidget {
       child: Center(
         child: Text(
           emoji ?? category.emoji,
-          style: TextStyle(fontSize: size * 0.45),
+          style: TextStyle(fontSize: size * 0.36),
         ),
       ),
     );
@@ -2664,7 +2813,7 @@ void showAddLedgerPage(
   required WidgetRef ref,
   required DateTime date,
   required ExchangeService exchangeService,
-  required ValueChanged<LedgerEntry> onSaved,
+  required FutureOr<void> Function(LedgerEntry entry) onSaved,
   LedgerEntry? initialEntry,
   VoidCallback? onCategoriesChanged,
   String? initialVoiceText,
@@ -2702,7 +2851,7 @@ class _AddLedgerPage extends StatefulWidget {
   final WidgetRef ref;
   final DateTime date;
   final ExchangeService exchangeService;
-  final ValueChanged<LedgerEntry> onSaved;
+  final FutureOr<void> Function(LedgerEntry entry) onSaved;
   final LedgerEntry? initialEntry;
   final VoidCallback? onCategoriesChanged;
   final String? initialVoiceText;
@@ -2731,6 +2880,8 @@ class _AddLedgerPageState extends State<_AddLedgerPage>
   var _aiGenerated = false;
   var _tags = <Tag>[];
   var _customCategories = <LedgerCategory>[];
+  var _saving = false;
+  var _showAllCategories = false;
 
   @override
   void initState() {
@@ -2741,7 +2892,7 @@ class _AddLedgerPageState extends State<_AddLedgerPage>
       _category = LedgerCategory(
         id: initial.categoryId,
         name: initial.categoryName,
-        emoji: initial.categoryEmoji,
+        emoji: _resolvedLedgerEmoji(initial),
         color: _findCategory(initial.categoryName).color,
         kind: initial.kind,
       );
@@ -2750,6 +2901,7 @@ class _AddLedgerPageState extends State<_AddLedgerPage>
       _aiGenerated = initial.aiGenerated;
       _tags = List.from(initial.tags);
       _noteController.text = initial.note;
+      _showAllCategories = true;
     }
     final initialVoiceText = widget.initialVoiceText?.trim() ?? '';
     if (initialVoiceText.isNotEmpty && initial == null) {
@@ -2812,13 +2964,19 @@ class _AddLedgerPageState extends State<_AddLedgerPage>
       return null;
     }
     try {
+      final expenseNames = _categoriesFor(
+        LedgerKind.expense,
+      ).map((item) => item.name).join('、');
+      final incomeNames = _categoriesFor(
+        LedgerKind.income,
+      ).map((item) => item.name).join('、');
       final reply = await OpenAiCompatibleClient().chat(
         config: config,
         messages: [
-          const LlmChatMessage(
+          LlmChatMessage(
             role: 'system',
             content:
-                '你是记账识别器，只返回 JSON。字段 kind(expense/income), amount(number), currency(CNY/USD/EUR/JPY/HKD/GBP/KRW), categoryName, note。默认 kind=expense。支出分类只能是 餐饮、购物、交通、零食、学习、医疗、其他；收入分类只能是 工资、奖金、退款。',
+                '你是记账识别器，只返回 JSON。字段 kind(expense/income), amount(number), currency(CNY/USD/EUR/JPY/HKD/GBP/KRW), categoryName, note。默认 kind=expense。支出分类只能从这些名称中选：$expenseNames；收入分类只能从这些名称中选：$incomeNames。',
           ),
           LlmChatMessage(role: 'user', content: text),
         ],
@@ -2894,10 +3052,37 @@ class _AddLedgerPageState extends State<_AddLedgerPage>
     for (final item in all) {
       if (text.contains(item.name)) return item;
     }
-    if (RegExp('地铁|公交|打车|交通').hasMatch(text)) return _findCategory('交通');
-    if (RegExp('饭|餐|咖啡|奶茶|早餐|午餐|晚餐').hasMatch(text)) return _findCategory('餐饮');
-    if (RegExp('买|购物|超市').hasMatch(text)) return _findCategory('购物');
-    if (RegExp('工资|收入').hasMatch(text)) return _incomeCategories.first;
+    if (RegExp('早餐|早饭|包子|豆浆|油条').hasMatch(text)) return _findCategory('早餐');
+    if (RegExp('外卖|饿了么|美团').hasMatch(text)) return _findCategory('外卖');
+    if (RegExp('咖啡|奶茶|茶饮|瑞幸|星巴克').hasMatch(text)) {
+      return _findCategory('咖啡茶饮');
+    }
+    if (RegExp('地铁|公交|高铁|火车|机票|交通').hasMatch(text)) {
+      return _findCategory('交通');
+    }
+    if (RegExp('打车|滴滴|出租|网约车').hasMatch(text)) return _findCategory('打车');
+    if (RegExp('饭|餐|午餐|晚餐|夜宵|食堂|餐厅').hasMatch(text)) {
+      return _findCategory('餐饮');
+    }
+    if (RegExp('超市|商场|淘宝|京东|拼多多|购物').hasMatch(text)) {
+      return _findCategory('购物');
+    }
+    if (RegExp('衣服|鞋|裤|帽|服饰').hasMatch(text)) return _findCategory('服饰');
+    if (RegExp('房租|租房|物业|房贷|住房').hasMatch(text)) return _findCategory('住房');
+    if (RegExp('水费|电费|燃气|煤气|水电|生活缴费|物业').hasMatch(text)) {
+      return _findCategory('生活缴费');
+    }
+    if (RegExp('话费|流量|宽带|通讯').hasMatch(text)) return _findCategory('通讯');
+    if (RegExp('电影|演唱会|剧场|娱乐').hasMatch(text)) return _findCategory('电影演出');
+    if (RegExp('健身|运动|瑜伽|跑步').hasMatch(text)) return _findCategory('运动健身');
+    if (RegExp('旅游|旅行|酒店|民宿|门票').hasMatch(text)) return _findCategory('旅行');
+    if (RegExp('手机|电脑|耳机|数码|软件|订阅').hasMatch(text)) return _findCategory('数码');
+    if (RegExp('工资|薪资|薪水').hasMatch(text)) return _findCategory('工资');
+    if (RegExp('报销').hasMatch(text)) return _findCategory('报销');
+    if (RegExp('兼职|副业|接单').hasMatch(text)) return _findCategory('副业');
+    if (RegExp('利息|理财|收益|分红').hasMatch(text)) return _findCategory('理财收益');
+    if (RegExp('退款|退回').hasMatch(text)) return _findCategory('退款');
+    if (RegExp('收入|到账|转账').hasMatch(text)) return _incomeCategories.first;
     return _expenseCategories.last;
   }
 
@@ -2925,36 +3110,53 @@ class _AddLedgerPageState extends State<_AddLedgerPage>
   }
 
   Future<void> _save() async {
+    if (_saving) return;
     final amount = _evaluateAmount(_amountText);
-    if (amount == null || amount <= 0) return;
-    final rates = await widget.exchangeService.getRates();
-    final cny = amount * (rates.toCny[_currency] ?? 1);
-    final now = DateTime.now();
-    final initial = widget.initialEntry;
-    final entryDate = initial?.date;
-    final entry = LedgerEntry(
-      id: initial?.id ?? const Uuid().v4(),
-      kind: _kind,
-      categoryId: _category.id,
-      categoryName: _category.name,
-      categoryEmoji: _category.emoji,
-      note: _noteController.text.trim(),
-      amount: amount,
-      currency: _currency,
-      cnyAmount: cny,
-      tags: _tags,
-      date: DateTime(
-        entryDate?.year ?? widget.date.year,
-        entryDate?.month ?? widget.date.month,
-        entryDate?.day ?? widget.date.day,
-        entryDate?.hour ?? now.hour,
-        entryDate?.minute ?? now.minute,
-      ),
-      aiGenerated: _aiGenerated,
-      createdAt: initial?.createdAt ?? now,
-    );
-    widget.onSaved(entry);
-    if (mounted) Navigator.of(context).pop();
+    if (amount == null || amount <= 0) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('请输入有效金额')));
+      return;
+    }
+    setState(() => _saving = true);
+    try {
+      final rate = _currency == 'CNY'
+          ? 1.0
+          : (await widget.exchangeService.getRates()).toCny[_currency] ?? 1;
+      final cny = amount * rate;
+      final now = DateTime.now();
+      final initial = widget.initialEntry;
+      final entryDate = initial?.date;
+      final entry = LedgerEntry(
+        id: initial?.id ?? const Uuid().v4(),
+        kind: _kind,
+        categoryId: _category.id,
+        categoryName: _category.name,
+        categoryEmoji: _category.emoji,
+        note: _noteController.text.trim(),
+        amount: amount,
+        currency: _currency,
+        cnyAmount: cny,
+        tags: _tags,
+        date: DateTime(
+          entryDate?.year ?? widget.date.year,
+          entryDate?.month ?? widget.date.month,
+          entryDate?.day ?? widget.date.day,
+          entryDate?.hour ?? now.hour,
+          entryDate?.minute ?? now.minute,
+        ),
+        aiGenerated: _aiGenerated,
+        createdAt: initial?.createdAt ?? now,
+      );
+      await widget.onSaved(entry);
+      if (mounted) Navigator.of(context).pop();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('记账失败：$e')));
+    }
   }
 
   List<LedgerCategory> _categoriesFor(LedgerKind kind) {
@@ -3097,6 +3299,7 @@ class _AddLedgerPageState extends State<_AddLedgerPage>
                           selected: _kind == LedgerKind.expense,
                           onTap: () => setState(() {
                             _kind = LedgerKind.expense;
+                            _showAllCategories = false;
                             _category = _categoriesFor(
                               LedgerKind.expense,
                             ).first;
@@ -3107,6 +3310,7 @@ class _AddLedgerPageState extends State<_AddLedgerPage>
                           selected: _kind == LedgerKind.income,
                           onTap: () => setState(() {
                             _kind = LedgerKind.income;
+                            _showAllCategories = false;
                             _category = _categoriesFor(LedgerKind.income).first;
                           }),
                         ),
@@ -3130,19 +3334,26 @@ class _AddLedgerPageState extends State<_AddLedgerPage>
                         builder: (context, constraints) {
                           const spacing = 8.0;
                           final columns = constraints.maxWidth < 340
-                              ? 4
-                              : constraints.maxWidth < 520
                               ? 5
-                              : 6;
+                              : constraints.maxWidth < 520
+                              ? 6
+                              : 7;
                           final rawWidth =
                               (constraints.maxWidth - spacing * (columns - 1)) /
                               columns;
-                          final tileWidth = rawWidth.clamp(64.0, 82.0);
+                          final tileWidth = rawWidth.clamp(54.0, 72.0);
+                          final defaultSlots = columns * 3;
+                          final hasHiddenItems = cats.length + 1 > defaultSlots;
+                          final visibleCategoryCount =
+                              _showAllCategories || !hasHiddenItems
+                              ? cats.length
+                              : math.max(0, defaultSlots - 1);
+                          final visibleCats = cats.take(visibleCategoryCount);
                           return Wrap(
                             spacing: spacing,
                             runSpacing: spacing,
                             children: [
-                              ...cats.map((cat) {
+                              ...visibleCats.map((cat) {
                                 final selected = cat.id == _category.id;
                                 return _CategoryPickTile(
                                   width: tileWidth,
@@ -3151,10 +3362,17 @@ class _AddLedgerPageState extends State<_AddLedgerPage>
                                   onTap: () => setState(() => _category = cat),
                                 );
                               }),
-                              _AddCategoryTile(
-                                width: tileWidth,
-                                onTap: _addCustomCategory,
-                              ),
+                              if (_showAllCategories || !hasHiddenItems)
+                                _AddCategoryTile(
+                                  width: tileWidth,
+                                  onTap: _addCustomCategory,
+                                )
+                              else
+                                _MoreCategoryTile(
+                                  width: tileWidth,
+                                  onTap: () =>
+                                      setState(() => _showAllCategories = true),
+                                ),
                             ],
                           );
                         },
@@ -3240,8 +3458,14 @@ class _AddLedgerPageState extends State<_AddLedgerPage>
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 18),
               actions: [
                 AppBottomAction(
-                  label: widget.initialEntry == null ? '完成记账' : '保存修改',
-                  icon: Icons.check_rounded,
+                  label: _saving
+                      ? '保存中'
+                      : widget.initialEntry == null
+                      ? '完成记账'
+                      : '保存修改',
+                  icon: _saving
+                      ? Icons.hourglass_top_rounded
+                      : Icons.check_rounded,
                   onPressed: _save,
                   tone: AppActionButtonTone.primary,
                 ),
@@ -3307,12 +3531,13 @@ class _CategoryPickTile extends StatelessWidget {
           ),
         ),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Text(
               category.emoji,
-              style: TextStyle(fontSize: (width * 0.34).clamp(22.0, 29.0)),
+              style: TextStyle(fontSize: (width * 0.29).clamp(17.0, 22.0)),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 3),
             Text(
               category.name,
               maxLines: 1,
@@ -3351,10 +3576,11 @@ class _AddCategoryTile extends StatelessWidget {
           border: Border.all(color: scheme.appBorder),
         ),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               Icons.add_circle_outline_rounded,
-              size: (width * 0.34).clamp(22.0, 29.0),
+              size: (width * 0.29).clamp(17.0, 22.0),
             ),
             const SizedBox(height: 4),
             Text(
@@ -3365,6 +3591,54 @@ class _AddCategoryTile extends StatelessWidget {
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
                 color: scheme.appText,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MoreCategoryTile extends StatelessWidget {
+  final double width;
+  final VoidCallback onTap;
+
+  const _MoreCategoryTile({required this.width, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: width,
+        padding: EdgeInsets.symmetric(vertical: width < 72 ? 8 : 10),
+        decoration: BoxDecoration(
+          color: Color.alphaBlend(
+            scheme.primary.withValues(alpha: 0.08),
+            scheme.appSurface,
+          ),
+          borderRadius: BorderRadius.circular(width < 72 ? 15 : 18),
+          border: Border.all(color: scheme.primary.withValues(alpha: 0.28)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.more_horiz_rounded,
+              size: (width * 0.29).clamp(17.0, 22.0),
+              color: scheme.primary,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '更多',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: scheme.primary,
               ),
             ),
           ],
@@ -3881,11 +4155,35 @@ class _DonutChartPainter extends CustomPainter {
   bool shouldRepaint(covariant _DonutChartPainter oldDelegate) => true;
 }
 
+const _ledgerCategoryAliasIds = <String, String>{
+  '生活缴费': 'utilities',
+  '水电燃气': 'utilities',
+  '未识别': 'unrecognized',
+  '15': 'unrecognized',
+  '质': 'unrecognized',
+  '落茨': 'unrecognized',
+  '覃皇耆宁/】宁-星星抖首创业': 'unrecognized',
+  '彗享亘亡吾.{〉>"吏车】贾′用': 'unrecognized',
+  '贺': 'gift_expense',
+};
+
 LedgerCategory _findCategory(String name) {
+  final normalized = name.trim();
+  final aliasId = _ledgerCategoryAliasIds[normalized];
   return [..._expenseCategories, ..._incomeCategories].firstWhere(
-    (item) => item.name == name || item.id == name,
+    (item) =>
+        item.name == normalized || item.id == normalized || item.id == aliasId,
     orElse: () => _expenseCategories.last,
   );
+}
+
+String _resolvedLedgerEmoji(LedgerEntry entry) {
+  final stored = entry.categoryEmoji.trim();
+  final resolved = _findCategory(entry.categoryName);
+  if (stored.isEmpty || (stored == '🔹' && resolved.id != 'other')) {
+    return resolved.emoji;
+  }
+  return stored;
 }
 
 const _currencyCodes = ['CNY', 'USD', 'EUR', 'JPY', 'HKD', 'GBP', 'KRW'];

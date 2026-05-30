@@ -10,7 +10,15 @@
     },
     {
       "name": "EntryAbility_label",
-      "value": "ai_assistant"
+      "value": "我的助手"
+    },
+    {
+      "name": "permission_vibrate_reason",
+      "value": "Used for haptic feedback and voice input status prompts."
+    },
+    {
+      "name": "permission_pasteboard_reason",
+      "value": "Used to paste quick note text, images, and web snapshot information."
     }
   ]
 }

@@ -7,6 +7,16 @@ class TodoReminderService {
 
   const TodoReminderService();
 
+  Future<void> ensureNotificationPermission() async {
+    try {
+      await _channel.invokeMethod<void>('ensureNotificationPermission');
+    } on MissingPluginException {
+      // 鸿蒙等未接入原生桥时不阻断应用启动。
+    } on PlatformException {
+      // 用户拒绝或平台异常时，后续保存代办仍可继续。
+    }
+  }
+
   Future<void> schedule(Todo todo) async {
     final fireAt = reminderTimeFor(todo);
     if (fireAt == null) {

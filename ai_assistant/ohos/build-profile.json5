@@ -1,7 +1,20 @@
-
 {
   "app": {
-    "signingConfigs": [],
+    "signingConfigs": [
+      {
+        "name": "default",
+        "type": "HarmonyOS",
+        "material": {
+          "certpath": "/Users/pankang/.ohos/config/default_ohos_TyqmrRj85o0fL2KCJUTlmawMMhEn8mjATfIU5EbtWpE=.cer",
+          "keyAlias": "debugKey",
+          "keyPassword": "0000001BC687073B4BCD0C480C7A1EBCEFBB3A611B3BD46831432CC16DE26EE3D6C8533A625742DCF08A50",
+          "profile": "/Users/pankang/.ohos/config/default_ohos_TyqmrRj85o0fL2KCJUTlmawMMhEn8mjATfIU5EbtWpE=.p7b",
+          "signAlg": "SHA256withECDSA",
+          "storeFile": "/Users/pankang/.ohos/config/default_ohos_TyqmrRj85o0fL2KCJUTlmawMMhEn8mjATfIU5EbtWpE=.p12",
+          "storePassword": "0000001BEEA1D868993FE645AB8832B9FC455384ACC74E39ED2DA4007228EE65F6F3AEAEDD59D67268AB00"
+        }
+      }
+    ],
     "products": [
       {
         "name": "default",

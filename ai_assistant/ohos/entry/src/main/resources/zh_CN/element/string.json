@@ -10,7 +10,15 @@
     },
     {
       "name": "EntryAbility_label",
-      "value": "ai_assistant"
+      "value": "我的助手"
+    },
+    {
+      "name": "permission_vibrate_reason",
+      "value": "用于按钮触感反馈和语音输入状态提示。"
+    },
+    {
+      "name": "permission_pasteboard_reason",
+      "value": "用于粘贴随手记文字、图片和网页快照信息。"
     }
   ]
 }
