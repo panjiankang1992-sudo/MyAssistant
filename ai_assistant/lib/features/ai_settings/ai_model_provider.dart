@@ -39,6 +39,7 @@ class AiModelState {
 
 class AiModelNotifier extends Notifier<AiModelState> {
   late final AiModelStore _store;
+  var _stateGeneration = 0;
 
   @override
   AiModelState build() {
@@ -48,7 +49,13 @@ class AiModelNotifier extends Notifier<AiModelState> {
   }
 
   Future<void> load() async {
+    final generation = _stateGeneration;
     final configs = await _store.getAll();
+    if (generation != _stateGeneration) return;
+    if (configs.isEmpty && state.configs.isNotEmpty) {
+      state = state.copyWith(loading: false);
+      return;
+    }
     state = AiModelState(
       configs: configs,
       selectedId:
@@ -62,14 +69,35 @@ class AiModelNotifier extends Notifier<AiModelState> {
   }
 
   Future<void> upsert(AiModelConfig config) async {
+    _stateGeneration++;
     final saved = await _store.upsert(config);
-    await load();
-    state = state.copyWith(selectedId: saved.id);
+    final configs = [...state.configs];
+    final index = configs.indexWhere((item) => item.id == saved.id);
+    if (index >= 0) {
+      configs[index] = saved;
+    } else {
+      configs.add(saved);
+    }
+    state = AiModelState(
+      configs: configs,
+      selectedId: saved.id,
+      loading: false,
+    );
   }
 
   Future<void> delete(String id) async {
+    _stateGeneration++;
     await _store.delete(id);
-    await load();
+    final configs = state.configs.where((item) => item.id != id).toList();
+    state = AiModelState(
+      configs: configs,
+      selectedId: configs.isEmpty
+          ? null
+          : state.selectedId == id
+          ? configs.first.id
+          : state.selectedId,
+      loading: false,
+    );
   }
 }
 

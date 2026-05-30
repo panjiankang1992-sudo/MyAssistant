@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/providers/core_providers.dart';
 import '../../core/theme/app_theme.dart';
 import '../../domain/models/tag.dart';
+import '../../shared/widgets/app_controls.dart';
 import '../../shared/widgets/tag_chip.dart';
 
 class TagManagePage extends ConsumerStatefulWidget {
@@ -249,16 +250,11 @@ class _CreateTagCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 10),
-              FilledButton(
+              AppDialogActionButton(
+                label: '添加',
                 onPressed: onAdd,
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size(60, 36),
-                  backgroundColor: AppColors.primary,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                ),
-                child: const Text('添加'),
+                filled: true,
+                height: 36,
               ),
             ],
           ),

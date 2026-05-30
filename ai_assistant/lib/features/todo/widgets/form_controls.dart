@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../../../core/platform/app_launcher_service.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/app_controls.dart';
 
 class TodoAction {
   final String value;
@@ -392,28 +393,38 @@ class _WheelTimePickerDialogState extends State<_WheelTimePickerDialog> {
               Row(
                 children: [
                   Expanded(
-                    child: TextButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: const Text(
-                        '取消',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w900,
-                          color: AppColors.primary,
+                    child: AppPointerTap(
+                      onTap: () => Navigator.of(context).pop(),
+                      child: const SizedBox(
+                        height: 48,
+                        child: Center(
+                          child: Text(
+                            '取消',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.primary,
+                            ),
+                          ),
                         ),
                       ),
                     ),
                   ),
                   Container(width: 1, height: 36, color: AppColors.border),
                   Expanded(
-                    child: TextButton(
-                      onPressed: () => Navigator.of(context).pop(_value),
-                      child: const Text(
-                        '确定',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w900,
-                          color: AppColors.primary,
+                    child: AppPointerTap(
+                      onTap: () => Navigator.of(context).pop(_value),
+                      child: const SizedBox(
+                        height: 48,
+                        child: Center(
+                          child: Text(
+                            '确定',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.primary,
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -620,11 +631,14 @@ class _AppLaunchPickerSheetState extends State<_AppLaunchPickerSheet> {
             ],
           ),
           actions: [
-            TextButton(
+            AppDialogActionButton(
+              label: '取消',
+              tone: AppActionButtonTone.neutral,
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('取消'),
             ),
-            FilledButton(
+            AppDialogActionButton(
+              label: '添加',
+              filled: true,
               onPressed: () {
                 final id = bundleController.text.trim();
                 if (id.isEmpty) return;
@@ -652,7 +666,6 @@ class _AppLaunchPickerSheetState extends State<_AppLaunchPickerSheet> {
                   ),
                 );
               },
-              child: const Text('添加'),
             ),
           ],
         );
@@ -694,10 +707,10 @@ class _AppLaunchPickerSheetState extends State<_AppLaunchPickerSheet> {
                       ),
                     ),
                   ),
-                  IconButton(
+                  AppIconTapButton(
                     tooltip: '关闭',
                     onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close_rounded),
+                    icon: Icons.close_rounded,
                   ),
                 ],
               ),

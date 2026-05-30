@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../domain/models/ai_model_config.dart';
+import '../../../shared/widgets/app_controls.dart';
 import '../../ai_settings/ai_model_catalog_service.dart';
 import '../../ai_settings/ai_model_provider.dart';
 
@@ -167,18 +168,15 @@ class _CopilotInputState extends ConsumerState<CopilotInput> {
                           : scheme.appSubtleText.withValues(alpha: 0.48),
                       shape: BoxShape.circle,
                     ),
-                    child: IconButton(
-                      onPressed: hasText && !widget.isRunning
-                          ? _handleSend
-                          : null,
-                      icon: Icon(
+                    child: AppPointerTap(
+                      onTap: hasText && !widget.isRunning ? _handleSend : null,
+                      child: Icon(
                         widget.isRunning
                             ? Icons.hourglass_top_rounded
                             : Icons.arrow_upward_rounded,
                         size: 18,
                         color: Colors.white,
                       ),
-                      padding: EdgeInsets.zero,
                     ),
                   ),
                 ],

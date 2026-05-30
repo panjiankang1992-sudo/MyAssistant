@@ -621,13 +621,15 @@ Future<bool?> _confirmDelete(BuildContext context, QuickNote note) {
       title: const Text('删除随手记'),
       content: Text('确定删除「${note.title}」吗？'),
       actions: [
-        TextButton(
+        AppDialogActionButton(
+          label: '取消',
+          tone: AppActionButtonTone.neutral,
           onPressed: () => Navigator.of(context).pop(false),
-          child: const Text('取消'),
         ),
-        TextButton(
+        AppDialogActionButton(
+          label: '删除',
+          tone: AppActionButtonTone.danger,
           onPressed: () => Navigator.of(context).pop(true),
-          child: const Text('删除', style: TextStyle(color: AppColors.danger)),
         ),
       ],
     ),
@@ -1667,13 +1669,15 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
           decoration: const InputDecoration(hintText: 'https://example.com'),
         ),
         actions: [
-          TextButton(
+          AppDialogActionButton(
+            label: '取消',
+            tone: AppActionButtonTone.neutral,
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('取消'),
           ),
-          TextButton(
+          AppDialogActionButton(
+            label: '抓取',
+            filled: true,
             onPressed: () => Navigator.of(context).pop(controller.text.trim()),
-            child: const Text('抓取'),
           ),
         ],
       ),

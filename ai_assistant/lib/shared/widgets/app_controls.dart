@@ -6,7 +6,7 @@ import '../../core/theme/app_theme.dart';
 
 const double appControlHeight = 54;
 
-class AppPointerTap extends StatelessWidget {
+class AppPointerTap extends StatefulWidget {
   final Widget child;
   final VoidCallback? onTap;
   final HitTestBehavior behavior;
@@ -19,12 +19,41 @@ class AppPointerTap extends StatelessWidget {
   });
 
   @override
+  State<AppPointerTap> createState() => _AppPointerTapState();
+}
+
+class _AppPointerTapState extends State<AppPointerTap> {
+  DateTime? _lastFireAt;
+
+  void _fire() {
+    final onTap = widget.onTap;
+    if (onTap == null) return;
+    final now = DateTime.now();
+    final lastFireAt = _lastFireAt;
+    if (lastFireAt != null &&
+        now.difference(lastFireAt) < const Duration(milliseconds: 700)) {
+      return;
+    }
+    _lastFireAt = now;
+    onTap();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final enabled = onTap != null;
-    return Listener(
-      behavior: behavior,
-      onPointerDown: enabled ? (_) => onTap!() : null,
-      child: child,
+    final enabled = widget.onTap != null;
+    return Semantics(
+      button: enabled,
+      enabled: enabled,
+      onTap: enabled ? _fire : null,
+      child: Listener(
+        behavior: widget.behavior,
+        onPointerDown: enabled ? (_) => _fire() : null,
+        child: GestureDetector(
+          behavior: widget.behavior,
+          onTap: enabled ? _fire : null,
+          child: widget.child,
+        ),
+      ),
     );
   }
 }
@@ -396,6 +425,137 @@ class AppAddFab extends StatelessWidget {
 
 enum AppActionButtonTone { primary, danger, neutral }
 
+class AppDialogActionButton extends StatelessWidget {
+  final String label;
+  final VoidCallback? onPressed;
+  final AppActionButtonTone tone;
+  final bool filled;
+  final IconData? icon;
+  final double height;
+
+  const AppDialogActionButton({
+    super.key,
+    required this.label,
+    required this.onPressed,
+    this.tone = AppActionButtonTone.primary,
+    this.filled = false,
+    this.icon,
+    this.height = 48,
+  });
+
+  Color _accent(ColorScheme scheme) {
+    return switch (tone) {
+      AppActionButtonTone.primary => scheme.primary,
+      AppActionButtonTone.danger => const Color(0xFFE62D27),
+      AppActionButtonTone.neutral => scheme.appText,
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final accent = _accent(scheme);
+    final disabled = onPressed == null;
+    final foreground = disabled
+        ? scheme.appDisabledText
+        : filled
+        ? scheme.onPrimary
+        : accent;
+    final background = disabled
+        ? scheme.appInput.withValues(alpha: 0.52)
+        : filled
+        ? accent
+        : accent.withValues(
+            alpha: tone == AppActionButtonTone.neutral ? 0.06 : 0.09,
+          );
+    final borderColor = disabled
+        ? scheme.appBorder.withValues(alpha: 0.5)
+        : accent.withValues(
+            alpha: tone == AppActionButtonTone.neutral ? 0.12 : 0.18,
+          );
+
+    return AppPointerTap(
+      onTap: onPressed,
+      child: Container(
+        height: height,
+        constraints: const BoxConstraints(minWidth: 82),
+        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: BoxDecoration(
+          color: background,
+          borderRadius: BorderRadius.circular(16),
+          border: filled ? null : Border.all(color: borderColor),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 18, color: foreground),
+              const SizedBox(width: 6),
+            ],
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                  color: foreground,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class AppDialogActionRow extends StatelessWidget {
+  final String cancelLabel;
+  final String confirmLabel;
+  final VoidCallback? onCancel;
+  final VoidCallback? onConfirm;
+  final AppActionButtonTone confirmTone;
+  final bool confirmFilled;
+
+  const AppDialogActionRow({
+    super.key,
+    required this.onCancel,
+    required this.onConfirm,
+    this.cancelLabel = '取消',
+    this.confirmLabel = '确定',
+    this.confirmTone = AppActionButtonTone.primary,
+    this.confirmFilled = true,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: AppDialogActionButton(
+            label: cancelLabel,
+            onPressed: onCancel,
+            tone: AppActionButtonTone.neutral,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: AppDialogActionButton(
+            label: confirmLabel,
+            onPressed: onConfirm,
+            tone: confirmTone,
+            filled: confirmFilled,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class AppRoundIconButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback? onPressed;
@@ -429,6 +589,52 @@ class AppRoundIconButton extends StatelessWidget {
           color: onPressed == null
               ? scheme.appDisabledText
               : foregroundColor ?? scheme.appText,
+        ),
+      ),
+    );
+    return tooltip == null ? button : Tooltip(message: tooltip!, child: button);
+  }
+}
+
+class AppIconTapButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback? onPressed;
+  final String? tooltip;
+  final Color? foregroundColor;
+  final Color? backgroundColor;
+  final double size;
+  final double iconSize;
+
+  const AppIconTapButton({
+    super.key,
+    required this.icon,
+    this.onPressed,
+    this.tooltip,
+    this.foregroundColor,
+    this.backgroundColor,
+    this.size = 42,
+    this.iconSize = 20,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final button = AppPointerTap(
+      onTap: onPressed,
+      child: Container(
+        width: size,
+        height: size,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: backgroundColor ?? Colors.transparent,
+          shape: BoxShape.circle,
+        ),
+        child: Icon(
+          icon,
+          size: iconSize,
+          color: onPressed == null
+              ? scheme.appDisabledText
+              : foregroundColor ?? scheme.appMutedText,
         ),
       ),
     );
@@ -786,47 +992,40 @@ class AppPillActionButton extends StatelessWidget {
         : BorderSide.none;
     return SizedBox(
       height: height,
-      child: Semantics(
-        button: true,
-        label: action.label,
+      child: AppPointerTap(
         onTap: action.onPressed,
-        excludeSemantics: true,
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: action.onPressed,
-          child: Container(
-            height: height,
-            alignment: Alignment.center,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              color: background,
-              borderRadius: BorderRadius.circular(24),
-              border: side == BorderSide.none
-                  ? null
-                  : Border.fromBorderSide(side),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (action.icon != null) ...[
-                  Icon(action.icon, size: 19, color: foreground),
-                  const SizedBox(width: 6),
-                ],
-                Flexible(
-                  child: Text(
-                    action.label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w900,
-                      color: foreground,
-                    ),
+        child: Container(
+          height: height,
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: background,
+            borderRadius: BorderRadius.circular(24),
+            border: side == BorderSide.none
+                ? null
+                : Border.fromBorderSide(side),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (action.icon != null) ...[
+                Icon(action.icon, size: 19, color: foreground),
+                const SizedBox(width: 6),
+              ],
+              Flexible(
+                child: Text(
+                  action.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                    color: foreground,
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -993,20 +1192,16 @@ class _AppDatePickerDialogState extends State<_AppDatePickerDialog> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  TextButton(
+                  AppDialogActionButton(
+                    label: '取消',
                     onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('取消'),
+                    tone: AppActionButtonTone.neutral,
                   ),
                   const SizedBox(width: 8),
-                  FilledButton(
+                  AppDialogActionButton(
+                    label: '确定',
                     onPressed: () => Navigator.of(context).pop(_selected),
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size(82, 44),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                    ),
-                    child: const Text('确定'),
+                    filled: true,
                   ),
                 ],
               ),

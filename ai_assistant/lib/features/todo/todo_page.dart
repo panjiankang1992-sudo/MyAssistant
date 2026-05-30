@@ -242,25 +242,24 @@ class _TodoPageState extends ConsumerState<TodoPage>
                                   ),
                                 ),
                                 const SizedBox(width: 2),
-                                IconButton(
-                                  tooltip: '同步系统日历',
-                                  onPressed: _calendarSyncing
-                                      ? null
-                                      : _syncCalendarTodos,
-                                  icon: _calendarSyncing
-                                      ? const SizedBox(
+                                _calendarSyncing
+                                    ? const Padding(
+                                        padding: EdgeInsets.all(12),
+                                        child: SizedBox(
                                           width: 18,
                                           height: 18,
                                           child: CircularProgressIndicator(
                                             strokeWidth: 2,
                                           ),
-                                        )
-                                      : Icon(
-                                          Icons.event_available_rounded,
-                                          size: 22,
-                                          color: scheme.appMutedText,
                                         ),
-                                ),
+                                      )
+                                    : AppIconTapButton(
+                                        tooltip: '同步系统日历',
+                                        onPressed: _syncCalendarTodos,
+                                        icon: Icons.event_available_rounded,
+                                        iconSize: 22,
+                                        foregroundColor: scheme.appMutedText,
+                                      ),
                               ],
                             ),
                             const SizedBox(height: 2),

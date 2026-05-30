@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
+import '../../shared/widgets/app_controls.dart';
 import '../auth/auth_provider.dart';
 
 class AuthPage extends ConsumerStatefulWidget {
@@ -178,9 +179,10 @@ class _AuthPageState extends ConsumerState<AuthPage> {
             ),
           ),
           actions: [
-            TextButton(
+            AppDialogActionButton(
+              label: '我知道了',
+              filled: true,
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('我知道了'),
             ),
           ],
         );
@@ -398,14 +400,12 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                           size: 20,
                           color: AppColors.textTertiary,
                         ),
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _obscurePassword
-                                ? Icons.visibility_off
-                                : Icons.visibility,
-                            size: 20,
-                            color: AppColors.textTertiary,
-                          ),
+                        suffixIcon: AppIconTapButton(
+                          icon: _obscurePassword
+                              ? Icons.visibility_off
+                              : Icons.visibility,
+                          iconSize: 20,
+                          foregroundColor: AppColors.textTertiary,
                           onPressed: () => setState(
                             () => _obscurePassword = !_obscurePassword,
                           ),
@@ -457,14 +457,12 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                             size: 20,
                             color: AppColors.textTertiary,
                           ),
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              _obscureConfirmPassword
-                                  ? Icons.visibility_off
-                                  : Icons.visibility,
-                              size: 20,
-                              color: AppColors.textTertiary,
-                            ),
+                          suffixIcon: AppIconTapButton(
+                            icon: _obscureConfirmPassword
+                                ? Icons.visibility_off
+                                : Icons.visibility,
+                            iconSize: 20,
+                            foregroundColor: AppColors.textTertiary,
                             onPressed: () => setState(
                               () => _obscureConfirmPassword =
                                   !_obscureConfirmPassword,
@@ -556,19 +554,11 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                           const SizedBox(width: 10),
                           SizedBox(
                             height: 50,
-                            child: OutlinedButton(
+                            child: AppDialogActionButton(
+                              label: _sendingCode ? '发送中' : '获取验证码',
                               onPressed: _sendingCode
                                   ? null
                                   : _sendRegisterCode,
-                              child: _sendingCode
-                                  ? const SizedBox(
-                                      width: 16,
-                                      height: 16,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                  : const Text('获取验证码'),
                             ),
                           ),
                         ],
@@ -606,42 +596,27 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                     SizedBox(
                       width: double.infinity,
                       height: 50,
-                      child: ElevatedButton(
+                      child: AppDialogActionButton(
+                        label: authState.isLoading
+                            ? '处理中'
+                            : (_isRegisterMode ? '注册并登录' : '登录'),
                         onPressed: authState.isLoading
                             ? null
                             : (_isRegisterMode ? _register : _login),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(25),
-                          ),
-                        ),
-                        child: authState.isLoading
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : Text(
-                                _isRegisterMode ? '注册并登录' : '登录',
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
+                        filled: true,
+                        height: 50,
                       ),
                     ),
                     const SizedBox(height: 12),
-                    TextButton(
-                      onPressed: authState.isLoading ? null : _toggleMode,
-                      child: Text(
-                        _isRegisterMode ? '已有账号？返回登录' : '没有账号？立即注册',
-                        style: const TextStyle(fontWeight: FontWeight.w700),
+                    AppPointerTap(
+                      onTap: authState.isLoading ? null : _toggleMode,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 9),
+                        child: Text(
+                          _isRegisterMode ? '已有账号？返回登录' : '没有账号？立即注册',
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                          textAlign: TextAlign.center,
+                        ),
                       ),
                     ),
                     if (authState.error != null)

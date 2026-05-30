@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/storage/app_paths.dart';
 import '../../core/theme/app_theme.dart';
+import '../../shared/widgets/app_controls.dart';
 
 class AvatarImageCropPage extends StatefulWidget {
   final String imagePath;
@@ -224,29 +225,23 @@ class _AvatarImageCropPageState extends State<AvatarImageCropPage> {
                 Row(
                   children: [
                     Expanded(
-                      child: OutlinedButton(
+                      child: AppDialogActionButton(
+                        label: '取消',
                         onPressed: _saving
                             ? null
                             : () => Navigator.of(context).pop(),
-                        child: const Text('取消'),
+                        tone: AppActionButtonTone.neutral,
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: FilledButton.icon(
+                      child: AppDialogActionButton(
+                        label: _saving ? '保存中' : '保存头像',
                         onPressed: _image == null || _saving
                             ? null
                             : _saveCropped,
-                        icon: _saving
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Icon(Icons.crop_square_rounded, size: 18),
-                        label: Text(_saving ? '保存中' : '保存头像'),
+                        icon: Icons.crop_square_rounded,
+                        filled: true,
                       ),
                     ),
                   ],

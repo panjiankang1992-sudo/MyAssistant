@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/app_controls.dart';
 import '../services/todo_text_parser.dart';
 
 class SmartInput extends StatefulWidget {
@@ -50,7 +51,10 @@ class _SmartInputState extends State<SmartInput> {
 
     if (result.title.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('未能识别，请尝试更具体的描述'), duration: Duration(seconds: 1)),
+        const SnackBar(
+          content: Text('未能识别，请尝试更具体的描述'),
+          duration: Duration(seconds: 1),
+        ),
       );
       return;
     }
@@ -77,22 +81,33 @@ class _SmartInputState extends State<SmartInput> {
 
   String _getTypeLabel(String type) {
     switch (type) {
-      case 'bill': return '帐单';
-      case 'work': return '工作';
-      case 'personal': return '个人';
-      case 'health': return '健康';
-      default: return type;
+      case 'bill':
+        return '帐单';
+      case 'work':
+        return '工作';
+      case 'personal':
+        return '个人';
+      case 'health':
+        return '健康';
+      default:
+        return type;
     }
   }
 
   String _getSourceLabel(String source) {
     switch (source) {
-      case 'recommend': return '推荐';
-      case 'routine': return '例行';
-      case 'message': return '消息';
-      case 'calendar': return '日历';
-      case 'manual': return '手动';
-      default: return source;
+      case 'recommend':
+        return '推荐';
+      case 'routine':
+        return '例行';
+      case 'message':
+        return '消息';
+      case 'calendar':
+        return '日历';
+      case 'manual':
+        return '手动';
+      default:
+        return source;
     }
   }
 
@@ -119,7 +134,11 @@ class _SmartInputState extends State<SmartInput> {
                       hintText: '输入你想做的事，我会自动识别…',
                       hintStyle: TextStyle(
                         fontFamily: 'PingFang SC',
-                        fontFamilyFallback: ['.SF Pro Text', 'system-ui', 'sans-serif'],
+                        fontFamilyFallback: [
+                          '.SF Pro Text',
+                          'system-ui',
+                          'sans-serif',
+                        ],
                         fontSize: 15,
                         fontWeight: FontWeight.w400,
                         color: AppColors.textTertiary,
@@ -130,7 +149,11 @@ class _SmartInputState extends State<SmartInput> {
                     ),
                     style: const TextStyle(
                       fontFamily: 'PingFang SC',
-                      fontFamilyFallback: ['.SF Pro Text', 'system-ui', 'sans-serif'],
+                      fontFamilyFallback: [
+                        '.SF Pro Text',
+                        'system-ui',
+                        'sans-serif',
+                      ],
                       fontSize: 15,
                       fontWeight: FontWeight.w400,
                       color: AppColors.text,
@@ -146,10 +169,13 @@ class _SmartInputState extends State<SmartInput> {
                     color: AppColors.primary,
                     shape: BoxShape.circle,
                   ),
-                  child: IconButton(
-                    onPressed: _analyze,
-                    icon: const Icon(Icons.send, size: 14, color: Colors.white),
-                    padding: EdgeInsets.zero,
+                  child: AppPointerTap(
+                    onTap: _analyze,
+                    child: const Icon(
+                      Icons.send,
+                      size: 14,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
               ],
@@ -168,21 +194,68 @@ class _SmartInputState extends State<SmartInput> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('✓ AI 识别结果', style: TextStyle(fontFamily: 'PingFang SC', fontFamilyFallback: ['.SF Pro Text', 'system-ui', 'sans-serif'], fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.primary, letterSpacing: 0.5)),
+                  const Text(
+                    '✓ AI 识别结果',
+                    style: TextStyle(
+                      fontFamily: 'PingFang SC',
+                      fontFamilyFallback: [
+                        '.SF Pro Text',
+                        'system-ui',
+                        'sans-serif',
+                      ],
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primary,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
                   const SizedBox(height: 10),
-                  Text(_result!.title, style: const TextStyle(fontFamily: 'PingFang SC', fontFamilyFallback: ['.SF Pro Text', 'system-ui', 'sans-serif'], fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.text)),
+                  Text(
+                    _result!.title,
+                    style: const TextStyle(
+                      fontFamily: 'PingFang SC',
+                      fontFamilyFallback: [
+                        '.SF Pro Text',
+                        'system-ui',
+                        'sans-serif',
+                      ],
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.text,
+                    ),
+                  ),
                   const SizedBox(height: 8),
                   _buildPreviewRow('标签', _getTypeLabel(_result!.type)),
                   _buildPreviewRow('时间', _result!.time),
-                  _buildPreviewRow('日期', '${_result!.date.year}-${_result!.date.month.toString().padLeft(2, '0')}-${_result!.date.day.toString().padLeft(2, '0')}'),
+                  _buildPreviewRow(
+                    '日期',
+                    '${_result!.date.year}-${_result!.date.month.toString().padLeft(2, '0')}-${_result!.date.day.toString().padLeft(2, '0')}',
+                  ),
                   _buildPreviewRow('来源', _getSourceLabel(_result!.source)),
-                  if (_result!.description != null) _buildPreviewRow('详情', _result!.description!),
+                  if (_result!.description != null)
+                    _buildPreviewRow('详情', _result!.description!),
                   const SizedBox(height: 14),
-                  Row(children: [
-                    Expanded(child: SizedBox(height: 44, child: ElevatedButton(onPressed: _reset, style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF0F0F5), foregroundColor: AppColors.text, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25))), child: const Text('重新输入', style: TextStyle(fontFamily: 'PingFang SC', fontFamilyFallback: ['.SF Pro Text', 'system-ui', 'sans-serif'], fontSize: 14, fontWeight: FontWeight.w500))))),
-                    const SizedBox(width: 10),
-                    Expanded(child: SizedBox(height: 44, child: ElevatedButton(onPressed: _confirm, style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25))), child: const Text('确认添加', style: TextStyle(fontFamily: 'PingFang SC', fontFamilyFallback: ['.SF Pro Text', 'system-ui', 'sans-serif'], fontSize: 14, fontWeight: FontWeight.w500))))),
-                  ]),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: AppDialogActionButton(
+                          label: '重新输入',
+                          onPressed: _reset,
+                          tone: AppActionButtonTone.neutral,
+                          height: 44,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: AppDialogActionButton(
+                          label: '确认添加',
+                          onPressed: _confirm,
+                          filled: true,
+                          height: 44,
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -194,10 +267,31 @@ class _SmartInputState extends State<SmartInput> {
   Widget _buildPreviewRow(String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-        Text(label, style: const TextStyle(fontFamily: 'PingFang SC', fontFamilyFallback: ['.SF Pro Text', 'system-ui', 'sans-serif'], fontSize: 12, fontWeight: FontWeight.w400, color: AppColors.textTertiary)),
-        Text(value, style: const TextStyle(fontFamily: 'PingFang SC', fontFamilyFallback: ['.SF Pro Text', 'system-ui', 'sans-serif'], fontSize: 14, fontWeight: FontWeight.w500, color: AppColors.text)),
-      ]),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontFamily: 'PingFang SC',
+              fontFamilyFallback: ['.SF Pro Text', 'system-ui', 'sans-serif'],
+              fontSize: 12,
+              fontWeight: FontWeight.w400,
+              color: AppColors.textTertiary,
+            ),
+          ),
+          Text(
+            value,
+            style: const TextStyle(
+              fontFamily: 'PingFang SC',
+              fontFamilyFallback: ['.SF Pro Text', 'system-ui', 'sans-serif'],
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: AppColors.text,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

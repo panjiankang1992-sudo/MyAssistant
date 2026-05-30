@@ -47,13 +47,31 @@ class AiModelPage extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 12),
-          SizedBox(
-            height: appControlHeight,
-            child: ElevatedButton.icon(
-              onPressed: () => showAiModelDialog(context, ref),
-              icon: const Icon(Icons.add_rounded, size: 18),
-              label: const Text('添加模型'),
-              style: appControlButtonStyle(),
+          AppPointerTap(
+            onTap: () => showAiModelDialog(context, ref),
+            child: Container(
+              height: appControlHeight,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.add_rounded, size: 20, color: Colors.white),
+                  SizedBox(width: 6),
+                  Text(
+                    '添加模型',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
           const SizedBox(height: 22),
@@ -125,25 +143,27 @@ class _ModelConfigCard extends ConsumerWidget {
               ],
             ),
           ),
-          IconButton(
+          AppIconTapButton(
             tooltip: '设为当前',
             onPressed: () =>
                 ref.read(aiModelProvider.notifier).select(config.id),
-            icon: Icon(
-              selected ? Icons.check_circle_rounded : Icons.circle_outlined,
-              color: selected ? AppColors.primary : AppColors.textTertiary,
-            ),
+            icon: selected ? Icons.check_circle_rounded : Icons.circle_outlined,
+            foregroundColor: selected
+                ? AppColors.primary
+                : AppColors.textTertiary,
           ),
-          IconButton(
+          AppIconTapButton(
             tooltip: '编辑',
             onPressed: () => showAiModelDialog(context, ref, config: config),
-            icon: const Icon(Icons.edit_outlined, size: 18),
+            icon: Icons.edit_outlined,
+            iconSize: 18,
           ),
-          IconButton(
+          AppIconTapButton(
             tooltip: '删除',
             onPressed: () =>
                 ref.read(aiModelProvider.notifier).delete(config.id),
-            icon: const Icon(Icons.delete_outline_rounded, size: 18),
+            icon: Icons.delete_outline_rounded,
+            iconSize: 18,
           ),
         ],
       ),
@@ -250,6 +270,24 @@ Future<void> showAiModelDialog(
               fetchingModels = false;
             });
           }
+        }
+
+        Future<void> saveConfig() async {
+          await ref
+              .read(aiModelProvider.notifier)
+              .upsert(
+                AiModelConfig(
+                  id: config?.id ?? '',
+                  name: nameCtrl.text.trim(),
+                  provider: provider,
+                  baseUrl: baseCtrl.text.trim(),
+                  model: modelCtrl.text.trim(),
+                  apiKey: keyCtrl.text.trim(),
+                  createdAt: config?.createdAt ?? now,
+                  updatedAt: now,
+                ),
+              );
+          if (ctx.mounted) Navigator.of(ctx).pop();
         }
 
         return AlertDialog(
@@ -361,36 +399,16 @@ Future<void> showAiModelDialog(
                     obscureText: true,
                     decoration: appInputDecoration(label: 'API Key'),
                   ),
+                  const SizedBox(height: 18),
+                  AppDialogActionRow(
+                    onCancel: () => Navigator.of(ctx).pop(),
+                    onConfirm: saveConfig,
+                    confirmLabel: '保存',
+                  ),
                 ],
               ),
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('取消'),
-            ),
-            TextButton(
-              onPressed: () async {
-                await ref
-                    .read(aiModelProvider.notifier)
-                    .upsert(
-                      AiModelConfig(
-                        id: config?.id ?? '',
-                        name: nameCtrl.text.trim(),
-                        provider: provider,
-                        baseUrl: baseCtrl.text.trim(),
-                        model: modelCtrl.text.trim(),
-                        apiKey: keyCtrl.text.trim(),
-                        createdAt: config?.createdAt ?? now,
-                        updatedAt: now,
-                      ),
-                    );
-                if (ctx.mounted) Navigator.of(ctx).pop();
-              },
-              child: const Text('保存'),
-            ),
-          ],
         );
       },
     ),

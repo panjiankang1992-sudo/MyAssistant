@@ -10,6 +10,7 @@ import 'widgets/copilot_hero.dart';
 import 'widgets/copilot_input.dart';
 import 'widgets/prompt_cards.dart';
 import '../../core/theme/app_theme.dart';
+import '../../shared/widgets/app_controls.dart';
 import '../../shared/widgets/profile_avatar_button.dart';
 
 class CopilotPage extends ConsumerWidget {
@@ -104,13 +105,13 @@ class _HistoryDrawer extends ConsumerWidget {
                       ),
                     ),
                   ),
-                  IconButton(
+                  AppIconTapButton(
                     tooltip: '新会话',
                     onPressed: () {
                       ref.read(copilotNotifierProvider.notifier).newSession();
                       Navigator.of(context).pop();
                     },
-                    icon: const Icon(Icons.add_rounded),
+                    icon: Icons.add_rounded,
                   ),
                 ],
               ),
@@ -200,16 +201,14 @@ class _HistoryDrawer extends ConsumerWidget {
                                       ],
                                     ),
                                   ),
-                                  IconButton(
+                                  AppIconTapButton(
                                     tooltip: '删除',
                                     onPressed: () => ref
                                         .read(copilotNotifierProvider.notifier)
                                         .deleteSession(session.id),
-                                    icon: const Icon(
-                                      Icons.delete_outline_rounded,
-                                      size: 18,
-                                      color: AppColors.textTertiary,
-                                    ),
+                                    icon: Icons.delete_outline_rounded,
+                                    iconSize: 18,
+                                    foregroundColor: AppColors.textTertiary,
                                   ),
                                 ],
                               ),
@@ -246,10 +245,12 @@ class _CopilotTopBar extends ConsumerWidget {
         children: [
           Builder(
             builder: (context) {
-              return IconButton(
+              return AppIconTapButton(
                 tooltip: '历史会话',
                 onPressed: () => Scaffold.of(context).openDrawer(),
-                icon: Icon(Icons.menu_rounded, size: 24, color: scheme.appText),
+                icon: Icons.menu_rounded,
+                iconSize: 24,
+                foregroundColor: scheme.appText,
               );
             },
           ),

@@ -99,10 +99,12 @@ class _CopilotSettingsPageState extends ConsumerState<CopilotSettingsPage> {
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 20),
-            child: IconButton(
+            child: AppIconTapButton(
               tooltip: '保存',
               onPressed: _save,
-              icon: const Icon(Icons.check_rounded),
+              icon: Icons.check_rounded,
+              foregroundColor: AppColors.primary,
+              backgroundColor: AppColors.primary.withValues(alpha: 0.08),
             ),
           ),
         ],
@@ -246,13 +248,15 @@ class _CopilotSettingsPageState extends ConsumerState<CopilotSettingsPage> {
                   subtitle: '自动记录最近对话摘要，最多保留 30 条，用于当前阶段连续性。',
                   items: memoryState.shortTerm,
                   emptyText: '暂无短期记忆。和 Copilot 对话后会自动生成。',
-                  trailing: TextButton(
+                  trailing: AppDialogActionButton(
+                    label: '清空',
+                    tone: AppActionButtonTone.danger,
+                    height: 38,
                     onPressed: memoryState.shortTerm.isEmpty
                         ? null
                         : () => ref
                               .read(copilotMemoryProvider.notifier)
                               .clearShortTerm(),
-                    child: const Text('清空'),
                   ),
                   onAdd: () => _showMemoryDialog(
                     context,
@@ -425,25 +429,22 @@ class _AvatarSummary extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        InkWell(
+        AppPointerTap(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(24),
           child: Padding(
             padding: const EdgeInsets.all(2),
             child: CopilotAvatarView(value: value, size: 58),
           ),
         ),
         const SizedBox(height: 5),
-        TextButton(
-          onPressed: onTap,
-          style: TextButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            minimumSize: const Size(0, 28),
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          ),
-          child: const Text(
-            '更换头像',
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+        AppPointerTap(
+          onTap: onTap,
+          child: const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            child: Text(
+              '更换头像',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+            ),
           ),
         ),
       ],
@@ -643,20 +644,24 @@ class _ModelTile extends StatelessWidget {
               ],
             ),
           ),
-          IconButton(
+          AppIconTapButton(
             tooltip: '设为当前',
             onPressed: onSelect,
-            icon: const Icon(Icons.radio_button_checked_rounded, size: 18),
+            icon: Icons.radio_button_checked_rounded,
+            iconSize: 18,
           ),
-          IconButton(
+          AppIconTapButton(
             tooltip: '编辑',
             onPressed: onEdit,
-            icon: const Icon(Icons.edit_rounded, size: 18),
+            icon: Icons.edit_rounded,
+            iconSize: 18,
           ),
-          IconButton(
+          AppIconTapButton(
             tooltip: '删除',
             onPressed: onDelete,
-            icon: const Icon(Icons.delete_outline_rounded, size: 18),
+            icon: Icons.delete_outline_rounded,
+            iconSize: 18,
+            foregroundColor: AppColors.danger,
           ),
         ],
       ),
@@ -750,10 +755,11 @@ class _MemoryList extends StatelessWidget {
                 ),
               ),
               ?trailing,
-              IconButton(
+              AppIconTapButton(
                 tooltip: '添加记忆',
                 onPressed: onAdd,
-                icon: const Icon(Icons.add_rounded),
+                icon: Icons.add_rounded,
+                foregroundColor: AppColors.primary,
               ),
             ],
           ),
@@ -861,19 +867,18 @@ class _MemoryTile extends StatelessWidget {
               ],
             ),
           ),
-          IconButton(
+          AppIconTapButton(
             tooltip: '编辑',
             onPressed: onEdit,
-            icon: const Icon(Icons.edit_rounded, size: 17),
+            icon: Icons.edit_rounded,
+            iconSize: 17,
           ),
-          IconButton(
+          AppIconTapButton(
             tooltip: '删除',
             onPressed: onDelete,
-            icon: const Icon(
-              Icons.delete_outline_rounded,
-              size: 17,
-              color: AppColors.danger,
-            ),
+            icon: Icons.delete_outline_rounded,
+            iconSize: 17,
+            foregroundColor: AppColors.danger,
           ),
         ],
       ),
@@ -1026,6 +1031,28 @@ Future<void> _showMemoryDialog(
     builder: (dialogContext) {
       return StatefulBuilder(
         builder: (dialogContext, setState) {
+          Future<void> saveMemory() async {
+            final content = contentController.text.trim();
+            if (content.isEmpty) return;
+            final tags = tagsController.text
+                .split(RegExp(r'[、,\s]+'))
+                .map((item) => item.trim())
+                .where((item) => item.isNotEmpty)
+                .toSet()
+                .toList();
+            await ref
+                .read(copilotMemoryProvider.notifier)
+                .upsert(
+                  id: item?.id,
+                  type: memoryType,
+                  title: titleController.text.trim(),
+                  content: content,
+                  tags: tags,
+                  importance: importance,
+                );
+            if (dialogContext.mounted) Navigator.of(dialogContext).pop();
+          }
+
           return AlertDialog(
             title: Text(item == null ? '添加记忆' : '编辑记忆'),
             content: SizedBox(
@@ -1101,40 +1128,16 @@ Future<void> _showMemoryDialog(
                         ),
                       ],
                     ),
+                    const SizedBox(height: 18),
+                    AppDialogActionRow(
+                      onCancel: () => Navigator.of(dialogContext).pop(),
+                      onConfirm: saveMemory,
+                      confirmLabel: '保存',
+                    ),
                   ],
                 ),
               ),
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(),
-                child: const Text('取消'),
-              ),
-              TextButton(
-                onPressed: () async {
-                  final content = contentController.text.trim();
-                  if (content.isEmpty) return;
-                  final tags = tagsController.text
-                      .split(RegExp(r'[、,\s]+'))
-                      .map((item) => item.trim())
-                      .where((item) => item.isNotEmpty)
-                      .toSet()
-                      .toList();
-                  await ref
-                      .read(copilotMemoryProvider.notifier)
-                      .upsert(
-                        id: item?.id,
-                        type: memoryType,
-                        title: titleController.text.trim(),
-                        content: content,
-                        tags: tags,
-                        importance: importance,
-                      );
-                  if (dialogContext.mounted) Navigator.of(dialogContext).pop();
-                },
-                child: const Text('保存'),
-              ),
-            ],
           );
         },
       );

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/platform/app_file_picker.dart';
 import '../../core/theme/app_theme.dart';
+import '../../shared/widgets/app_controls.dart';
 import 'avatar_image_crop_page.dart';
 import 'copilot_avatar.dart';
 
@@ -82,10 +83,10 @@ class _CopilotAvatarPickerDialogState extends State<CopilotAvatarPickerDialog> {
                         ),
                       ),
                     ),
-                    IconButton(
+                    AppIconTapButton(
                       tooltip: '关闭',
                       onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(Icons.close_rounded),
+                      icon: Icons.close_rounded,
                     ),
                   ],
                 ),
@@ -153,16 +154,18 @@ class _CopilotAvatarPickerDialogState extends State<CopilotAvatarPickerDialog> {
                 child: Row(
                   children: [
                     Expanded(
-                      child: OutlinedButton(
+                      child: AppDialogActionButton(
+                        label: '取消',
                         onPressed: () => Navigator.of(context).pop(),
-                        child: const Text('取消'),
+                        tone: AppActionButtonTone.neutral,
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: FilledButton(
+                      child: AppDialogActionButton(
+                        label: '确定',
                         onPressed: () => Navigator.of(context).pop(_selected),
-                        child: const Text('确定'),
+                        filled: true,
                       ),
                     ),
                   ],

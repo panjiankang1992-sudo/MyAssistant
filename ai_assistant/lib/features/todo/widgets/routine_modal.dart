@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../../domain/models/routine.dart';
 import '../../../domain/models/tag.dart';
+import '../../../shared/widgets/app_controls.dart';
 import '../../../shared/widgets/tag_chip.dart';
 import '../providers/routine_provider.dart';
 import '../../tags/tag_selector.dart';
@@ -123,11 +124,14 @@ class _RoutineModalContentState extends ConsumerState<_RoutineModalContent> {
                 ),
               ),
               actions: [
-                TextButton(
+                AppDialogActionButton(
+                  label: '取消',
+                  tone: AppActionButtonTone.neutral,
                   onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('取消'),
                 ),
-                TextButton(
+                AppDialogActionButton(
+                  label: '保存',
+                  filled: true,
                   onPressed: () {
                     if (!formKey.currentState!.validate()) return;
                     final routine = Routine(
@@ -143,7 +147,6 @@ class _RoutineModalContentState extends ConsumerState<_RoutineModalContent> {
                         .addRoutine(routine);
                     Navigator.of(context).pop();
                   },
-                  child: const Text('保存'),
                 ),
               ],
             );
@@ -161,13 +164,15 @@ class _RoutineModalContentState extends ConsumerState<_RoutineModalContent> {
           title: const Text('确认删除'),
           content: Text('确定要删除 "${routine.title}" 吗？'),
           actions: [
-            TextButton(
+            AppDialogActionButton(
+              label: '取消',
+              tone: AppActionButtonTone.neutral,
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('取消'),
             ),
-            TextButton(
+            AppDialogActionButton(
+              label: '删除',
+              tone: AppActionButtonTone.danger,
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('删除'),
             ),
           ],
         );
@@ -223,11 +228,14 @@ class _RoutineModalContentState extends ConsumerState<_RoutineModalContent> {
                 ),
               ),
               actions: [
-                TextButton(
+                AppDialogActionButton(
+                  label: '取消',
+                  tone: AppActionButtonTone.neutral,
                   onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('取消'),
                 ),
-                TextButton(
+                AppDialogActionButton(
+                  label: '保存',
+                  filled: true,
                   onPressed: () {
                     if (!formKey.currentState!.validate()) return;
                     final newRoutine = routine.copyWith(
@@ -242,7 +250,6 @@ class _RoutineModalContentState extends ConsumerState<_RoutineModalContent> {
                         .updateRoutine(newRoutine);
                     Navigator.of(context).pop();
                   },
-                  child: const Text('保存'),
                 ),
               ],
             );
@@ -309,9 +316,10 @@ class _RoutineModalContentState extends ConsumerState<_RoutineModalContent> {
               padding: const EdgeInsets.all(16),
               child: SizedBox(
                 width: double.infinity,
-                child: ElevatedButton(
+                child: AppDialogActionButton(
+                  label: '添加例行待办',
                   onPressed: _showAddDialog,
-                  child: const Text('添加例行待办'),
+                  filled: true,
                 ),
               ),
             ),

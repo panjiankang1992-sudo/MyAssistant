@@ -241,10 +241,22 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                           ),
                         ),
                         const Spacer(),
-                        TextButton.icon(
-                          onPressed: _openWebdavEditor,
-                          icon: const Icon(Icons.edit_outlined, size: 16),
-                          label: const Text('修改'),
+                        AppPointerTap(
+                          onTap: _openWebdavEditor,
+                          child: const Padding(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 6,
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.edit_outlined, size: 16),
+                                SizedBox(width: 4),
+                                Text('修改'),
+                              ],
+                            ),
+                          ),
                         ),
                         Container(
                           padding: const EdgeInsets.symmetric(
@@ -304,9 +316,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                         ),
                       ),
                     ),
-                    TextButton(
+                    AppDialogActionButton(
+                      label: '去配置',
+                      height: 38,
                       onPressed: _openWebdavEditor,
-                      child: const Text('去配置'),
                     ),
                   ],
                 ),
@@ -410,56 +423,24 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
             SizedBox(
               width: double.infinity,
-              child: ElevatedButton(
+              child: AppDialogActionButton(
+                label: _syncing
+                    ? '同步中'
+                    : (_webdavLoaded ? '增量同步' : '配置 WebDAV 后同步'),
                 onPressed: _syncing || !_webdavLoaded ? null : _syncWebdav,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  disabledBackgroundColor: AppColors.primary.withValues(
-                    alpha: 0.5,
-                  ),
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
-                child: _syncing
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : Text(_webdavLoaded ? '增量同步' : '配置 WebDAV 后同步'),
+                filled: true,
+                height: 52,
               ),
             ),
             const SizedBox(height: 10),
             SizedBox(
               width: double.infinity,
-              child: OutlinedButton(
+              child: AppDialogActionButton(
+                label: _syncing
+                    ? '同步中'
+                    : (_webdavLoaded ? '全量同步' : '配置 WebDAV 后全量同步'),
                 onPressed: _syncing || !_webdavLoaded ? null : _fullSync,
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.primary,
-                  side: const BorderSide(color: AppColors.primary),
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
-                child: _syncing
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: AppColors.primary,
-                        ),
-                      )
-                    : Text(_webdavLoaded ? '全量同步' : '配置 WebDAV 后全量同步'),
+                height: 52,
               ),
             ),
             if (_syncMessage.isNotEmpty) ...[
@@ -701,13 +682,16 @@ class _WebDavConfigPageState extends State<_WebDavConfigPage> {
         title: const Text('清除 WebDAV 配置'),
         content: const Text('清除后自动同步会停止，本地数据不会删除。'),
         actions: [
-          TextButton(
+          AppDialogActionButton(
+            label: '取消',
+            tone: AppActionButtonTone.neutral,
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('取消'),
           ),
-          FilledButton(
+          AppDialogActionButton(
+            label: '清除',
+            tone: AppActionButtonTone.danger,
+            filled: true,
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('清除'),
           ),
         ],
       ),
@@ -819,15 +803,13 @@ class _WebDavConfigPageState extends State<_WebDavConfigPage> {
                       context: context,
                       label: '密码 / 授权码',
                       hintText: 'WebDAV 密码或应用授权码',
-                      suffixIcon: IconButton(
+                      suffixIcon: AppIconTapButton(
                         onPressed: () => setState(
                           () => _obscurePassword = !_obscurePassword,
                         ),
-                        icon: Icon(
-                          _obscurePassword
-                              ? Icons.visibility_outlined
-                              : Icons.visibility_off_outlined,
-                        ),
+                        icon: _obscurePassword
+                            ? Icons.visibility_outlined
+                            : Icons.visibility_off_outlined,
                       ),
                     ),
                   ),
@@ -883,67 +865,30 @@ class _WebDavConfigPageState extends State<_WebDavConfigPage> {
                 children: [
                   if (widget.initialUrl.trim().isNotEmpty) ...[
                     Expanded(
-                      child: OutlinedButton.icon(
+                      child: AppDialogActionButton(
+                        label: '清除',
                         onPressed: busy ? null : _clear,
-                        icon: const Icon(Icons.delete_outline_rounded),
-                        label: const Text('清除'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: scheme.error,
-                          side: BorderSide(
-                            color: scheme.error.withValues(alpha: 0.35),
-                          ),
-                          minimumSize: const Size(0, 48),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                        ),
+                        icon: Icons.delete_outline_rounded,
+                        tone: AppActionButtonTone.danger,
                       ),
                     ),
                     const SizedBox(width: 10),
                   ],
                   Expanded(
-                    child: OutlinedButton.icon(
+                    child: AppDialogActionButton(
+                      label: _testing ? '验证中' : '验证',
                       onPressed: busy ? null : _testConnection,
-                      icon: _testing
-                          ? const SizedBox(
-                              width: 17,
-                              height: 17,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.wifi_tethering_rounded),
-                      label: const Text('验证'),
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size(0, 48),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
+                      icon: Icons.wifi_tethering_rounded,
                     ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
                     flex: 2,
-                    child: ElevatedButton.icon(
+                    child: AppDialogActionButton(
+                      label: _saving ? '保存中' : '保存配置',
                       onPressed: busy ? null : _save,
-                      icon: const Icon(Icons.check_rounded),
-                      label: const Text('保存配置'),
-                      style:
-                          appControlButtonStyle(
-                            background: scheme.primary,
-                            foreground: scheme.onPrimary,
-                          ).copyWith(
-                            minimumSize: const WidgetStatePropertyAll(
-                              Size(0, 48),
-                            ),
-                            fixedSize: const WidgetStatePropertyAll(
-                              Size.fromHeight(48),
-                            ),
-                            shape: WidgetStatePropertyAll(
-                              RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                            ),
-                          ),
+                      icon: Icons.check_rounded,
+                      filled: true,
                     ),
                   ),
                 ],

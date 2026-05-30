@@ -1145,23 +1145,19 @@ class _Header extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 6),
-                    IconButton(
+                    AppIconTapButton(
                       tooltip: '选择日期',
                       onPressed: onDatePick,
-                      icon: Icon(
-                        Icons.calendar_month_outlined,
-                        size: 24,
-                        color: scheme.appMutedText,
-                      ),
+                      icon: Icons.calendar_month_outlined,
+                      iconSize: 24,
+                      foregroundColor: scheme.appMutedText,
                     ),
-                    IconButton(
+                    AppIconTapButton(
                       tooltip: '统计',
                       onPressed: onStats,
-                      icon: Icon(
-                        Icons.pie_chart_rounded,
-                        size: 24,
-                        color: scheme.appMutedText,
-                      ),
+                      icon: Icons.pie_chart_rounded,
+                      iconSize: 24,
+                      foregroundColor: scheme.appMutedText,
                     ),
                   ],
                 ),
@@ -1267,13 +1263,15 @@ class _LedgerDayView extends StatelessWidget {
           '确定删除「${entry.categoryName} ${_money(entry.cnyAmount)}」吗？',
         ),
         actions: [
-          TextButton(
+          AppDialogActionButton(
+            label: '取消',
+            tone: AppActionButtonTone.neutral,
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('取消'),
           ),
-          TextButton(
+          AppDialogActionButton(
+            label: '删除',
+            tone: AppActionButtonTone.danger,
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('删除', style: TextStyle(color: AppColors.danger)),
           ),
         ],
       ),
@@ -1394,13 +1392,15 @@ class _LedgerDetailPage extends StatelessWidget {
           '确定删除「${entry.categoryName} ${_money(entry.cnyAmount)}」吗？',
         ),
         actions: [
-          TextButton(
+          AppDialogActionButton(
+            label: '取消',
+            tone: AppActionButtonTone.neutral,
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('取消'),
           ),
-          TextButton(
+          AppDialogActionButton(
+            label: '删除',
+            tone: AppActionButtonTone.danger,
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('删除', style: TextStyle(color: AppColors.danger)),
           ),
         ],
       ),
@@ -1879,13 +1879,13 @@ class _StatsPageState extends State<_StatsPage> {
                   padding: const EdgeInsets.fromLTRB(24, 18, 18, 10),
                   child: Row(
                     children: [
-                      IconButton(
+                      AppIconTapButton(
                         onPressed: () => Navigator.of(context).pop(),
-                        icon: const Icon(Icons.arrow_back_ios_new_rounded),
-                        style: IconButton.styleFrom(
-                          backgroundColor: AppColors.inputBg,
-                          fixedSize: const Size(50, 50),
-                        ),
+                        icon: Icons.arrow_back_ios_new_rounded,
+                        size: 50,
+                        iconSize: 22,
+                        backgroundColor: AppColors.inputBg,
+                        foregroundColor: AppColors.text,
                       ),
                       const SizedBox(width: 14),
                       Expanded(
@@ -2176,15 +2176,13 @@ class _StatsPageState extends State<_StatsPage> {
                         children: [
                           Row(
                             children: [
-                              IconButton(
+                              AppIconTapButton(
                                 onPressed: () => Navigator.of(context).pop(),
-                                icon: const Icon(
-                                  Icons.arrow_back_ios_new_rounded,
-                                ),
-                                style: IconButton.styleFrom(
-                                  backgroundColor: AppColors.inputBg,
-                                  fixedSize: const Size(50, 50),
-                                ),
+                                icon: Icons.arrow_back_ios_new_rounded,
+                                size: 50,
+                                iconSize: 22,
+                                backgroundColor: AppColors.inputBg,
+                                foregroundColor: AppColors.text,
                               ),
                               const SizedBox(width: 14),
                               const Text(
@@ -2237,8 +2235,10 @@ class _StatsPageState extends State<_StatsPage> {
                           ),
                           SizedBox(
                             width: double.infinity,
-                            height: 52,
-                            child: FilledButton(
+                            child: AppDialogActionButton(
+                              label: '应用',
+                              filled: true,
+                              height: 52,
                               onPressed: () {
                                 setState(() {
                                   _query = queryController.text.trim();
@@ -2246,7 +2246,6 @@ class _StatsPageState extends State<_StatsPage> {
                                 });
                                 Navigator.of(context).pop();
                               },
-                              child: const Text('应用'),
                             ),
                           ),
                         ],
@@ -3327,14 +3326,16 @@ class _AddLedgerPageState extends State<_AddLedgerPage>
             decoration: const InputDecoration(hintText: '输入分类名称'),
           ),
           actions: [
-            TextButton(
+            AppDialogActionButton(
+              label: '取消',
+              tone: AppActionButtonTone.neutral,
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('取消'),
             ),
-            FilledButton(
+            AppDialogActionButton(
+              label: '保存',
+              filled: true,
               onPressed: () =>
                   Navigator.of(context).pop(controller.text.trim()),
-              child: const Text('保存'),
             ),
           ],
         );

@@ -129,13 +129,15 @@ class _TodoDetailSheetState extends ConsumerState<_TodoDetailSheet> {
         title: const Text('删除待办'),
         content: Text('确定删除「${widget.todo.title}」吗？'),
         actions: [
-          TextButton(
+          AppDialogActionButton(
+            label: '取消',
+            tone: AppActionButtonTone.neutral,
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('取消'),
           ),
-          TextButton(
+          AppDialogActionButton(
+            label: '删除',
+            tone: AppActionButtonTone.danger,
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('删除', style: TextStyle(color: AppColors.danger)),
           ),
         ],
       ),

@@ -614,25 +614,24 @@ class _AddTodoModalContentState extends ConsumerState<_AddTodoModalContent>
                                   context: context,
                                   label: '',
                                   hintText: '输入待办事项…',
-                                  suffixIcon: IconButton(
-                                    tooltip: '使用当前 AI 分析',
-                                    onPressed: _aiParsing
-                                        ? null
-                                        : _applyAiParse,
-                                    icon: _aiParsing
-                                        ? const SizedBox(
+                                  suffixIcon: _aiParsing
+                                      ? const Padding(
+                                          padding: EdgeInsets.all(14),
+                                          child: SizedBox(
                                             width: 16,
                                             height: 16,
                                             child: CircularProgressIndicator(
                                               strokeWidth: 2,
                                             ),
-                                          )
-                                        : const Icon(
-                                            Icons.auto_awesome_rounded,
-                                            size: 18,
-                                            color: AppColors.primary,
                                           ),
-                                  ),
+                                        )
+                                      : AppIconTapButton(
+                                          tooltip: '使用当前 AI 分析',
+                                          onPressed: _applyAiParse,
+                                          icon: Icons.auto_awesome_rounded,
+                                          iconSize: 18,
+                                          foregroundColor: AppColors.primary,
+                                        ),
                                 ),
                                 validator: (value) {
                                   if (value == null || value.trim().isEmpty) {
@@ -1299,28 +1298,38 @@ class _TodoDateTimePickerDialogState extends State<_TodoDateTimePickerDialog> {
               Row(
                 children: [
                   Expanded(
-                    child: TextButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: const Text(
-                        '取消',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w900,
-                          color: AppColors.primary,
+                    child: AppPointerTap(
+                      onTap: () => Navigator.of(context).pop(),
+                      child: const SizedBox(
+                        height: 48,
+                        child: Center(
+                          child: Text(
+                            '取消',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.primary,
+                            ),
+                          ),
                         ),
                       ),
                     ),
                   ),
                   Container(width: 1, height: 36, color: AppColors.border),
                   Expanded(
-                    child: TextButton(
-                      onPressed: () => Navigator.of(context).pop(_value),
-                      child: const Text(
-                        '确定',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w900,
-                          color: AppColors.primary,
+                    child: AppPointerTap(
+                      onTap: () => Navigator.of(context).pop(_value),
+                      child: const SizedBox(
+                        height: 48,
+                        child: Center(
+                          child: Text(
+                            '确定',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.primary,
+                            ),
+                          ),
                         ),
                       ),
                     ),

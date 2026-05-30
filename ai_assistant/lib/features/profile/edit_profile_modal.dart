@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
+import '../../shared/widgets/app_controls.dart';
 import '../copilot/copilot_avatar.dart';
 import '../copilot/copilot_avatar_picker.dart';
 import 'profile_provider.dart';
@@ -279,45 +280,20 @@ class _EditProfileContentState extends ConsumerState<_EditProfileContent> {
                 Row(
                   children: [
                     Expanded(
-                      child: OutlinedButton(
+                      child: AppDialogActionButton(
+                        label: '取消',
                         onPressed: _saving
                             ? null
                             : () => Navigator.pop(context),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.text,
-                          side: const BorderSide(color: AppColors.border),
-                          backgroundColor: AppColors.surface,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(25),
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                        ),
-                        child: const Text('取消'),
+                        tone: AppActionButtonTone.neutral,
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: ElevatedButton(
+                      child: AppDialogActionButton(
+                        label: _saving ? '保存中' : '保存',
                         onPressed: _saving ? null : _save,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(25),
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                        ),
-                        child: _saving
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Text('保存'),
+                        filled: true,
                       ),
                     ),
                   ],

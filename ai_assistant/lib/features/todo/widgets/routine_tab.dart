@@ -533,13 +533,11 @@ class _RoutineEditorPageState extends State<_RoutineEditorPage> {
                 padding: const EdgeInsets.fromLTRB(20, 14, 16, 10),
                 child: Row(
                   children: [
-                    IconButton(
+                    AppIconTapButton(
                       tooltip: '返回',
                       onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(
-                        Icons.arrow_back_ios_new_rounded,
-                        color: AppColors.text,
-                      ),
+                      icon: Icons.arrow_back_ios_new_rounded,
+                      foregroundColor: AppColors.text,
                     ),
                     const SizedBox(width: 4),
                     Expanded(
@@ -558,13 +556,11 @@ class _RoutineEditorPageState extends State<_RoutineEditorPage> {
                         ),
                       ),
                     ),
-                    IconButton(
+                    AppIconTapButton(
                       tooltip: '关闭',
                       onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(
-                        Icons.close_rounded,
-                        color: AppColors.text,
-                      ),
+                      icon: Icons.close_rounded,
+                      foregroundColor: AppColors.text,
                     ),
                   ],
                 ),
@@ -773,13 +769,15 @@ class _RoutineTabState extends ConsumerState<RoutineTab> {
         title: const Text('确认删除'),
         content: Text('确定要删除「${routine.title}」吗？'),
         actions: [
-          TextButton(
+          AppDialogActionButton(
+            label: '取消',
+            tone: AppActionButtonTone.neutral,
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('取消'),
           ),
-          TextButton(
+          AppDialogActionButton(
+            label: '删除',
+            tone: AppActionButtonTone.danger,
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('删除', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
