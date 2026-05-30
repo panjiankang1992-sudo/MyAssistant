@@ -587,9 +587,8 @@ class _NotesDateFilterButton extends StatelessWidget {
     final tooltip = active ? DateFormat('MM月dd日').format(filterDate!) : '筛选日期';
     return Tooltip(
       message: tooltip,
-      child: GestureDetector(
+      child: AppPointerTap(
         onTap: onTap,
-        behavior: HitTestBehavior.opaque,
         child: Container(
           width: 40,
           height: 40,
@@ -644,27 +643,29 @@ class _LayoutToggleButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return IconButton(
-      tooltip: value == _NotesLayoutMode.list ? '切换宫格' : '切换列表',
-      onPressed: () => onChanged(
-        value == _NotesLayoutMode.list
-            ? _NotesLayoutMode.grid
-            : _NotesLayoutMode.list,
-      ),
-      icon: Icon(
-        value == _NotesLayoutMode.list
-            ? Icons.grid_view_rounded
-            : Icons.view_agenda_outlined,
-        color: scheme.primary,
-      ),
-      style: IconButton.styleFrom(
-        fixedSize: const Size(40, 40),
-        minimumSize: const Size(40, 40),
-        maximumSize: const Size(40, 40),
-        backgroundColor: scheme.appInput,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: scheme.appBorder),
+    final tooltip = value == _NotesLayoutMode.list ? '切换宫格' : '切换列表';
+    return Tooltip(
+      message: tooltip,
+      child: AppPointerTap(
+        onTap: () => onChanged(
+          value == _NotesLayoutMode.list
+              ? _NotesLayoutMode.grid
+              : _NotesLayoutMode.list,
+        ),
+        child: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: scheme.appInput,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: scheme.appBorder),
+          ),
+          child: Icon(
+            value == _NotesLayoutMode.list
+                ? Icons.grid_view_rounded
+                : Icons.view_agenda_outlined,
+            color: scheme.primary,
+          ),
         ),
       ),
     );
@@ -752,9 +753,9 @@ class _NoteCard extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: InkWell(
+      child: GestureDetector(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        behavior: HitTestBehavior.opaque,
         child: Container(
           height: compact ? 188 : null,
           padding: const EdgeInsets.fromLTRB(16, 14, 12, 12),
@@ -957,9 +958,8 @@ class _NoteMoreButtonState extends State<_NoteMoreButton> {
   Widget build(BuildContext context) {
     return CompositedTransformTarget(
       link: _layerLink,
-      child: InkWell(
+      child: AppPointerTap(
         onTap: _toggleMenu,
-        borderRadius: BorderRadius.circular(15),
         child: const SizedBox(
           width: 34,
           height: 30,
@@ -1052,7 +1052,7 @@ class _MenuButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    return AppPointerTap(
       onTap: () => onSelected(action),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -1164,9 +1164,8 @@ class _NotesModeSegmented extends StatelessWidget {
   Widget _modeItem(BuildContext context, String label, _NotesViewMode mode) {
     final selected = value == mode;
     final scheme = Theme.of(context).colorScheme;
-    return InkWell(
+    return AppPointerTap(
       onTap: () => onChanged(mode),
-      borderRadius: BorderRadius.circular(15),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         width: 62,
@@ -1382,9 +1381,8 @@ class _AnalysisDocTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    return AppPointerTap(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 7),
         child: Row(
@@ -2090,9 +2088,8 @@ class _CircleTool extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return InkWell(
+    return AppPointerTap(
       onTap: faded ? null : onTap,
-      borderRadius: BorderRadius.circular(28),
       child: Container(
         width: 44,
         height: 44,
@@ -2405,9 +2402,8 @@ class _AttachmentRecordCard extends StatelessWidget {
       );
     }
 
-    return InkWell(
+    return AppPointerTap(
       onTap: () => _openAttachmentRecord(attachment),
-      borderRadius: BorderRadius.circular(18),
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
@@ -2486,7 +2482,7 @@ class _ImageBlockCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(18),
-      child: InkWell(
+      child: AppPointerTap(
         onTap: () => _openFile(block.value),
         child: Stack(
           children: [
@@ -2527,9 +2523,8 @@ class _AttachmentBlockCard extends StatelessWidget {
         : '${_formatAttachmentSize(block.sizeBytes!)} · 点击打开附件';
     return Stack(
       children: [
-        InkWell(
+        AppPointerTap(
           onTap: () => _openFile(block.value),
-          borderRadius: BorderRadius.circular(18),
           child: Container(
             width: double.infinity,
             padding: const EdgeInsets.fromLTRB(16, 14, 48, 14),
@@ -2602,9 +2597,8 @@ class _SnapshotBlockCard extends StatelessWidget {
     final host = Uri.tryParse(block.value)?.host ?? block.value;
     return Stack(
       children: [
-        InkWell(
+        AppPointerTap(
           onTap: () => _openUrl(block.value),
-          borderRadius: BorderRadius.circular(20),
           child: Container(
             width: double.infinity,
             padding: const EdgeInsets.fromLTRB(18, 16, 48, 16),
@@ -2693,9 +2687,8 @@ class _RemoveBlockButton extends StatelessWidget {
     return Positioned(
       top: 8,
       right: 8,
-      child: InkWell(
+      child: AppPointerTap(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
         child: Container(
           width: 28,
           height: 28,
@@ -2852,9 +2845,8 @@ class _ToolIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return GestureDetector(
+    return AppPointerTap(
       onTap: onTap,
-      behavior: HitTestBehavior.opaque,
       child: SizedBox(
         width: 34,
         height: 44,

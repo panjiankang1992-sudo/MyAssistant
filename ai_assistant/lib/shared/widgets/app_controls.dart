@@ -6,6 +6,29 @@ import '../../core/theme/app_theme.dart';
 
 const double appControlHeight = 54;
 
+class AppPointerTap extends StatelessWidget {
+  final Widget child;
+  final VoidCallback? onTap;
+  final HitTestBehavior behavior;
+
+  const AppPointerTap({
+    super.key,
+    required this.child,
+    this.onTap,
+    this.behavior = HitTestBehavior.opaque,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onTap != null;
+    return Listener(
+      behavior: behavior,
+      onPointerDown: enabled ? (_) => onTap!() : null,
+      child: child,
+    );
+  }
+}
+
 InputDecoration appInputDecoration({
   required String label,
   String? hintText,
@@ -336,43 +359,34 @@ class AppAddFab extends StatelessWidget {
       offset: const Offset(0, -12),
       child: Tooltip(
         message: tooltip,
-        child: Material(
-          color: Colors.transparent,
-          shape: const CircleBorder(),
-          child: InkWell(
-            onTap: onPressed,
-            customBorder: const CircleBorder(),
-            child: Ink(
-              width: 58,
-              height: 58,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  colors: gradientColors,
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                boxShadow: reduceMotion
-                    ? null
-                    : [
-                        BoxShadow(
-                          color: gradientColors.last.withValues(alpha: 0.26),
-                          blurRadius: 18,
-                          offset: const Offset(0, 8),
-                        ),
-                        BoxShadow(
-                          color: gradientColors.first.withValues(alpha: 0.16),
-                          blurRadius: 10,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
+        child: AppPointerTap(
+          onTap: onPressed,
+          child: Container(
+            width: 58,
+            height: 58,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                colors: gradientColors,
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
-              child: const Icon(
-                Icons.add_rounded,
-                size: 29,
-                color: Colors.white,
-              ),
+              boxShadow: reduceMotion
+                  ? null
+                  : [
+                      BoxShadow(
+                        color: gradientColors.last.withValues(alpha: 0.26),
+                        blurRadius: 18,
+                        offset: const Offset(0, 8),
+                      ),
+                      BoxShadow(
+                        color: gradientColors.first.withValues(alpha: 0.16),
+                        blurRadius: 10,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
             ),
+            child: const Icon(Icons.add_rounded, size: 29, color: Colors.white),
           ),
         ),
       ),
@@ -399,21 +413,26 @@ class AppRoundIconButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return IconButton(
-      tooltip: tooltip,
-      onPressed: onPressed,
-      icon: Icon(icon, size: 28),
-      style: IconButton.styleFrom(
-        fixedSize: const Size(58, 58),
-        minimumSize: const Size(58, 58),
-        maximumSize: const Size(58, 58),
-        backgroundColor: scheme.appInput.withValues(alpha: 0.95),
-        foregroundColor: foregroundColor ?? scheme.appText,
-        disabledForegroundColor: scheme.appDisabledText,
-        shape: const CircleBorder(),
-        elevation: 0,
+    final button = AppPointerTap(
+      onTap: onPressed,
+      child: Container(
+        width: 58,
+        height: 58,
+        decoration: BoxDecoration(
+          color: scheme.appInput.withValues(alpha: 0.95),
+          shape: BoxShape.circle,
+        ),
+        alignment: Alignment.center,
+        child: Icon(
+          icon,
+          size: 28,
+          color: onPressed == null
+              ? scheme.appDisabledText
+              : foregroundColor ?? scheme.appText,
+        ),
       ),
     );
+    return tooltip == null ? button : Tooltip(message: tooltip!, child: button);
   }
 }
 
@@ -1008,9 +1027,8 @@ class _MonthNavButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return InkWell(
+    return AppPointerTap(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
       child: Container(
         width: 48,
         height: 48,
@@ -1079,9 +1097,8 @@ class _CalendarGrid extends StatelessWidget {
                 date.isBefore(_dateOnly(firstDate)) ||
                 date.isAfter(_dateOnly(lastDate));
             final marker = disabled ? null : markerBuilder?.call(date);
-            return InkWell(
+            return AppPointerTap(
               onTap: disabled ? null : () => onSelected(date),
-              borderRadius: BorderRadius.circular(18),
               child: Stack(
                 fit: StackFit.expand,
                 children: [
