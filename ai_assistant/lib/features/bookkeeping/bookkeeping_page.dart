@@ -511,24 +511,17 @@ const _expenseCategoryGroups = [
   LedgerCategoryGroup(
     primary: LedgerCategory(
       id: 'food',
-      name: '餐饮',
+      name: '餐饮零食',
       emoji: '🍽️',
-      color: Color(0xFFF6EDE8),
+      color: Color(0xFFFFF1E6),
       kind: LedgerKind.expense,
     ),
     children: [
       LedgerCategory(
-        id: 'food_meals',
-        name: '三餐',
-        emoji: '🍱',
-        color: Color(0xFFFFF1E6),
-        kind: LedgerKind.expense,
-      ),
-      LedgerCategory(
-        id: 'food_breakfast',
-        name: '早餐',
-        emoji: '🥣',
-        color: Color(0xFFFFF4E6),
+        id: 'food_groceries',
+        name: '买菜',
+        emoji: '🥬',
+        color: Color(0xFFEAF8EF),
         kind: LedgerKind.expense,
       ),
       LedgerCategory(
@@ -539,31 +532,10 @@ const _expenseCategoryGroups = [
         kind: LedgerKind.expense,
       ),
       LedgerCategory(
-        id: 'food_dinner',
-        name: '晚餐',
-        emoji: '🍲',
-        color: Color(0xFFF8EFE4),
-        kind: LedgerKind.expense,
-      ),
-      LedgerCategory(
         id: 'food_coffee',
         name: '咖啡',
         emoji: '☕',
         color: Color(0xFFF2ECE6),
-        kind: LedgerKind.expense,
-      ),
-      LedgerCategory(
-        id: 'food_milk_tea',
-        name: '奶茶',
-        emoji: '🧋',
-        color: Color(0xFFFFEEF4),
-        kind: LedgerKind.expense,
-      ),
-      LedgerCategory(
-        id: 'food_snack',
-        name: '零食',
-        emoji: '🍭',
-        color: Color(0xFFFFF3E7),
         kind: LedgerKind.expense,
       ),
       LedgerCategory(
@@ -574,6 +546,41 @@ const _expenseCategoryGroups = [
         kind: LedgerKind.expense,
       ),
       LedgerCategory(
+        id: 'food_milk_tea',
+        name: '奶茶',
+        emoji: '🧋',
+        color: Color(0xFFFFEEF4),
+        kind: LedgerKind.expense,
+      ),
+      LedgerCategory(
+        id: 'food_street_snack',
+        name: '小吃',
+        emoji: '🍢',
+        color: Color(0xFFFFF4E6),
+        kind: LedgerKind.expense,
+      ),
+      LedgerCategory(
+        id: 'food_breakfast',
+        name: '早餐',
+        emoji: '🥣',
+        color: Color(0xFFFFF4E6),
+        kind: LedgerKind.expense,
+      ),
+      LedgerCategory(
+        id: 'food_dinner',
+        name: '晚餐',
+        emoji: '🍲',
+        color: Color(0xFFF8EFE4),
+        kind: LedgerKind.expense,
+      ),
+      LedgerCategory(
+        id: 'food_fruit',
+        name: '水果',
+        emoji: '🍎',
+        color: Color(0xFFEAF8EF),
+        kind: LedgerKind.expense,
+      ),
+      LedgerCategory(
         id: 'food_gathering',
         name: '聚餐',
         emoji: '🍻',
@@ -581,10 +588,10 @@ const _expenseCategoryGroups = [
         kind: LedgerKind.expense,
       ),
       LedgerCategory(
-        id: 'food_groceries',
-        name: '买菜',
-        emoji: '🥬',
-        color: Color(0xFFEAF8EF),
+        id: 'food_snack',
+        name: '零食',
+        emoji: '🍭',
+        color: Color(0xFFFFF3E7),
         kind: LedgerKind.expense,
       ),
       LedgerCategory(
@@ -599,17 +606,17 @@ const _expenseCategoryGroups = [
   LedgerCategoryGroup(
     primary: LedgerCategory(
       id: 'traffic',
-      name: '交通',
+      name: '交通出行',
       emoji: '🚌',
-      color: Color(0xFFEDEBFA),
+      color: Color(0xFFEAF7FF),
       kind: LedgerKind.expense,
     ),
     children: [
       LedgerCategory(
-        id: 'traffic_taxi',
-        name: '打车',
-        emoji: '🚕',
-        color: Color(0xFFEAF1FF),
+        id: 'traffic_parking',
+        name: '停车',
+        emoji: '🅿️',
+        color: Color(0xFFEFF4FF),
         kind: LedgerKind.expense,
       ),
       LedgerCategory(
@@ -620,10 +627,10 @@ const _expenseCategoryGroups = [
         kind: LedgerKind.expense,
       ),
       LedgerCategory(
-        id: 'traffic_subway',
-        name: '地铁',
-        emoji: '🚇',
-        color: Color(0xFFEDEBFA),
+        id: 'traffic_bike',
+        name: '共享单车',
+        emoji: '🚲',
+        color: Color(0xFFEAF8EF),
         kind: LedgerKind.expense,
       ),
       LedgerCategory(
@@ -634,17 +641,17 @@ const _expenseCategoryGroups = [
         kind: LedgerKind.expense,
       ),
       LedgerCategory(
-        id: 'traffic_parking',
-        name: '停车',
-        emoji: '🅿️',
-        color: Color(0xFFEFF4FF),
+        id: 'traffic_subway',
+        name: '地铁',
+        emoji: '🚇',
+        color: Color(0xFFEDEBFA),
         kind: LedgerKind.expense,
       ),
       LedgerCategory(
-        id: 'traffic_toll',
-        name: '高速费',
-        emoji: '🛣️',
-        color: Color(0xFFFFF4E6),
+        id: 'traffic_taxi',
+        name: '打车',
+        emoji: '🚕',
+        color: Color(0xFFFFF3D8),
         kind: LedgerKind.expense,
       ),
       LedgerCategory(
@@ -662,10 +669,10 @@ const _expenseCategoryGroups = [
         kind: LedgerKind.expense,
       ),
       LedgerCategory(
-        id: 'traffic_bike',
-        name: '共享单车',
-        emoji: '🚲',
-        color: Color(0xFFEAF8EF),
+        id: 'traffic_toll',
+        name: '高速费',
+        emoji: '🛣️',
+        color: Color(0xFFFFF4E6),
         kind: LedgerKind.expense,
       ),
       LedgerCategory(
@@ -680,31 +687,17 @@ const _expenseCategoryGroups = [
   LedgerCategoryGroup(
     primary: LedgerCategory(
       id: 'shopping',
-      name: '购物',
+      name: '购物消费',
       emoji: '🛍️',
       color: Color(0xFFF8F1FF),
       kind: LedgerKind.expense,
     ),
     children: [
       LedgerCategory(
-        id: 'shopping_daily',
-        name: '日用品',
-        emoji: '🧴',
-        color: Color(0xFFF4F8FF),
-        kind: LedgerKind.expense,
-      ),
-      LedgerCategory(
-        id: 'shopping_clothing',
-        name: '衣服鞋帽',
-        emoji: '👕',
-        color: Color(0xFFF1F4FF),
-        kind: LedgerKind.expense,
-      ),
-      LedgerCategory(
-        id: 'shopping_digital',
-        name: '数码产品',
-        emoji: '💻',
-        color: Color(0xFFEFF1FF),
+        id: 'shopping_learning',
+        name: '学习用品',
+        emoji: '✏️',
+        color: Color(0xFFEAF1FF),
         kind: LedgerKind.expense,
       ),
       LedgerCategory(
@@ -715,10 +708,17 @@ const _expenseCategoryGroups = [
         kind: LedgerKind.expense,
       ),
       LedgerCategory(
-        id: 'shopping_online',
-        name: '网购',
-        emoji: '📦',
-        color: Color(0xFFFFF4E6),
+        id: 'shopping_digital',
+        name: '数码产品',
+        emoji: '💻',
+        color: Color(0xFFEFF1FF),
+        kind: LedgerKind.expense,
+      ),
+      LedgerCategory(
+        id: 'shopping_daily',
+        name: '日用品',
+        emoji: '🧴',
+        color: Color(0xFFF4F8FF),
         kind: LedgerKind.expense,
       ),
       LedgerCategory(
@@ -729,10 +729,24 @@ const _expenseCategoryGroups = [
         kind: LedgerKind.expense,
       ),
       LedgerCategory(
+        id: 'shopping_online',
+        name: '网购',
+        emoji: '📦',
+        color: Color(0xFFFFF4E6),
+        kind: LedgerKind.expense,
+      ),
+      LedgerCategory(
         id: 'shopping_beauty',
         name: '美妆护肤',
         emoji: '💄',
         color: Color(0xFFFFEEF8),
+        kind: LedgerKind.expense,
+      ),
+      LedgerCategory(
+        id: 'shopping_clothing',
+        name: '衣服鞋帽',
+        emoji: '👕',
+        color: Color(0xFFF1F4FF),
         kind: LedgerKind.expense,
       ),
       LedgerCategory(
@@ -747,45 +761,17 @@ const _expenseCategoryGroups = [
   LedgerCategoryGroup(
     primary: LedgerCategory(
       id: 'life',
-      name: '生活',
+      name: '居家生活',
       emoji: '🏠',
       color: Color(0xFFEFF4FF),
       kind: LedgerKind.expense,
     ),
     children: [
       LedgerCategory(
-        id: 'life_rent',
-        name: '房租',
-        emoji: '🏘️',
-        color: Color(0xFFEFF4FF),
-        kind: LedgerKind.expense,
-      ),
-      LedgerCategory(
-        id: 'life_property',
-        name: '物业',
-        emoji: '🏢',
-        color: Color(0xFFEAF5FF),
-        kind: LedgerKind.expense,
-      ),
-      LedgerCategory(
-        id: 'life_water',
-        name: '水费',
-        emoji: '💧',
-        color: Color(0xFFEAF7FF),
-        kind: LedgerKind.expense,
-      ),
-      LedgerCategory(
-        id: 'life_electricity',
-        name: '电费',
-        emoji: '💡',
-        color: Color(0xFFFFF7E8),
-        kind: LedgerKind.expense,
-      ),
-      LedgerCategory(
-        id: 'life_gas',
-        name: '燃气',
-        emoji: '🔥',
-        color: Color(0xFFFFF1E8),
+        id: 'life_housekeeping',
+        name: '家政',
+        emoji: '🧹',
+        color: Color(0xFFF4F8FF),
         kind: LedgerKind.expense,
       ),
       LedgerCategory(
@@ -796,10 +782,38 @@ const _expenseCategoryGroups = [
         kind: LedgerKind.expense,
       ),
       LedgerCategory(
-        id: 'life_housekeeping',
-        name: '家政',
-        emoji: '🧹',
-        color: Color(0xFFF4F8FF),
+        id: 'life_rent',
+        name: '房租',
+        emoji: '🏘️',
+        color: Color(0xFFEFF4FF),
+        kind: LedgerKind.expense,
+      ),
+      LedgerCategory(
+        id: 'life_water',
+        name: '水费',
+        emoji: '💧',
+        color: Color(0xFFEAF7FF),
+        kind: LedgerKind.expense,
+      ),
+      LedgerCategory(
+        id: 'life_gas',
+        name: '燃气',
+        emoji: '🔥',
+        color: Color(0xFFFFF1E8),
+        kind: LedgerKind.expense,
+      ),
+      LedgerCategory(
+        id: 'life_property',
+        name: '物业',
+        emoji: '🏢',
+        color: Color(0xFFEAF5FF),
+        kind: LedgerKind.expense,
+      ),
+      LedgerCategory(
+        id: 'life_electricity',
+        name: '电费',
+        emoji: '💡',
+        color: Color(0xFFFFF7E8),
         kind: LedgerKind.expense,
       ),
       LedgerCategory(
@@ -821,26 +835,12 @@ const _expenseCategoryGroups = [
   LedgerCategoryGroup(
     primary: LedgerCategory(
       id: 'medical',
-      name: '医疗',
+      name: '健康医疗',
       emoji: '💊',
       color: Color(0xFFEAF8F2),
       kind: LedgerKind.expense,
     ),
     children: [
-      LedgerCategory(
-        id: 'medical_hospital',
-        name: '医院',
-        emoji: '🏥',
-        color: Color(0xFFEAF8F2),
-        kind: LedgerKind.expense,
-      ),
-      LedgerCategory(
-        id: 'medical_medicine',
-        name: '药品',
-        emoji: '💊',
-        color: Color(0xFFFFEEF1),
-        kind: LedgerKind.expense,
-      ),
       LedgerCategory(
         id: 'medical_checkup',
         name: '体检',
@@ -863,6 +863,20 @@ const _expenseCategoryGroups = [
         kind: LedgerKind.expense,
       ),
       LedgerCategory(
+        id: 'medical_hospital',
+        name: '医院',
+        emoji: '🏥',
+        color: Color(0xFFEAF8F2),
+        kind: LedgerKind.expense,
+      ),
+      LedgerCategory(
+        id: 'medical_medicine',
+        name: '药品',
+        emoji: '💊',
+        color: Color(0xFFFFEEF1),
+        kind: LedgerKind.expense,
+      ),
+      LedgerCategory(
         id: 'medical_running',
         name: '跑步',
         emoji: '👟',
@@ -880,27 +894,101 @@ const _expenseCategoryGroups = [
   ),
   LedgerCategoryGroup(
     primary: LedgerCategory(
+      id: 'education',
+      name: '教育学习',
+      emoji: '📚',
+      color: Color(0xFFEAF1FF),
+      kind: LedgerKind.expense,
+    ),
+    children: [
+      LedgerCategory(
+        id: 'education_books',
+        name: '书籍教材',
+        emoji: '📚',
+        color: Color(0xFFEAF1FF),
+        kind: LedgerKind.expense,
+      ),
+      LedgerCategory(
+        id: 'education_software',
+        name: '学习软件',
+        emoji: '💻',
+        color: Color(0xFFEFF1FF),
+        kind: LedgerKind.expense,
+      ),
+      LedgerCategory(
+        id: 'education_misc',
+        name: '学杂费',
+        emoji: '🧾',
+        color: Color(0xFFFFF4E6),
+        kind: LedgerKind.expense,
+      ),
+      LedgerCategory(
+        id: 'education_training',
+        name: '学费培训',
+        emoji: '🎓',
+        color: Color(0xFFF0F3FF),
+        kind: LedgerKind.expense,
+      ),
+      LedgerCategory(
+        id: 'education_printing',
+        name: '打印复印',
+        emoji: '🖨️',
+        color: Color(0xFFF4F8FF),
+        kind: LedgerKind.expense,
+      ),
+      LedgerCategory(
+        id: 'education_stationery',
+        name: '文具用品',
+        emoji: '✏️',
+        color: Color(0xFFFFF7E8),
+        kind: LedgerKind.expense,
+      ),
+      LedgerCategory(
+        id: 'education_devices',
+        name: '电子设备',
+        emoji: '💻',
+        color: Color(0xFFEFF1FF),
+        kind: LedgerKind.expense,
+      ),
+      LedgerCategory(
+        id: 'education_language',
+        name: '留学语言',
+        emoji: '🌏',
+        color: Color(0xFFEAF7FF),
+        kind: LedgerKind.expense,
+      ),
+      LedgerCategory(
+        id: 'education_online',
+        name: '网课订阅',
+        emoji: '🎧',
+        color: Color(0xFFF0F3FF),
+        kind: LedgerKind.expense,
+      ),
+      LedgerCategory(
+        id: 'education_exam',
+        name: '考试认证',
+        emoji: '🪪',
+        color: Color(0xFFEAF8F2),
+        kind: LedgerKind.expense,
+      ),
+      LedgerCategory(
+        id: 'education_other',
+        name: '其他',
+        emoji: '📚',
+        color: Color(0xFFEAF1FF),
+        kind: LedgerKind.expense,
+      ),
+    ],
+  ),
+  LedgerCategoryGroup(
+    primary: LedgerCategory(
       id: 'entertainment',
-      name: '娱乐',
+      name: '娱乐休闲',
       emoji: '🎭',
       color: Color(0xFFFFF1E8),
       kind: LedgerKind.expense,
     ),
     children: [
-      LedgerCategory(
-        id: 'entertainment_movie',
-        name: '电影',
-        emoji: '🎬',
-        color: Color(0xFFFFF0F7),
-        kind: LedgerKind.expense,
-      ),
-      LedgerCategory(
-        id: 'entertainment_game',
-        name: '游戏',
-        emoji: '🎮',
-        color: Color(0xFFEFF1FF),
-        kind: LedgerKind.expense,
-      ),
       LedgerCategory(
         id: 'entertainment_ktv',
         name: 'KTV',
@@ -909,17 +997,10 @@ const _expenseCategoryGroups = [
         kind: LedgerKind.expense,
       ),
       LedgerCategory(
-        id: 'entertainment_bar',
-        name: '酒吧',
-        emoji: '🍸',
-        color: Color(0xFFF8F1FF),
-        kind: LedgerKind.expense,
-      ),
-      LedgerCategory(
-        id: 'entertainment_travel',
-        name: '旅游',
-        emoji: '🧳',
-        color: Color(0xFFEAF7FF),
+        id: 'entertainment_books',
+        name: '书籍',
+        emoji: '📚',
+        color: Color(0xFFEAF1FF),
         kind: LedgerKind.expense,
       ),
       LedgerCategory(
@@ -930,10 +1011,31 @@ const _expenseCategoryGroups = [
         kind: LedgerKind.expense,
       ),
       LedgerCategory(
-        id: 'entertainment_books',
-        name: '书籍',
-        emoji: '📚',
-        color: Color(0xFFEAF1FF),
+        id: 'entertainment_travel',
+        name: '旅游',
+        emoji: '🧳',
+        color: Color(0xFFEAF7FF),
+        kind: LedgerKind.expense,
+      ),
+      LedgerCategory(
+        id: 'entertainment_game',
+        name: '游戏',
+        emoji: '🎮',
+        color: Color(0xFFEFF1FF),
+        kind: LedgerKind.expense,
+      ),
+      LedgerCategory(
+        id: 'entertainment_movie',
+        name: '电影',
+        emoji: '🎬',
+        color: Color(0xFFFFF0F7),
+        kind: LedgerKind.expense,
+      ),
+      LedgerCategory(
+        id: 'entertainment_bar',
+        name: '酒吧',
+        emoji: '🍸',
+        color: Color(0xFFF8F1FF),
         kind: LedgerKind.expense,
       ),
       LedgerCategory(
@@ -955,17 +1057,17 @@ const _expenseCategoryGroups = [
   LedgerCategoryGroup(
     primary: LedgerCategory(
       id: 'social',
-      name: '社交',
+      name: '人情社交',
       emoji: '🤝',
       color: Color(0xFFFFF1EB),
       kind: LedgerKind.expense,
     ),
     children: [
       LedgerCategory(
-        id: 'social_red_packet',
-        name: '红包',
-        emoji: '🧧',
-        color: Color(0xFFFFEFEF),
+        id: 'social_love',
+        name: '恋爱',
+        emoji: '💗',
+        color: Color(0xFFFFEEF8),
         kind: LedgerKind.expense,
       ),
       LedgerCategory(
@@ -976,10 +1078,10 @@ const _expenseCategoryGroups = [
         kind: LedgerKind.expense,
       ),
       LedgerCategory(
-        id: 'social_treat',
-        name: '请客',
-        emoji: '🍽️',
-        color: Color(0xFFFFF1E6),
+        id: 'social_red_packet',
+        name: '红包',
+        emoji: '🧧',
+        color: Color(0xFFFFEFEF),
         kind: LedgerKind.expense,
       ),
       LedgerCategory(
@@ -990,10 +1092,10 @@ const _expenseCategoryGroups = [
         kind: LedgerKind.expense,
       ),
       LedgerCategory(
-        id: 'social_love',
-        name: '恋爱',
-        emoji: '💗',
-        color: Color(0xFFFFEEF8),
+        id: 'social_treat',
+        name: '请客',
+        emoji: '🍽️',
+        color: Color(0xFFFFF1E6),
         kind: LedgerKind.expense,
       ),
       LedgerCategory(
@@ -1007,27 +1109,196 @@ const _expenseCategoryGroups = [
   ),
   LedgerCategoryGroup(
     primary: LedgerCategory(
+      id: 'baby',
+      name: '母婴用品',
+      emoji: '🍼',
+      color: Color(0xFFFFEEF4),
+      kind: LedgerKind.expense,
+    ),
+    children: [
+      LedgerCategory(
+        id: 'baby_feeding_bottle',
+        name: '奶瓶喂养',
+        emoji: '🍼',
+        color: Color(0xFFEAF7FF),
+        kind: LedgerKind.expense,
+      ),
+      LedgerCategory(
+        id: 'baby_formula',
+        name: '奶粉辅食',
+        emoji: '🥣',
+        color: Color(0xFFFFF4E6),
+        kind: LedgerKind.expense,
+      ),
+      LedgerCategory(
+        id: 'baby_wash',
+        name: '婴儿洗护',
+        emoji: '🧴',
+        color: Color(0xFFF4F8FF),
+        kind: LedgerKind.expense,
+      ),
+      LedgerCategory(
+        id: 'baby_maternity',
+        name: '孕产护理',
+        emoji: '🤰',
+        color: Color(0xFFFFEEF4),
+        kind: LedgerKind.expense,
+      ),
+      LedgerCategory(
+        id: 'baby_diapers',
+        name: '尿裤湿巾',
+        emoji: '🧻',
+        color: Color(0xFFF4F8FF),
+        kind: LedgerKind.expense,
+      ),
+      LedgerCategory(
+        id: 'baby_stroller',
+        name: '推车座椅',
+        emoji: '🛒',
+        color: Color(0xFFEAF7FF),
+        kind: LedgerKind.expense,
+      ),
+      LedgerCategory(
+        id: 'baby_early_learning',
+        name: '早教启蒙',
+        emoji: '🧸',
+        color: Color(0xFFFFF4E6),
+        kind: LedgerKind.expense,
+      ),
+      LedgerCategory(
+        id: 'baby_toys_books',
+        name: '玩具绘本',
+        emoji: '🧸',
+        color: Color(0xFFF8F1FF),
+        kind: LedgerKind.expense,
+      ),
+      LedgerCategory(
+        id: 'baby_vaccine',
+        name: '疫苗体检',
+        emoji: '💉',
+        color: Color(0xFFEAF8F2),
+        kind: LedgerKind.expense,
+      ),
+      LedgerCategory(
+        id: 'baby_clothing',
+        name: '童装鞋帽',
+        emoji: '👕',
+        color: Color(0xFFF1F4FF),
+        kind: LedgerKind.expense,
+      ),
+      LedgerCategory(
+        id: 'baby_other',
+        name: '其他',
+        emoji: '🍼',
+        color: Color(0xFFFFEEF4),
+        kind: LedgerKind.expense,
+      ),
+    ],
+  ),
+  LedgerCategoryGroup(
+    primary: LedgerCategory(
+      id: 'hobby',
+      name: '兴趣爱好',
+      emoji: '🎨',
+      color: Color(0xFFF0F3FF),
+      kind: LedgerKind.expense,
+    ),
+    children: [
+      LedgerCategory(
+        id: 'hobby_music',
+        name: '乐器',
+        emoji: '🎸',
+        color: Color(0xFFFFF7E8),
+        kind: LedgerKind.expense,
+      ),
+      LedgerCategory(
+        id: 'hobby_general',
+        name: '兴趣爱好',
+        emoji: '🎨',
+        color: Color(0xFFF0F3FF),
+        kind: LedgerKind.expense,
+      ),
+      LedgerCategory(
+        id: 'hobby_gardening',
+        name: '园艺绿植',
+        emoji: '🪴',
+        color: Color(0xFFEAF8EF),
+        kind: LedgerKind.expense,
+      ),
+      LedgerCategory(
+        id: 'hobby_camping',
+        name: '户外露营',
+        emoji: '⛺',
+        color: Color(0xFFFFF4E6),
+        kind: LedgerKind.expense,
+      ),
+      LedgerCategory(
+        id: 'hobby_photo',
+        name: '摄影',
+        emoji: '📷',
+        color: Color(0xFFFFF4E6),
+        kind: LedgerKind.expense,
+      ),
+      LedgerCategory(
+        id: 'hobby_model',
+        name: '模型拼装',
+        emoji: '🧩',
+        color: Color(0xFFEFF1FF),
+        kind: LedgerKind.expense,
+      ),
+      LedgerCategory(
+        id: 'hobby_game_merch',
+        name: '游戏周边',
+        emoji: '🎮',
+        color: Color(0xFFEFF1FF),
+        kind: LedgerKind.expense,
+      ),
+      LedgerCategory(
+        id: 'hobby_baking',
+        name: '烘焙料理',
+        emoji: '🧁',
+        color: Color(0xFFFFF1E6),
+        kind: LedgerKind.expense,
+      ),
+      LedgerCategory(
+        id: 'hobby_art',
+        name: '绘画手工',
+        emoji: '🎨',
+        color: Color(0xFFF8F1FF),
+        kind: LedgerKind.expense,
+      ),
+      LedgerCategory(
+        id: 'hobby_sports',
+        name: '运动球类',
+        emoji: '🏀',
+        color: Color(0xFFEAF8EF),
+        kind: LedgerKind.expense,
+      ),
+      LedgerCategory(
+        id: 'hobby_reading',
+        name: '阅读收藏',
+        emoji: '📚',
+        color: Color(0xFFEAF1FF),
+        kind: LedgerKind.expense,
+      ),
+      LedgerCategory(
+        id: 'hobby_other',
+        name: '其他',
+        emoji: '🎨',
+        color: Color(0xFFF0F3FF),
+        kind: LedgerKind.expense,
+      ),
+    ],
+  ),
+  LedgerCategoryGroup(
+    primary: LedgerCategory(
       id: 'pet',
-      name: '宠物',
+      name: '宠物相关',
       emoji: '🐱',
       color: Color(0xFFFFF0F0),
       kind: LedgerKind.expense,
     ),
     children: [
-      LedgerCategory(
-        id: 'pet_dog_food',
-        name: '狗粮',
-        emoji: '🐶',
-        color: Color(0xFFFFF4E6),
-        kind: LedgerKind.expense,
-      ),
-      LedgerCategory(
-        id: 'pet_cat_food',
-        name: '猫粮',
-        emoji: '🐱',
-        color: Color(0xFFEAF7FF),
-        kind: LedgerKind.expense,
-      ),
       LedgerCategory(
         id: 'pet_medical',
         name: '医疗',
@@ -1040,6 +1311,20 @@ const _expenseCategoryGroups = [
         name: '洗护',
         emoji: '🧴',
         color: Color(0xFFF4F8FF),
+        kind: LedgerKind.expense,
+      ),
+      LedgerCategory(
+        id: 'pet_dog_food',
+        name: '狗粮',
+        emoji: '🐶',
+        color: Color(0xFFFFF4E6),
+        kind: LedgerKind.expense,
+      ),
+      LedgerCategory(
+        id: 'pet_cat_food',
+        name: '猫粮',
+        emoji: '🐱',
+        color: Color(0xFFEAF7FF),
         kind: LedgerKind.expense,
       ),
       LedgerCategory(
@@ -1060,8 +1345,8 @@ const _expenseCategoryGroups = [
   ),
   LedgerCategoryGroup(
     primary: LedgerCategory(
-      id: 'custom_expense',
-      name: '自定义',
+      id: 'other_expense',
+      name: '其他',
       emoji: '➕',
       color: Color(0xFFEAF5FF),
       kind: LedgerKind.expense,
@@ -1162,6 +1447,142 @@ const _incomeCategories = [
 ];
 
 List<LedgerCategory> get defaultExpenseLedgerCategories => _expenseCategories;
+
+const _bookkeepingIconBase = 'assets/bookkeeping_icons';
+const _ledgerCategoryIconAssets = <String, String>{
+  'food': '$_bookkeepingIconBase/food.png',
+  'food_breakfast': '$_bookkeepingIconBase/food_breakfast.png',
+  'food_lunch': '$_bookkeepingIconBase/food_lunch.png',
+  'food_dinner': '$_bookkeepingIconBase/food_dinner.png',
+  'food_coffee': '$_bookkeepingIconBase/food_coffee.png',
+  'food_milk_tea': '$_bookkeepingIconBase/food_milk_tea.png',
+  'food_street_snack': '$_bookkeepingIconBase/food_street_snack.png',
+  'food_snack': '$_bookkeepingIconBase/food_snack.png',
+  'food_takeout': '$_bookkeepingIconBase/food_takeout.png',
+  'food_gathering': '$_bookkeepingIconBase/food_gathering.png',
+  'food_groceries': '$_bookkeepingIconBase/food_groceries.png',
+  'food_fruit': '$_bookkeepingIconBase/food_fruit.png',
+  'food_other': '$_bookkeepingIconBase/food_other.png',
+  'traffic': '$_bookkeepingIconBase/traffic.png',
+  'traffic_taxi': '$_bookkeepingIconBase/traffic_taxi.png',
+  'traffic_bus': '$_bookkeepingIconBase/traffic_bus.png',
+  'traffic_subway': '$_bookkeepingIconBase/traffic_subway.png',
+  'traffic_fuel': '$_bookkeepingIconBase/traffic_fuel.png',
+  'traffic_parking': '$_bookkeepingIconBase/traffic_parking.png',
+  'traffic_toll': '$_bookkeepingIconBase/traffic_toll.png',
+  'traffic_train': '$_bookkeepingIconBase/traffic_train.png',
+  'traffic_flight': '$_bookkeepingIconBase/traffic_flight.png',
+  'traffic_bike': '$_bookkeepingIconBase/traffic_bike.png',
+  'traffic_other': '$_bookkeepingIconBase/traffic_other.png',
+  'shopping': '$_bookkeepingIconBase/shopping.png',
+  'shopping_daily': '$_bookkeepingIconBase/shopping_daily.png',
+  'shopping_learning': '$_bookkeepingIconBase/shopping_learning.png',
+  'shopping_clothing': '$_bookkeepingIconBase/shopping_clothing.png',
+  'shopping_digital': '$_bookkeepingIconBase/shopping_digital.png',
+  'shopping_home': '$_bookkeepingIconBase/shopping_home.png',
+  'shopping_online': '$_bookkeepingIconBase/shopping_online.png',
+  'shopping_gift': '$_bookkeepingIconBase/shopping_gift.png',
+  'shopping_beauty': '$_bookkeepingIconBase/shopping_beauty.png',
+  'shopping_other': '$_bookkeepingIconBase/shopping_other.png',
+  'life': '$_bookkeepingIconBase/life.png',
+  'life_rent': '$_bookkeepingIconBase/life_rent.png',
+  'life_property': '$_bookkeepingIconBase/life_property.png',
+  'life_water': '$_bookkeepingIconBase/life_water.png',
+  'life_electricity': '$_bookkeepingIconBase/life_electricity.png',
+  'life_gas': '$_bookkeepingIconBase/life_gas.png',
+  'life_broadband': '$_bookkeepingIconBase/life_broadband.png',
+  'life_housekeeping': '$_bookkeepingIconBase/life_housekeeping.png',
+  'life_repair': '$_bookkeepingIconBase/life_repair.png',
+  'life_other': '$_bookkeepingIconBase/life_other.png',
+  'medical': '$_bookkeepingIconBase/medical.png',
+  'medical_hospital': '$_bookkeepingIconBase/medical_hospital.png',
+  'medical_medicine': '$_bookkeepingIconBase/medical_medicine.png',
+  'medical_checkup': '$_bookkeepingIconBase/medical_checkup.png',
+  'medical_insurance': '$_bookkeepingIconBase/medical_insurance.png',
+  'medical_fitness': '$_bookkeepingIconBase/medical_fitness.png',
+  'medical_running': '$_bookkeepingIconBase/medical_running.png',
+  'medical_other': '$_bookkeepingIconBase/medical_other.png',
+  'education': '$_bookkeepingIconBase/education.png',
+  'education_books': '$_bookkeepingIconBase/education_books.png',
+  'education_software': '$_bookkeepingIconBase/education_software.png',
+  'education_misc': '$_bookkeepingIconBase/education_misc.png',
+  'education_training': '$_bookkeepingIconBase/education_training.png',
+  'education_printing': '$_bookkeepingIconBase/education_printing.png',
+  'education_stationery': '$_bookkeepingIconBase/education_stationery.png',
+  'education_devices': '$_bookkeepingIconBase/education_devices.png',
+  'education_language': '$_bookkeepingIconBase/education_language.png',
+  'education_online': '$_bookkeepingIconBase/education_online.png',
+  'education_exam': '$_bookkeepingIconBase/education_exam.png',
+  'education_other': '$_bookkeepingIconBase/education_other.png',
+  'entertainment': '$_bookkeepingIconBase/entertainment.png',
+  'entertainment_movie': '$_bookkeepingIconBase/entertainment_movie.png',
+  'entertainment_game': '$_bookkeepingIconBase/entertainment_game.png',
+  'entertainment_ktv': '$_bookkeepingIconBase/entertainment_ktv.png',
+  'entertainment_bar': '$_bookkeepingIconBase/entertainment_bar.png',
+  'entertainment_travel': '$_bookkeepingIconBase/entertainment_travel.png',
+  'entertainment_photo': '$_bookkeepingIconBase/entertainment_photo.png',
+  'entertainment_books': '$_bookkeepingIconBase/entertainment_books.png',
+  'entertainment_music': '$_bookkeepingIconBase/entertainment_music.png',
+  'entertainment_other': '$_bookkeepingIconBase/entertainment_other.png',
+  'social': '$_bookkeepingIconBase/social.png',
+  'social_red_packet': '$_bookkeepingIconBase/social_red_packet.png',
+  'social_cash_gift': '$_bookkeepingIconBase/social_cash_gift.png',
+  'social_treat': '$_bookkeepingIconBase/social_treat.png',
+  'social_party': '$_bookkeepingIconBase/social_party.png',
+  'social_love': '$_bookkeepingIconBase/social_love.png',
+  'social_other': '$_bookkeepingIconBase/social_other.png',
+  'baby': '$_bookkeepingIconBase/baby.png',
+  'baby_feeding_bottle': '$_bookkeepingIconBase/baby_feeding_bottle.png',
+  'baby_formula': '$_bookkeepingIconBase/baby_formula.png',
+  'baby_wash': '$_bookkeepingIconBase/baby_wash.png',
+  'baby_maternity': '$_bookkeepingIconBase/baby_maternity.png',
+  'baby_diapers': '$_bookkeepingIconBase/baby_diapers.png',
+  'baby_stroller': '$_bookkeepingIconBase/baby_stroller.png',
+  'baby_early_learning': '$_bookkeepingIconBase/baby_early_learning.png',
+  'baby_toys_books': '$_bookkeepingIconBase/baby_toys_books.png',
+  'baby_vaccine': '$_bookkeepingIconBase/baby_vaccine.png',
+  'baby_clothing': '$_bookkeepingIconBase/baby_clothing.png',
+  'baby_other': '$_bookkeepingIconBase/baby_other.png',
+  'hobby': '$_bookkeepingIconBase/hobby.png',
+  'hobby_music': '$_bookkeepingIconBase/hobby_music.png',
+  'hobby_general': '$_bookkeepingIconBase/hobby_general.png',
+  'hobby_gardening': '$_bookkeepingIconBase/hobby_gardening.png',
+  'hobby_camping': '$_bookkeepingIconBase/hobby_camping.png',
+  'hobby_photo': '$_bookkeepingIconBase/hobby_photo.png',
+  'hobby_model': '$_bookkeepingIconBase/hobby_model.png',
+  'hobby_game_merch': '$_bookkeepingIconBase/hobby_game_merch.png',
+  'hobby_baking': '$_bookkeepingIconBase/hobby_baking.png',
+  'hobby_art': '$_bookkeepingIconBase/hobby_art.png',
+  'hobby_sports': '$_bookkeepingIconBase/hobby_sports.png',
+  'hobby_reading': '$_bookkeepingIconBase/hobby_reading.png',
+  'hobby_other': '$_bookkeepingIconBase/hobby_other.png',
+  'pet': '$_bookkeepingIconBase/pet.png',
+  'pet_dog_food': '$_bookkeepingIconBase/pet_dog_food.png',
+  'pet_cat_food': '$_bookkeepingIconBase/pet_cat_food.png',
+  'pet_medical': '$_bookkeepingIconBase/pet_medical.png',
+  'pet_grooming': '$_bookkeepingIconBase/pet_grooming.png',
+  'pet_toy': '$_bookkeepingIconBase/pet_toy.png',
+  'pet_other': '$_bookkeepingIconBase/pet_other.png',
+  'other_expense': '$_bookkeepingIconBase/other_expense.png',
+  'salary': '$_bookkeepingIconBase/salary.png',
+  'bonus': '$_bookkeepingIconBase/bonus.png',
+  'part_time': '$_bookkeepingIconBase/part_time.png',
+  'investment_income': '$_bookkeepingIconBase/investment_income.png',
+  'stock': '$_bookkeepingIconBase/stock.png',
+  'fund': '$_bookkeepingIconBase/fund.png',
+  'interest': '$_bookkeepingIconBase/interest.png',
+  'rent_income': '$_bookkeepingIconBase/rent_income.png',
+  'refund': '$_bookkeepingIconBase/refund.png',
+  'red_packet_income': '$_bookkeepingIconBase/red_packet_income.png',
+  'other_income': '$_bookkeepingIconBase/other_income.png',
+};
+
+String? _ledgerIconAssetForCategory(LedgerCategory category) {
+  return _ledgerCategoryIconAssets[category.id] ??
+      (category.kind == LedgerKind.income
+          ? _ledgerCategoryIconAssets['other_income']
+          : _ledgerCategoryIconAssets['other_expense']);
+}
 
 LedgerCategory findDefaultLedgerCategory(String name) => _findCategory(name);
 
@@ -2671,6 +3092,7 @@ class _StatsView extends StatelessWidget {
     }
     final grouped = <String, double>{};
     final emojis = <String, String>{};
+    final rowCategories = <String, LedgerCategory>{};
     for (final item in entries.where((e) => e.kind == LedgerKind.expense)) {
       final key = selectedCategory == null
           ? _ledgerPrimaryName(item)
@@ -2679,6 +3101,9 @@ class _StatsView extends StatelessWidget {
       emojis[key] = selectedCategory == null
           ? _findCategory(key).emoji
           : _resolvedLedgerEmoji(item);
+      rowCategories[key] = selectedCategory == null
+          ? _findCategory(key)
+          : _ledgerCategoryForEntry(item);
     }
     final rows = grouped.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
@@ -2708,7 +3133,7 @@ class _StatsView extends StatelessWidget {
         ),
         const SizedBox(height: 22),
         ...rows.map((row) {
-          final cat = _findCategory(row.key);
+          final cat = rowCategories[row.key] ?? _findCategory(row.key);
           final pct = expense == 0 ? 0.0 : row.value / expense * 100;
           return _StatCategoryRow(
             label: row.key,
@@ -3287,10 +3712,76 @@ class _CategoryIcon extends StatelessWidget {
         ),
       ),
       child: Center(
-        child: Text(
-          emoji ?? category.emoji,
-          style: TextStyle(fontSize: size * 0.36),
+        child: _LedgerIconImage(
+          category: category,
+          size: size * 0.72,
+          emoji: emoji,
         ),
+      ),
+    );
+  }
+}
+
+class _LedgerIconImage extends StatelessWidget {
+  final LedgerCategory category;
+  final double size;
+  final String? emoji;
+  final bool dimmed;
+
+  const _LedgerIconImage({
+    required this.category,
+    required this.size,
+    this.emoji,
+    this.dimmed = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final asset = _ledgerIconAssetForCategory(category);
+    final fallback = Text(
+      emoji ?? category.emoji,
+      style: TextStyle(fontSize: size * 0.5),
+    );
+    final child = asset == null
+        ? fallback
+        : ClipRRect(
+            borderRadius: BorderRadius.circular(size * 0.18),
+            child: Image.asset(
+              asset,
+              width: size,
+              height: size,
+              fit: BoxFit.contain,
+              filterQuality: FilterQuality.high,
+              errorBuilder: (_, _, _) => fallback,
+            ),
+          );
+    if (!dimmed) return child;
+    return Opacity(
+      opacity: 0.38,
+      child: ColorFiltered(
+        colorFilter: const ColorFilter.matrix(<double>[
+          0.2126,
+          0.7152,
+          0.0722,
+          0,
+          0,
+          0.2126,
+          0.7152,
+          0.0722,
+          0,
+          0,
+          0.2126,
+          0.7152,
+          0.0722,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+        ]),
+        child: child,
       ),
     );
   }
@@ -3640,13 +4131,16 @@ class _AddLedgerPageState extends State<_AddLedgerPage>
     if (RegExp('打车|滴滴|出租|网约车').hasMatch(text)) return _findCategory('打车');
     if (RegExp('午餐|午饭').hasMatch(text)) return _findCategory('午餐');
     if (RegExp('晚餐|晚饭|夜宵').hasMatch(text)) return _findCategory('晚餐');
-    if (RegExp('买菜|菜场|蔬菜|水果').hasMatch(text)) return _findCategory('买菜');
+    if (RegExp('水果').hasMatch(text)) return _findCategory('水果');
+    if (RegExp('买菜|菜场|蔬菜').hasMatch(text)) return _findCategory('买菜');
     if (RegExp('聚餐|请吃饭').hasMatch(text)) return _findCategory('聚餐');
     if (RegExp('零食|饮料').hasMatch(text)) return _findCategory('零食');
-    if (RegExp('饭|餐|食堂|餐厅').hasMatch(text)) return _findCategory('三餐');
+    if (RegExp('小吃|早点|夜市').hasMatch(text)) return _findCategory('小吃');
+    if (RegExp('饭|餐|食堂|餐厅').hasMatch(text)) return _findCategory('餐饮零食');
     if (RegExp('超市|商场|淘宝|京东|拼多多|购物').hasMatch(text)) {
-      return _findCategory('购物');
+      return _findCategory('购物消费');
     }
+    if (RegExp('学习用品|文具').hasMatch(text)) return _findCategory('学习用品');
     if (RegExp('日用品|纸巾|洗衣液').hasMatch(text)) return _findCategory('日用品');
     if (RegExp('衣服|鞋|裤|帽|服饰').hasMatch(text)) return _findCategory('衣服鞋帽');
     if (RegExp('手机|电脑|耳机|数码|软件|订阅').hasMatch(text)) {
@@ -3675,13 +4169,35 @@ class _AddLedgerPageState extends State<_AddLedgerPage>
     if (RegExp('酒吧').hasMatch(text)) return _findCategory('酒吧');
     if (RegExp('旅游|旅行|酒店|民宿|门票').hasMatch(text)) return _findCategory('旅游');
     if (RegExp('摄影|相机').hasMatch(text)) return _findCategory('摄影');
-    if (RegExp('书|课程|学习|培训').hasMatch(text)) return _findCategory('书籍');
+    if (RegExp('书籍教材|教材').hasMatch(text)) return _findCategory('书籍教材');
+    if (RegExp('学习软件').hasMatch(text)) return _findCategory('学习软件');
+    if (RegExp('学杂费').hasMatch(text)) return _findCategory('学杂费');
+    if (RegExp('课程|学习|培训|学费').hasMatch(text)) return _findCategory('学费培训');
+    if (RegExp('打印|复印').hasMatch(text)) return _findCategory('打印复印');
+    if (RegExp('网课|订阅课').hasMatch(text)) return _findCategory('网课订阅');
+    if (RegExp('考试|认证').hasMatch(text)) return _findCategory('考试认证');
+    if (RegExp('书').hasMatch(text)) return _findCategory('书籍');
     if (RegExp('音乐|会员').hasMatch(text)) return _findCategory('音乐');
     if (RegExp('红包').hasMatch(text)) return _findCategory('红包');
     if (RegExp('礼金').hasMatch(text)) return _findCategory('礼金');
     if (RegExp('请客').hasMatch(text)) return _findCategory('请客');
     if (RegExp('聚会').hasMatch(text)) return _findCategory('聚会');
     if (RegExp('恋爱|约会').hasMatch(text)) return _findCategory('恋爱');
+    if (RegExp('奶瓶|喂养').hasMatch(text)) return _findCategory('奶瓶喂养');
+    if (RegExp('奶粉|辅食').hasMatch(text)) return _findCategory('奶粉辅食');
+    if (RegExp('尿裤|湿巾').hasMatch(text)) return _findCategory('尿裤湿巾');
+    if (RegExp('孕产|产检').hasMatch(text)) return _findCategory('孕产护理');
+    if (RegExp('早教|启蒙').hasMatch(text)) return _findCategory('早教启蒙');
+    if (RegExp('童装|童鞋').hasMatch(text)) return _findCategory('童装鞋帽');
+    if (RegExp('母婴|宝宝|婴儿').hasMatch(text)) return _findCategory('母婴用品');
+    if (RegExp('乐器|吉他|钢琴').hasMatch(text)) return _findCategory('乐器');
+    if (RegExp('园艺|绿植|花盆').hasMatch(text)) return _findCategory('园艺绿植');
+    if (RegExp('露营|户外').hasMatch(text)) return _findCategory('户外露营');
+    if (RegExp('模型|拼装').hasMatch(text)) return _findCategory('模型拼装');
+    if (RegExp('手工|绘画').hasMatch(text)) return _findCategory('绘画手工');
+    if (RegExp('篮球|足球|羽毛球|球拍').hasMatch(text)) return _findCategory('运动球类');
+    if (RegExp('收藏').hasMatch(text)) return _findCategory('阅读收藏');
+    if (RegExp('兴趣|爱好').hasMatch(text)) return _findCategory('兴趣爱好');
     if (RegExp('狗粮').hasMatch(text)) return _findCategory('狗粮');
     if (RegExp('猫粮').hasMatch(text)) return _findCategory('猫粮');
     if (RegExp('宠物').hasMatch(text)) return _findCategory('宠物');
@@ -3895,74 +4411,37 @@ class _AddLedgerPageState extends State<_AddLedgerPage>
 
   Widget _buildExpenseCategoryPicker() {
     final parent = _expenseParent;
-    if (parent == null) {
-      return _buildFlatCategoryWrap(
-        categories: _expensePrimaryCategories,
-        includeAddTile: false,
-        onCategoryTap: (cat) {
-          setState(() {
-            _expenseParent = cat;
-            _category = cat;
-            _showAllCategories = false;
-          });
-        },
-      );
-    }
-
-    final group = _expenseCategoryGroups.firstWhere(
-      (item) => item.primary.id == parent.id,
-      orElse: () => _expenseCategoryGroups.last,
-    );
-    final subCategories = parent.id == _customExpensePrimaryCategory.id
-        ? _customCategories
-              .where((item) => item.kind == LedgerKind.expense)
-              .toList()
-        : group.children;
-
+    final group = parent == null
+        ? null
+        : _expenseCategoryGroups.firstWhere(
+            (item) => item.primary.id == parent.id,
+            orElse: () => _expenseCategoryGroups.last,
+          );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            AppIconTapButton(
-              tooltip: '返回大分类',
-              onPressed: () => setState(() => _expenseParent = null),
-              icon: Icons.arrow_back_ios_new_rounded,
-              size: 38,
-              iconSize: 17,
-              backgroundColor: Theme.of(context).colorScheme.appSurface,
-              foregroundColor: Theme.of(context).colorScheme.appText,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                '${parent.name} 小分类',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w900,
-                  color: Theme.of(context).colorScheme.appText,
-                ),
-              ),
-            ),
-            Text(
-              '可不选',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-                color: Theme.of(context).colorScheme.appMutedText,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
         _buildFlatCategoryWrap(
-          categories: [parent, ...subCategories],
-          includeAddTile: parent.id == _customExpensePrimaryCategory.id,
-          labelFor: (cat) => cat.id == parent.id ? '不选小类' : cat.name,
-          onCategoryTap: (cat) => setState(() => _category = cat),
+          categories: _expensePrimaryCategories,
+          includeAddTile: false,
+          selectedFor: (cat) => parent?.id == cat.id,
+          dimmedFor: (cat) => parent != null && parent.id != cat.id,
+          onCategoryTap: (cat) {
+            setState(() {
+              _expenseParent = cat;
+              _category = cat;
+              _showAllCategories = false;
+            });
+          },
         ),
+        if (group != null && group.children.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          _buildFlatCategoryWrap(
+            categories: [group.primary, ...group.children],
+            includeAddTile: false,
+            labelFor: (cat) => cat.id == group.primary.id ? '不选' : cat.name,
+            onCategoryTap: (cat) => setState(() => _category = cat),
+          ),
+        ],
       ],
     );
   }
@@ -3971,6 +4450,8 @@ class _AddLedgerPageState extends State<_AddLedgerPage>
     required List<LedgerCategory> categories,
     required bool includeAddTile,
     String Function(LedgerCategory category)? labelFor,
+    bool Function(LedgerCategory category)? selectedFor,
+    bool Function(LedgerCategory category)? dimmedFor,
     ValueChanged<LedgerCategory>? onCategoryTap,
   }) {
     return LayoutBuilder(
@@ -3983,7 +4464,7 @@ class _AddLedgerPageState extends State<_AddLedgerPage>
             : 7;
         final rawWidth =
             (constraints.maxWidth - spacing * (columns - 1)) / columns;
-        final tileWidth = rawWidth.clamp(54.0, 72.0);
+        final tileWidth = rawWidth.clamp(50.0, 64.0);
         final defaultSlots = columns * 3;
         final hasHiddenItems = categories.length + 1 > defaultSlots;
         final visibleCategoryCount = _showAllCategories || !hasHiddenItems
@@ -3995,12 +4476,13 @@ class _AddLedgerPageState extends State<_AddLedgerPage>
           runSpacing: spacing,
           children: [
             ...visibleCats.map((cat) {
-              final selected = cat.id == _category.id;
+              final selected = selectedFor?.call(cat) ?? cat.id == _category.id;
               return _CategoryPickTile(
                 width: tileWidth,
                 category: cat,
                 label: labelFor?.call(cat),
                 selected: selected,
+                dimmed: dimmedFor?.call(cat) ?? false,
                 onTap: () => onCategoryTap == null
                     ? setState(() => _category = cat)
                     : onCategoryTap(cat),
@@ -4280,6 +4762,7 @@ class _CategoryPickTile extends StatelessWidget {
   final LedgerCategory category;
   final String? label;
   final bool selected;
+  final bool dimmed;
   final VoidCallback onTap;
 
   const _CategoryPickTile({
@@ -4287,6 +4770,7 @@ class _CategoryPickTile extends StatelessWidget {
     required this.category,
     this.label,
     required this.selected,
+    this.dimmed = false,
     required this.onTap,
   });
 
@@ -4298,7 +4782,7 @@ class _CategoryPickTile extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 160),
         width: width,
-        padding: EdgeInsets.symmetric(vertical: width < 72 ? 8 : 10),
+        padding: EdgeInsets.symmetric(vertical: width < 64 ? 7 : 8),
         decoration: BoxDecoration(
           color: selected
               ? Color.alphaBlend(
@@ -4316,9 +4800,10 @@ class _CategoryPickTile extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              category.emoji,
-              style: TextStyle(fontSize: (width * 0.29).clamp(17.0, 22.0)),
+            _LedgerIconImage(
+              category: category,
+              size: (width * 0.44).clamp(24.0, 32.0),
+              dimmed: dimmed,
             ),
             const SizedBox(height: 3),
             Text(
@@ -4329,7 +4814,7 @@ class _CategoryPickTile extends StatelessWidget {
                 fontFamily: 'PingFang SC',
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
-                color: scheme.appText,
+                color: dimmed ? scheme.appMutedText : scheme.appText,
               ),
             ),
           ],
@@ -4939,16 +5424,41 @@ class _DonutChartPainter extends CustomPainter {
 }
 
 const _ledgerCategoryAliasIds = <String, String>{
-  '交通出行': 'traffic',
-  '购物消费': 'shopping',
-  '居家生活': 'life',
-  '健康医疗': 'medical',
-  '娱乐休闲': 'entertainment',
-  '人情社交': 'social',
-  '咖啡茶饮': 'food_coffee',
+  '餐饮': 'food',
+  '三餐': 'food',
+  'food_meals': 'food',
+  '餐饮零食': 'food',
+  '小吃': 'food_street_snack',
+  '水果': 'food_fruit',
   '蔬菜': 'food_groceries',
-  '水果': 'food_groceries',
+  '咖啡茶饮': 'food_coffee',
+  '交通': 'traffic',
+  '交通出行': 'traffic',
+  '购物': 'shopping',
+  '购物消费': 'shopping',
+  '生活': 'life',
+  '居家生活': 'life',
+  '医疗': 'medical',
+  '健康医疗': 'medical',
+  '教育': 'education',
+  '学习': 'education',
+  '教育学习': 'education',
+  '娱乐': 'entertainment',
+  '娱乐休闲': 'entertainment',
+  '社交': 'social',
+  '人情社交': 'social',
+  '母婴': 'baby',
+  '母婴用品': 'baby',
+  '兴趣': 'hobby',
+  '兴趣爱好': 'hobby',
+  '宠物': 'pet',
+  '宠物相关': 'pet',
+  '自定义': 'other_expense',
+  'custom_expense': 'other_expense',
+  '未识别': 'other_expense',
+  '其他': 'other_expense',
   '日用': 'shopping_daily',
+  '学习用品': 'shopping_learning',
   '服饰': 'shopping_clothing',
   '衣服': 'shopping_clothing',
   '数码': 'shopping_digital',
@@ -4957,7 +5467,12 @@ const _ledgerCategoryAliasIds = <String, String>{
   '生活缴费': 'life_other',
   '水电燃气': 'life_other',
   '通讯': 'life_broadband',
-  '学习': 'entertainment_books',
+  '课程': 'education_training',
+  '培训': 'education_training',
+  '网课': 'education_online',
+  '考试': 'education_exam',
+  '认证': 'education_exam',
+  '书籍教材': 'education_books',
   '电影演出': 'entertainment_movie',
   '运动健身': 'medical_fitness',
   '旅行': 'entertainment_travel',
@@ -4965,19 +5480,29 @@ const _ledgerCategoryAliasIds = <String, String>{
   '礼物': 'shopping_gift',
   '汽车': 'traffic_other',
   '办公': 'shopping_daily',
-  '未识别': 'custom_expense',
-  '其他': 'custom_expense',
+  '奶粉': 'baby_formula',
+  '尿裤': 'baby_diapers',
+  '婴儿洗护': 'baby_wash',
+  '早教': 'baby_early_learning',
+  '绘本': 'baby_toys_books',
+  '乐器': 'hobby_music',
+  '园艺': 'hobby_gardening',
+  '露营': 'hobby_camping',
+  '模型': 'hobby_model',
+  '手工': 'hobby_art',
+  '球类': 'hobby_sports',
+  '阅读收藏': 'hobby_reading',
   '副业': 'part_time',
   '投资': 'investment_income',
   '理财收益': 'investment_income',
   '租金': 'rent_income',
   '红包收入': 'red_packet_income',
   '红包': 'social_red_packet',
-  '15': 'custom_expense',
-  '质': 'custom_expense',
-  '落茨': 'custom_expense',
-  '覃皇耆宁/】宁-星星抖首创业': 'custom_expense',
-  '彗享亘亡吾.{〉>"吏车】贾′用': 'custom_expense',
+  '15': 'other_expense',
+  '质': 'other_expense',
+  '落茨': 'other_expense',
+  '覃皇耆宁/】宁-星星抖首创业': 'other_expense',
+  '彗享亘亡吾.{〉>"吏车】贾′用': 'other_expense',
   '贺': 'shopping_gift',
 };
 
@@ -5154,7 +5679,7 @@ String _ledgerCategoryTitle(LedgerEntry entry) {
 }
 
 String _ledgerSubCategoryChartName(LedgerEntry entry) {
-  return _ledgerSecondaryName(entry) ?? '未选小类';
+  return _ledgerSecondaryName(entry) ?? _ledgerPrimaryName(entry);
 }
 
 LedgerCategory _ledgerCategoryForEntry(LedgerEntry entry) {
