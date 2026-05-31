@@ -1,5 +1,6 @@
 class AppAttachment {
-  static const maxSizeBytes = 20 * 1024 * 1024;
+  static const maxSizeBytes = 50 * 1024 * 1024;
+  static const maxSizeLabel = '50MB';
 
   final String id;
   final String ownerType;

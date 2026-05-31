@@ -865,7 +865,9 @@ class LocalDatasource {
     model_attachment.AppAttachment attachment,
   ) async {
     if (attachment.exceedsMaxSize) {
-      throw ArgumentError('附件不能超过 20MB');
+      throw ArgumentError(
+        '附件不能超过 ${model_attachment.AppAttachment.maxSizeLabel}',
+      );
     }
     if (_useFileFallback) {
       final attachments = await _readFallbackAttachments();

@@ -53,20 +53,10 @@ class NotesNotifier extends Notifier<List<QuickNote>> {
             changed = true;
             return note.copyWith(
               summary: _summaryOf(note.content),
-              noteType: !note.isAnalysis && looksLikeDiaryTitle(note.title)
-                  ? QuickNoteType.diary
-                  : note.noteType,
-              category: !note.isAnalysis && looksLikeDiaryTitle(note.title)
+              category: !note.isAnalysis && note.noteType == QuickNoteType.diary
                   ? '日记'
                   : note.category,
             );
-          }()
-        else if (!note.isAnalysis &&
-            note.noteType != QuickNoteType.diary &&
-            looksLikeDiaryTitle(note.title))
-          () {
-            changed = true;
-            return note.copyWith(noteType: QuickNoteType.diary, category: '日记');
           }()
         else
           note,
@@ -89,11 +79,13 @@ class NotesNotifier extends Notifier<List<QuickNote>> {
     required DateTime date,
     required List<Tag> tags,
     List<NoteAttachmentDraft> attachments = const [],
+    QuickNoteType? noteType,
   }) async {
     final now = DateTime.now();
     final noteId = initial?.id ?? const Uuid().v4();
     final inferredType =
         initial?.noteType ??
+        noteType ??
         (looksLikeDiaryTitle(title)
             ? QuickNoteType.diary
             : QuickNoteType.document);
@@ -101,10 +93,13 @@ class NotesNotifier extends Notifier<List<QuickNote>> {
     for (final draft in attachments) {
       final file = File(draft.path);
       if (!await file.exists()) continue;
-      final bytes = await file.readAsBytes();
-      if (bytes.length > AppAttachment.maxSizeBytes) {
-        throw ArgumentError('附件不能超过 20MB：${draft.fileName}');
+      final sizeBytes = await file.length();
+      if (sizeBytes > AppAttachment.maxSizeBytes) {
+        throw ArgumentError(
+          '附件不能超过 ${AppAttachment.maxSizeLabel}：${draft.fileName}',
+        );
       }
+      final bytes = await file.readAsBytes();
       final attachment = AppAttachment(
         id: const Uuid().v4(),
         ownerType: initial?.archived == true
@@ -151,7 +146,7 @@ class NotesNotifier extends Notifier<List<QuickNote>> {
               noteType: inferredType,
               category: initial?.isAnalysis == true
                   ? initial!.category
-                  : looksLikeDiaryTitle(title)
+                  : inferredType == QuickNoteType.diary
                   ? '日记'
                   : _inferCategory(title, content, tags),
               attachmentIds: attachmentIds,

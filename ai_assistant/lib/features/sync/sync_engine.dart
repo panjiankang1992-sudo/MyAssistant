@@ -391,7 +391,9 @@ class SyncEngine {
           } else if (dataType == 'attachment') {
             final attachment = AppAttachment.fromJson(envelope);
             if (attachment.exceedsMaxSize) {
-              throw StateError('附件超过 20MB：${attachment.fileName}');
+              throw StateError(
+                '附件超过 ${AppAttachment.maxSizeLabel}：${attachment.fileName}',
+              );
             }
             await _localDs.upsertAttachment(attachment);
           } else {
@@ -690,7 +692,10 @@ class SyncEngine {
               continue;
             }
             if (attachment.exceedsMaxSize) {
-              await _localSyncDs.markTaskError(task.id, '附件超过 20MB');
+              await _localSyncDs.markTaskError(
+                task.id,
+                '附件超过 ${AppAttachment.maxSizeLabel}',
+              );
               continue;
             }
             final path = _pathBuilder.buildDataFilePath(

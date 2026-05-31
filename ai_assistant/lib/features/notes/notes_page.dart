@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -117,10 +119,7 @@ String _serializeNoteContent(String text, List<_NoteBlock> blocks) {
         parts.add('[附件] ${block.title}\n${block.value}');
         break;
       case _NoteBlockType.snapshot:
-        final desc = block.description?.trim() ?? '';
-        parts.add(
-          '【网页快照】${block.title}\n${block.value}${desc.isEmpty ? '' : '\n$desc'}',
-        );
+        parts.add(_snapshotMarkup(block));
         break;
     }
   }
@@ -177,6 +176,12 @@ String? _mimeTypeForFileName(String fileName) {
   if (lower.endsWith('.txt')) return 'text/plain';
   if (lower.endsWith('.json')) return 'application/json';
   return null;
+}
+
+String _snapshotMarkup(_NoteBlock block) {
+  final desc = block.description?.trim() ?? '';
+  return '【网页快照】${block.title}\n'
+      '${block.value}${desc.isEmpty ? '' : '\n$desc'}';
 }
 
 String _plainNoteText(String raw) => _parseNoteContent(raw).text;
@@ -321,12 +326,15 @@ class _NotesPageState extends ConsumerState<NotesPage> {
   }
 
   void _openEditor([QuickNote? note, String? initialText]) {
+    final targetNoteType =
+        note?.noteType ?? _activeNoteType ?? QuickNoteType.document;
     Navigator.of(context).push(
       _notesSideRoute(
         _NoteEditorPage(
           initial: note,
           initialText: initialText,
           initialDate: DateTime.now(),
+          targetNoteType: targetNoteType,
           readOnly: note?.archived == true,
           onSave: (title, content, date, tags, attachments) {
             return ref
@@ -338,6 +346,7 @@ class _NotesPageState extends ConsumerState<NotesPage> {
                   date: date,
                   tags: tags,
                   attachments: attachments,
+                  noteType: targetNoteType,
                 );
           },
         ),
@@ -1508,6 +1517,7 @@ class _NoteEditorPage extends StatefulWidget {
   final QuickNote? initial;
   final String? initialText;
   final DateTime initialDate;
+  final QuickNoteType targetNoteType;
   final bool readOnly;
   final Future<void> Function(
     String title,
@@ -1521,6 +1531,7 @@ class _NoteEditorPage extends StatefulWidget {
     this.initial,
     this.initialText,
     required this.initialDate,
+    required this.targetNoteType,
     this.readOnly = false,
     required this.onSave,
   });
@@ -1537,10 +1548,12 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
   late List<Tag> _tags;
   late List<_NoteBlock> _blocks;
   final ScrollController _scrollController = ScrollController();
+  final FocusNode _editorFocusNode = FocusNode(debugLabel: 'note-editor');
   final GlobalKey _blocksPreviewKey = GlobalKey();
   _NoteInputMode _mode = _NoteInputMode.text;
   bool _loadingSnapshot = false;
   late bool _editing;
+  _NoteBlock? _selectedBlock;
   final List<List<Offset>> _strokes = [];
   List<Offset> _currentStroke = [];
 
@@ -1548,7 +1561,13 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
   void initState() {
     super.initState();
     final parsed = _parseNoteContent(widget.initial?.content ?? '');
-    _title = TextEditingController(text: widget.initial?.title ?? '');
+    _title = TextEditingController(
+      text:
+          widget.initial?.title ??
+          (widget.targetNoteType == QuickNoteType.diary
+              ? DateFormat('yyyy-MM-dd').format(widget.initialDate)
+              : ''),
+    );
     final initialText = widget.initial == null
         ? (widget.initialText?.trim() ?? '')
         : '';
@@ -1566,13 +1585,33 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
     _title.dispose();
     _content.dispose();
     _scrollController.dispose();
+    _editorFocusNode.dispose();
     super.dispose();
   }
 
-  void _appendContent(String text) {
+  void _insertContentAtCursor(String text) {
     if (!_editing || widget.readOnly) return;
-    final current = _content.text.trimRight();
-    _content.text = current.isEmpty ? text : '$current\n$text';
+    final value = _content.value;
+    final selection = value.selection;
+    final start = selection.isValid ? selection.start : value.text.length;
+    final end = selection.isValid ? selection.end : value.text.length;
+    final rangeStart = math.min(start, end).clamp(0, value.text.length).toInt();
+    final rangeEnd = math.max(start, end).clamp(0, value.text.length).toInt();
+    final before = value.text.substring(0, rangeStart);
+    final after = value.text.substring(rangeEnd);
+    final prefix = before.isEmpty || before.endsWith('\n') ? '' : '\n';
+    final suffix = after.isEmpty
+        ? '\n'
+        : after.startsWith('\n')
+        ? ''
+        : '\n';
+    final insertion = '$prefix$text\n$suffix';
+    final nextText = '$before$insertion$after';
+    final nextOffset = (before + insertion).length;
+    _content.value = TextEditingValue(
+      text: nextText,
+      selection: TextSelection.collapsed(offset: nextOffset),
+    );
   }
 
   Future<void> _insertImage() async {
@@ -1604,27 +1643,71 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
       final files = await AppFilePicker.pickFiles();
       if (files.isEmpty) return;
       if (!mounted) return;
-      _appendBlocks(
-        files
-            .map(
-              (file) => _NoteBlock(
-                type: _NoteBlockType.attachment,
-                title: file.name,
-                value: file.path,
-                sizeBytes: file.size,
-              ),
-            )
-            .toList(),
-      );
+      final accepted = <_NoteBlock>[];
+      final rejected = <String>[];
+      for (final file in files) {
+        final size = await _pickedFileSize(file);
+        if (size != null && size > AppAttachment.maxSizeBytes) {
+          rejected.add(file.name);
+          continue;
+        }
+        accepted.add(
+          _NoteBlock(
+            type: _NoteBlockType.attachment,
+            title: file.name,
+            value: file.path,
+            sizeBytes: size ?? file.size,
+          ),
+        );
+      }
+      if (rejected.isNotEmpty) {
+        final name = rejected.length == 1
+            ? '：${rejected.first}'
+            : '（${rejected.length} 个）';
+        _showPickerError('附件超过 ${AppAttachment.maxSizeLabel}，太大了，无法插入$name');
+      }
+      if (accepted.isEmpty) return;
+      _appendBlocks(accepted);
     } catch (e) {
       _showPickerError('附件选择失败：$e');
     }
   }
 
+  Future<int?> _pickedFileSize(AppPickedFile file) async {
+    final pickedSize = file.size;
+    if (pickedSize != null && pickedSize >= 0) return pickedSize;
+    try {
+      return await File(file.path).length();
+    } catch (_) {
+      return null;
+    }
+  }
+
   void _appendBlocks(List<_NoteBlock> blocks) {
     if (blocks.isEmpty) return;
-    setState(() => _blocks.addAll(blocks));
+    setState(() {
+      _blocks.addAll(blocks);
+      _selectedBlock = null;
+    });
     _revealBlocksPreview();
+  }
+
+  void _selectBlock(_NoteBlock block) {
+    if (!_editing || widget.readOnly) return;
+    setState(() => _selectedBlock = block);
+    _editorFocusNode.requestFocus();
+  }
+
+  void _clearSelectedBlock() {
+    if (_selectedBlock == null) return;
+    setState(() => _selectedBlock = null);
+  }
+
+  void _removeBlock(_NoteBlock block) {
+    setState(() {
+      _blocks.remove(block);
+      if (identical(_selectedBlock, block)) _selectedBlock = null;
+    });
   }
 
   void _revealBlocksPreview() {
@@ -1664,22 +1747,25 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('网页快照'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(hintText: 'https://example.com'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: controller,
+              decoration: const InputDecoration(
+                hintText: 'https://example.com',
+              ),
+            ),
+            const SizedBox(height: 16),
+            AppDialogActionRow(
+              cancelLabel: '取消',
+              confirmLabel: '抓取',
+              onCancel: () => Navigator.of(context).pop(),
+              onConfirm: () =>
+                  Navigator.of(context).pop(controller.text.trim()),
+            ),
+          ],
         ),
-        actions: [
-          AppDialogActionButton(
-            label: '取消',
-            tone: AppActionButtonTone.neutral,
-            onPressed: () => Navigator.of(context).pop(),
-          ),
-          AppDialogActionButton(
-            label: '抓取',
-            filled: true,
-            onPressed: () => Navigator.of(context).pop(controller.text.trim()),
-          ),
-        ],
       ),
     );
     if (url == null || url.isEmpty) return;
@@ -1709,48 +1795,112 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
             caseSensitive: false,
           ).firstMatch(html)?.group(1)?.trim() ??
           '';
-      setState(() {
-        _blocks.add(
+      _insertContentAtCursor(
+        _snapshotMarkup(
           _NoteBlock(
             type: _NoteBlockType.snapshot,
             title: title,
             value: uri.toString(),
             description: desc,
           ),
-        );
-      });
+        ),
+      );
       if (_title.text.trim().isEmpty) _title.text = title;
     } catch (_) {
-      setState(() {
-        _blocks.add(
+      _insertContentAtCursor(
+        _snapshotMarkup(
           _NoteBlock(
             type: _NoteBlockType.snapshot,
             title: url,
             value: url,
             description: '抓取失败，已保存链接。',
           ),
-        );
-      });
+        ),
+      );
     } finally {
       if (mounted) setState(() => _loadingSnapshot = false);
     }
   }
 
-  void _commitHandwriting() {
+  Future<void> _commitHandwriting() async {
     if (!_editing || widget.readOnly) return;
     final count = _strokes.length + (_currentStroke.isEmpty ? 0 : 1);
     if (count == 0) return;
-    _appendContent('[手写输入] $count 笔画');
+    final strokes = [
+      ..._strokes,
+      if (_currentStroke.isNotEmpty) _currentStroke,
+    ];
+    final file = await _writeHandwritingImage(strokes);
+    final sizeBytes = await file.length();
+    if (!mounted) return;
     setState(() {
+      _blocks.add(
+        _NoteBlock(
+          type: _NoteBlockType.image,
+          title: file.path.split(Platform.pathSeparator).last,
+          value: file.path,
+          sizeBytes: sizeBytes,
+        ),
+      );
       _strokes.clear();
       _currentStroke = [];
       _mode = _NoteInputMode.text;
     });
+    _revealBlocksPreview();
+  }
+
+  Future<File> _writeHandwritingImage(List<List<Offset>> strokes) async {
+    final allPoints = strokes.expand((stroke) => stroke).toList();
+    final maxX = allPoints.fold<double>(
+      0,
+      (max, point) => math.max(max, point.dx),
+    );
+    final maxY = allPoints.fold<double>(
+      0,
+      (max, point) => math.max(max, point.dy),
+    );
+    final width = math.max(640, (maxX + 48).ceil()).clamp(320, 2048).toInt();
+    final height = math.max(420, (maxY + 48).ceil()).clamp(240, 2048).toInt();
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    final background = Paint()..color = Colors.white;
+    canvas.drawRect(
+      Rect.fromLTWH(0, 0, width.toDouble(), height.toDouble()),
+      background,
+    );
+    final paint = Paint()
+      ..color = AppColors.text
+      ..strokeWidth = 4
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..style = PaintingStyle.stroke;
+    for (final stroke in strokes) {
+      if (stroke.length < 2) continue;
+      final path = Path()..moveTo(stroke.first.dx + 24, stroke.first.dy + 24);
+      for (final point in stroke.skip(1)) {
+        path.lineTo(point.dx + 24, point.dy + 24);
+      }
+      canvas.drawPath(path, paint);
+    }
+    final image = await recorder.endRecording().toImage(width, height);
+    final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+    if (bytes == null) throw StateError('手写图片生成失败');
+    final dir = Directory(
+      '${(await getAppSupportDirectory()).path}/handwriting',
+    );
+    if (!await dir.exists()) await dir.create(recursive: true);
+    final name =
+        '手写输入-${DateFormat('yyyyMMdd-HHmmss').format(DateTime.now())}.png';
+    final file = File('${dir.path}/$name');
+    await file.writeAsBytes(bytes.buffer.asUint8List(), flush: true);
+    return file;
   }
 
   Future<void> _save() async {
     if (!_editing || widget.readOnly) return;
-    if (_strokes.isNotEmpty || _currentStroke.isNotEmpty) _commitHandwriting();
+    if (_strokes.isNotEmpty || _currentStroke.isNotEmpty) {
+      await _commitHandwriting();
+    }
     final attachments = _attachmentDraftsFromBlocks(_blocks);
     final content = _serializeNoteContent(
       _content.text,
@@ -1772,161 +1922,199 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
     }
   }
 
+  KeyEventResult _handleEditorKey(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent || !_editing || widget.readOnly) {
+      return KeyEventResult.ignored;
+    }
+    final selected = _selectedBlock;
+    if (selected == null) return KeyEventResult.ignored;
+    final key = event.logicalKey;
+    if (key == LogicalKeyboardKey.delete ||
+        key == LogicalKeyboardKey.backspace) {
+      _removeBlock(selected);
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final size = MediaQuery.sizeOf(context);
     final horizontalPadding = size.width < 430 ? 24.0 : 38.0;
+    final contentBlocks = _blocks
+        .where((block) => block.type != _NoteBlockType.attachment)
+        .toList();
+    final attachmentBlocks = _blocks
+        .where((block) => block.type == _NoteBlockType.attachment)
+        .toList();
     return EdgeSwipePop(
       child: Material(
         color: scheme.appPage,
-        child: SafeArea(
-          child: Stack(
-            children: [
-              SingleChildScrollView(
-                controller: _scrollController,
-                padding: EdgeInsets.fromLTRB(
-                  horizontalPadding,
-                  14,
-                  horizontalPadding,
-                  _editing ? 112 : 44,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        _CircleTool(
-                          icon: Icons.arrow_back_ios_new_rounded,
-                          onTap: () => Navigator.of(context).pop(),
-                        ),
-                        const Spacer(),
-                        if (_editing) ...[
-                          const _CircleTool(
-                            icon: Icons.undo_rounded,
-                            faded: true,
-                          ),
-                          const SizedBox(width: 10),
-                          const _CircleTool(
-                            icon: Icons.redo_rounded,
-                            faded: true,
-                          ),
-                          const SizedBox(width: 10),
+        child: Focus(
+          focusNode: _editorFocusNode,
+          onKeyEvent: _handleEditorKey,
+          child: SafeArea(
+            child: Stack(
+              children: [
+                SingleChildScrollView(
+                  controller: _scrollController,
+                  padding: EdgeInsets.fromLTRB(
+                    horizontalPadding,
+                    14,
+                    horizontalPadding,
+                    _editing ? 112 : 44,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
                           _CircleTool(
-                            icon: Icons.check_rounded,
-                            onTap: () => _save(),
+                            icon: Icons.arrow_back_ios_new_rounded,
+                            onTap: () => Navigator.of(context).pop(),
                           ),
-                        ] else if (!widget.readOnly) ...[
-                          _CircleTool(
-                            icon: Icons.edit_rounded,
-                            onTap: () => setState(() => _editing = true),
-                          ),
+                          const Spacer(),
+                          if (_editing) ...[
+                            const _CircleTool(
+                              icon: Icons.undo_rounded,
+                              faded: true,
+                            ),
+                            const SizedBox(width: 10),
+                            const _CircleTool(
+                              icon: Icons.redo_rounded,
+                              faded: true,
+                            ),
+                            const SizedBox(width: 10),
+                            _CircleTool(
+                              icon: Icons.check_rounded,
+                              onTap: () => _save(),
+                            ),
+                          ] else if (!widget.readOnly) ...[
+                            _CircleTool(
+                              icon: Icons.edit_rounded,
+                              onTap: () => setState(() => _editing = true),
+                            ),
+                          ],
                         ],
-                      ],
-                    ),
-                    const SizedBox(height: 18),
-                    if (_editing)
-                      _NoteTitleField(controller: _title)
-                    else
-                      Text(
-                        _title.text.trim().isEmpty ? '未命名随手记' : _title.text,
-                        style: TextStyle(
-                          fontSize: 30,
-                          fontWeight: FontWeight.w900,
-                          color: scheme.appText,
-                        ),
                       ),
-                    if (!_editing) ...[
-                      const SizedBox(height: 8),
-                      _NoteTimeSummary(
-                        note: widget.initial,
-                        fallbackDate: _date,
-                      ),
-                    ],
-                    const SizedBox(height: 14),
-                    if (_editing)
-                      TagSelector(
-                        selectedTags: _tags,
-                        onChanged: (tags) => setState(() => _tags = tags),
-                      )
-                    else if (_tags.isNotEmpty)
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 6,
-                        children: _tags
-                            .map((tag) => _MiniTag(tag: tag))
-                            .toList(),
-                      ),
-                    const SizedBox(height: 16),
-                    if (!_editing)
-                      _ReadOnlyNoteBody(
-                        content: _serializeNoteContent(_content.text, _blocks),
-                        attachmentIds:
-                            widget.initial?.attachmentIds ?? const [],
-                      )
-                    else if (_mode == _NoteInputMode.handwriting)
-                      _HandwritingPad(
-                        strokes: _strokes,
-                        currentStroke: _currentStroke,
-                        onStart: (point) => setState(() {
-                          _currentStroke = [point];
-                        }),
-                        onUpdate: (point) => setState(() {
-                          _currentStroke = [..._currentStroke, point];
-                        }),
-                        onEnd: () => setState(() {
-                          if (_currentStroke.isNotEmpty) {
-                            _strokes.add(_currentStroke);
-                            _currentStroke = [];
-                          }
-                        }),
-                      )
-                    else
-                      _NoteContentField(
-                        controller: _content,
-                        mode: _mode,
-                        blocks: _blocks,
-                        blocksPreviewKey: _blocksPreviewKey,
-                        onRemoveBlock: (block) =>
-                            setState(() => _blocks.remove(block)),
-                      ),
-                    if (_blocks.isNotEmpty &&
-                        _mode == _NoteInputMode.handwriting) ...[
                       const SizedBox(height: 18),
-                      _NoteBlocksPreview(
-                        key: _blocksPreviewKey,
-                        blocks: _blocks,
-                        onRemove: (block) =>
-                            setState(() => _blocks.remove(block)),
-                      ),
-                    ],
-                    if (_loadingSnapshot) ...[
+                      if (_editing)
+                        _NoteTitleField(controller: _title)
+                      else
+                        Text(
+                          _title.text.trim().isEmpty ? '未命名随手记' : _title.text,
+                          style: TextStyle(
+                            fontSize: 30,
+                            fontWeight: FontWeight.w900,
+                            color: scheme.appText,
+                          ),
+                        ),
+                      if (!_editing) ...[
+                        const SizedBox(height: 8),
+                        _NoteTimeSummary(
+                          note: widget.initial,
+                          fallbackDate: _date,
+                        ),
+                      ],
+                      const SizedBox(height: 14),
+                      if (_editing)
+                        TagSelector(
+                          selectedTags: _tags,
+                          onChanged: (tags) => setState(() => _tags = tags),
+                        )
+                      else if (_tags.isNotEmpty)
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: _tags
+                              .map((tag) => _MiniTag(tag: tag))
+                              .toList(),
+                        ),
                       const SizedBox(height: 16),
-                      const LinearProgressIndicator(),
+                      if (!_editing)
+                        _ReadOnlyNoteBody(
+                          content: _serializeNoteContent(
+                            _content.text,
+                            _blocks,
+                          ),
+                          attachmentIds:
+                              widget.initial?.attachmentIds ?? const [],
+                        )
+                      else if (_mode == _NoteInputMode.handwriting)
+                        _HandwritingPad(
+                          strokes: _strokes,
+                          currentStroke: _currentStroke,
+                          onStart: (point) => setState(() {
+                            _currentStroke = [point];
+                          }),
+                          onUpdate: (point) => setState(() {
+                            _currentStroke = [..._currentStroke, point];
+                          }),
+                          onEnd: () => setState(() {
+                            if (_currentStroke.isNotEmpty) {
+                              _strokes.add(_currentStroke);
+                              _currentStroke = [];
+                            }
+                          }),
+                        )
+                      else
+                        _NoteContentField(
+                          controller: _content,
+                          mode: _mode,
+                          blocks: contentBlocks,
+                          blocksPreviewKey: _blocksPreviewKey,
+                          selectedBlock: _selectedBlock,
+                          onTextFocus: _clearSelectedBlock,
+                          onSelectBlock: _selectBlock,
+                          onRemoveBlock: _removeBlock,
+                        ),
+                      if (contentBlocks.isNotEmpty &&
+                          _mode == _NoteInputMode.handwriting) ...[
+                        const SizedBox(height: 18),
+                        _NoteBlocksPreview(
+                          key: _blocksPreviewKey,
+                          blocks: contentBlocks,
+                          selectedBlock: _selectedBlock,
+                          onSelect: _selectBlock,
+                          onRemove: _removeBlock,
+                        ),
+                      ],
+                      if (_editing && attachmentBlocks.isNotEmpty) ...[
+                        const SizedBox(height: 18),
+                        _AttachmentDraftList(
+                          blocks: attachmentBlocks,
+                          onRemove: _removeBlock,
+                        ),
+                      ],
+                      if (_loadingSnapshot) ...[
+                        const SizedBox(height: 16),
+                        const LinearProgressIndicator(),
+                      ],
                     ],
-                  ],
-                ),
-              ),
-              if (_editing)
-                Positioned(
-                  left: horizontalPadding,
-                  right: horizontalPadding,
-                  bottom: 16,
-                  child: _NoteEditorToolbar(
-                    mode: _mode,
-                    onText: () => setState(() => _mode = _NoteInputMode.text),
-                    onChecklist: () {
-                      setState(() => _mode = _NoteInputMode.checklist);
-                      if (_content.text.trim().isEmpty) _content.text = '☐ ';
-                    },
-                    onHandwriting: () =>
-                        setState(() => _mode = _NoteInputMode.handwriting),
-                    onImage: _insertImage,
-                    onAttachment: _insertAttachment,
-                    onSnapshot: _captureWebSnapshot,
                   ),
                 ),
-            ],
+                if (_editing)
+                  Positioned(
+                    left: horizontalPadding,
+                    right: horizontalPadding,
+                    bottom: 16,
+                    child: _NoteEditorToolbar(
+                      mode: _mode,
+                      onText: () => setState(() => _mode = _NoteInputMode.text),
+                      onChecklist: () {
+                        setState(() => _mode = _NoteInputMode.checklist);
+                        if (_content.text.trim().isEmpty) _content.text = '☐ ';
+                      },
+                      onHandwriting: () =>
+                          setState(() => _mode = _NoteInputMode.handwriting),
+                      onImage: _insertImage,
+                      onAttachment: _insertAttachment,
+                      onSnapshot: _captureWebSnapshot,
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ),
@@ -2012,6 +2200,9 @@ class _NoteContentField extends StatelessWidget {
   final _NoteInputMode mode;
   final List<_NoteBlock> blocks;
   final Key? blocksPreviewKey;
+  final _NoteBlock? selectedBlock;
+  final VoidCallback? onTextFocus;
+  final ValueChanged<_NoteBlock>? onSelectBlock;
   final ValueChanged<_NoteBlock> onRemoveBlock;
 
   const _NoteContentField({
@@ -2019,6 +2210,9 @@ class _NoteContentField extends StatelessWidget {
     required this.mode,
     required this.blocks,
     required this.onRemoveBlock,
+    this.selectedBlock,
+    this.onTextFocus,
+    this.onSelectBlock,
     this.blocksPreviewKey,
   });
 
@@ -2043,6 +2237,7 @@ class _NoteContentField extends StatelessWidget {
         children: [
           TextField(
             controller: controller,
+            onTap: onTextFocus,
             minLines: hasBlocks ? 4 : 14,
             maxLines: null,
             keyboardType: TextInputType.multiline,
@@ -2073,6 +2268,8 @@ class _NoteContentField extends StatelessWidget {
             _NoteBlocksPreview(
               key: blocksPreviewKey,
               blocks: blocks,
+              selectedBlock: selectedBlock,
+              onSelect: onSelectBlock,
               onRemove: onRemoveBlock,
             ),
           ],
@@ -2337,9 +2534,17 @@ MarkdownStyleSheet _noteMarkdownStyle(BuildContext context) {
 
 class _NoteBlocksPreview extends StatelessWidget {
   final List<_NoteBlock> blocks;
+  final _NoteBlock? selectedBlock;
+  final ValueChanged<_NoteBlock>? onSelect;
   final ValueChanged<_NoteBlock>? onRemove;
 
-  const _NoteBlocksPreview({super.key, required this.blocks, this.onRemove});
+  const _NoteBlocksPreview({
+    super.key,
+    required this.blocks,
+    this.selectedBlock,
+    this.onSelect,
+    this.onRemove,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -2348,7 +2553,12 @@ class _NoteBlocksPreview extends StatelessWidget {
           .map(
             (block) => Padding(
               padding: const EdgeInsets.only(bottom: 12),
-              child: _NoteBlockCard(block: block, onRemove: onRemove),
+              child: _NoteBlockCard(
+                block: block,
+                selected: identical(selectedBlock, block),
+                onSelect: onSelect,
+                onRemove: onRemove,
+              ),
             ),
           )
           .toList(),
@@ -2358,19 +2568,35 @@ class _NoteBlocksPreview extends StatelessWidget {
 
 class _NoteBlockCard extends StatelessWidget {
   final _NoteBlock block;
+  final bool selected;
+  final ValueChanged<_NoteBlock>? onSelect;
   final ValueChanged<_NoteBlock>? onRemove;
 
-  const _NoteBlockCard({required this.block, this.onRemove});
+  const _NoteBlockCard({
+    required this.block,
+    this.selected = false,
+    this.onSelect,
+    this.onRemove,
+  });
 
   @override
   Widget build(BuildContext context) {
     switch (block.type) {
       case _NoteBlockType.image:
-        return _ImageBlockCard(block: block, onRemove: onRemove);
+        return _ImageBlockCard(
+          block: block,
+          selected: selected,
+          onSelect: onSelect,
+        );
       case _NoteBlockType.attachment:
         return _AttachmentBlockCard(block: block, onRemove: onRemove);
       case _NoteBlockType.snapshot:
-        return _SnapshotBlockCard(block: block, onRemove: onRemove);
+        return _SnapshotBlockCard(
+          block: block,
+          selected: selected,
+          onSelect: onSelect,
+          onRemove: onRemove,
+        );
     }
   }
 }
@@ -2478,37 +2704,79 @@ String _formatAttachmentSize(int size) {
 
 class _ImageBlockCard extends StatelessWidget {
   final _NoteBlock block;
-  final ValueChanged<_NoteBlock>? onRemove;
+  final bool selected;
+  final ValueChanged<_NoteBlock>? onSelect;
 
-  const _ImageBlockCard({required this.block, this.onRemove});
+  const _ImageBlockCard({
+    required this.block,
+    this.selected = false,
+    this.onSelect,
+  });
 
   @override
   Widget build(BuildContext context) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(18),
-      child: AppPointerTap(
-        onTap: () => _openFile(block.value),
-        child: Stack(
-          children: [
-            Container(
-              constraints: const BoxConstraints(maxHeight: 360),
-              width: double.infinity,
-              color: AppColors.inputBg,
-              child: Image.file(
-                File(block.value),
-                fit: BoxFit.contain,
-                errorBuilder: (context, error, stackTrace) => _BrokenBlock(
-                  icon: Icons.broken_image_outlined,
-                  title: block.title,
-                  subtitle: '图片无法读取',
-                ),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onSelect == null ? null : () => onSelect!(block),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: selected ? AppColors.primary : Colors.transparent,
+              width: selected ? 2 : 0,
+            ),
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: Container(
+            constraints: const BoxConstraints(maxHeight: 360),
+            width: double.infinity,
+            color: AppColors.inputBg,
+            child: Image.file(
+              File(block.value),
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) => _BrokenBlock(
+                icon: Icons.broken_image_outlined,
+                title: block.title,
+                subtitle: '图片无法读取',
               ),
             ),
-            if (onRemove != null)
-              _RemoveBlockButton(onTap: () => onRemove!(block)),
-          ],
+          ),
         ),
       ),
+    );
+  }
+}
+
+class _AttachmentDraftList extends StatelessWidget {
+  final List<_NoteBlock> blocks;
+  final ValueChanged<_NoteBlock> onRemove;
+
+  const _AttachmentDraftList({required this.blocks, required this.onRemove});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '已插入附件',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w900,
+            color: scheme.appText,
+          ),
+        ),
+        const SizedBox(height: 10),
+        ...blocks.map(
+          (block) => Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: _AttachmentBlockCard(block: block, onRemove: onRemove),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -2590,27 +2858,62 @@ class _AttachmentBlockCard extends StatelessWidget {
   }
 }
 
-class _SnapshotBlockCard extends StatelessWidget {
+class _SnapshotBlockCard extends StatefulWidget {
   final _NoteBlock block;
+  final bool selected;
+  final ValueChanged<_NoteBlock>? onSelect;
   final ValueChanged<_NoteBlock>? onRemove;
 
-  const _SnapshotBlockCard({required this.block, this.onRemove});
+  const _SnapshotBlockCard({
+    required this.block,
+    this.selected = false,
+    this.onSelect,
+    this.onRemove,
+  });
+
+  @override
+  State<_SnapshotBlockCard> createState() => _SnapshotBlockCardState();
+}
+
+class _SnapshotBlockCardState extends State<_SnapshotBlockCard> {
+  bool _localSelected = false;
+
+  bool get _selected =>
+      widget.onSelect == null ? _localSelected : widget.selected;
+
+  void _selectOrOpen() {
+    if (_selected) {
+      _openUrl(widget.block.value);
+      return;
+    }
+    widget.onSelect?.call(widget.block);
+    if (widget.onSelect == null) {
+      setState(() => _localSelected = true);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final block = widget.block;
     final host = Uri.tryParse(block.value)?.host ?? block.value;
     return Stack(
       children: [
-        AppPointerTap(
-          onTap: () => _openUrl(block.value),
-          child: Container(
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: _selectOrOpen,
+          onDoubleTap: () => _openUrl(block.value),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
             width: double.infinity,
             padding: const EdgeInsets.fromLTRB(18, 16, 48, 16),
             decoration: BoxDecoration(
               color: const Color(0xFFF3F7FF),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: AppColors.primary.withValues(alpha: 0.16),
+                color: _selected
+                    ? AppColors.primary
+                    : AppColors.primary.withValues(alpha: 0.16),
+                width: _selected ? 1.6 : 1,
               ),
             ),
             child: Row(
@@ -2675,7 +2978,8 @@ class _SnapshotBlockCard extends StatelessWidget {
             ),
           ),
         ),
-        if (onRemove != null) _RemoveBlockButton(onTap: () => onRemove!(block)),
+        if (widget.onRemove != null)
+          _RemoveBlockButton(onTap: () => widget.onRemove!(block)),
       ],
     );
   }
