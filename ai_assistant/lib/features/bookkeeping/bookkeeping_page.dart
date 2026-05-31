@@ -4384,6 +4384,7 @@ class _AddLedgerPageState extends State<_AddLedgerPage>
           ? 1.0
           : (await widget.exchangeService.getRates()).toCny[_currency] ?? 1;
       final cny = amount * rate;
+      final isForeignCurrency = _currency != 'CNY';
       final now = DateTime.now();
       final initial = widget.initialEntry;
       final entryDate = initial?.date;
@@ -4393,9 +4394,17 @@ class _AddLedgerPageState extends State<_AddLedgerPage>
         categoryId: _category.id,
         categoryName: ledgerCategoryDisplayNameForSelection(_category),
         categoryEmoji: _category.emoji,
-        note: _noteController.text.trim(),
-        amount: amount,
-        currency: _currency,
+        note: isForeignCurrency
+            ? _noteWithExchangeInfo(
+                _noteController.text.trim(),
+                currency: _currency,
+                originalAmount: amount,
+                rate: rate,
+                cnyAmount: cny,
+              )
+            : _noteController.text.trim(),
+        amount: isForeignCurrency ? cny : amount,
+        currency: 'CNY',
         cnyAmount: cny,
         tags: _tags,
         date: DateTime(
@@ -4417,6 +4426,26 @@ class _AddLedgerPageState extends State<_AddLedgerPage>
         context,
       ).showSnackBar(SnackBar(content: Text('记账失败：$e')));
     }
+  }
+
+  String _noteWithExchangeInfo(
+    String note, {
+    required String currency,
+    required double originalAmount,
+    required double rate,
+    required double cnyAmount,
+  }) {
+    final cleaned = note
+        .replaceAll(
+          RegExp(r'(?:^|\n)外币金额：.+?；汇率：.+?；折合人民币：¥\s*\d+(?:\.\d+)?'),
+          '',
+        )
+        .trim();
+    final exchangeLine =
+        '外币金额：$currency ${_formatAmount(originalAmount)}；'
+        '汇率：1 $currency = ¥ ${rate.toStringAsFixed(4)}；'
+        '折合人民币：${_money(cnyAmount)}';
+    return cleaned.isEmpty ? exchangeLine : '$cleaned\n$exchangeLine';
   }
 
   List<LedgerCategory> _categoriesFor(LedgerKind kind) {
@@ -4450,29 +4479,43 @@ class _AddLedgerPageState extends State<_AddLedgerPage>
   Future<void> _showCurrencyPicker() async {
     final picked = await showModalBottomSheet<String>(
       context: context,
-      backgroundColor: AppColors.surface,
+      useSafeArea: true,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (context) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(18, 12, 18, 18),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: _currencyCodes.map((code) {
-                return ListTile(
-                  leading: Text(
-                    _currencyFlag(code),
-                    style: const TextStyle(fontSize: 24),
-                  ),
-                  title: Text('$code ${_currencyName(code)}'),
-                  trailing: code == _currency
-                      ? const Icon(
-                          Icons.check_rounded,
-                          color: AppColors.primary,
-                        )
-                      : null,
-                  onTap: () => Navigator.of(context).pop(code),
-                );
-              }).toList(),
+        final scheme = Theme.of(context).colorScheme;
+        final media = MediaQuery.of(context);
+        return Padding(
+          padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
+          child: FractionallySizedBox(
+            heightFactor: 0.58,
+            alignment: Alignment.bottomCenter,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: scheme.appSurface,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(24),
+                ),
+              ),
+              child: SafeArea(
+                top: false,
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(18, 12, 18, 18),
+                  children: _currencyCodes.map((code) {
+                    return ListTile(
+                      leading: Text(
+                        _currencyFlag(code),
+                        style: const TextStyle(fontSize: 24),
+                      ),
+                      title: Text('$code ${_currencyName(code)}'),
+                      trailing: code == _currency
+                          ? Icon(Icons.check_rounded, color: scheme.primary)
+                          : null,
+                      onTap: () => Navigator.of(context).pop(code),
+                    );
+                  }).toList(),
+                ),
+              ),
             ),
           ),
         );
