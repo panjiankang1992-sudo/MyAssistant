@@ -730,6 +730,8 @@ class AppVoiceInputFab extends StatefulWidget {
   final VoidCallback onPressed;
   final VoidCallback onLongPressStart;
   final VoidCallback onLongPressEnd;
+  final IconData idleIcon;
+  final IconData activeIcon;
   final List<Color> gradientColors;
 
   const AppVoiceInputFab({
@@ -739,6 +741,8 @@ class AppVoiceInputFab extends StatefulWidget {
     required this.onPressed,
     required this.onLongPressStart,
     required this.onLongPressEnd,
+    this.idleIcon = Icons.mic_rounded,
+    this.activeIcon = Icons.stop_rounded,
     this.gradientColors = const [Color(0xFF8B5CF6), Color(0xFF0A84FF)],
   });
 
@@ -881,8 +885,8 @@ class _AppVoiceInputFabState extends State<AppVoiceInputFab>
                 ),
                 child: Icon(
                   widget.listening || _armed
-                      ? Icons.mic_rounded
-                      : Icons.add_rounded,
+                      ? widget.activeIcon
+                      : widget.idleIcon,
                   size: 29,
                   color: Colors.white,
                 ),

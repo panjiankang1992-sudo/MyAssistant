@@ -2636,12 +2636,13 @@ class _StatsPageState extends State<_StatsPage> {
     final visible = _visible;
     final income = _sumEntries(visible, LedgerKind.income);
     final expense = _sumEntries(visible, LedgerKind.expense);
+    final scheme = Theme.of(context).colorScheme;
     return Align(
       alignment: Alignment.centerRight,
       child: SizedBox(
         width: MediaQuery.of(context).size.width,
         child: Material(
-          color: AppColors.scaffoldBg,
+          color: scheme.appPage,
           child: SafeArea(
             child: Column(
               children: [
@@ -2671,6 +2672,41 @@ class _StatsPageState extends State<_StatsPage> {
                             ),
                           ],
                           selected: {_period},
+                          style: ButtonStyle(
+                            visualDensity: VisualDensity.compact,
+                            backgroundColor: WidgetStateProperty.resolveWith((
+                              states,
+                            ) {
+                              if (states.contains(WidgetState.selected)) {
+                                return scheme.primary;
+                              }
+                              return scheme.appInput;
+                            }),
+                            foregroundColor: WidgetStateProperty.resolveWith((
+                              states,
+                            ) {
+                              if (states.contains(WidgetState.selected)) {
+                                return scheme.onPrimary;
+                              }
+                              return scheme.appText;
+                            }),
+                            textStyle: WidgetStateProperty.resolveWith(
+                              (states) => TextStyle(
+                                fontSize: 14,
+                                fontWeight:
+                                    states.contains(WidgetState.selected)
+                                    ? FontWeight.w800
+                                    : FontWeight.w700,
+                              ),
+                            ),
+                            side: WidgetStateProperty.resolveWith(
+                              (states) => BorderSide(
+                                color: states.contains(WidgetState.selected)
+                                    ? scheme.primary
+                                    : scheme.appBorder,
+                              ),
+                            ),
+                          ),
                           onSelectionChanged: (value) {
                             setState(() {
                               _period = value.first;
@@ -2695,13 +2731,13 @@ class _StatsPageState extends State<_StatsPage> {
                       _StatsAmount(
                         label: '收',
                         value: income,
-                        color: AppColors.success,
+                        color: _ledgerChartIncomeColor,
                       ),
                       const SizedBox(width: 18),
                       _StatsAmount(
                         label: '支',
                         value: expense,
-                        color: AppColors.danger,
+                        color: _ledgerChartExpenseColor,
                       ),
                       const SizedBox(width: 18),
                       _StatsAmount(
@@ -2866,13 +2902,13 @@ class _StatsPageState extends State<_StatsPage> {
                           _StatsAmount(
                             label: '收',
                             value: income,
-                            color: AppColors.success,
+                            color: _ledgerChartIncomeColor,
                           ),
                           const SizedBox(width: 18),
                           _StatsAmount(
                             label: '支',
                             value: expense,
-                            color: AppColors.danger,
+                            color: _ledgerChartExpenseColor,
                           ),
                         ],
                       ),
@@ -3047,6 +3083,22 @@ class _StatsPageState extends State<_StatsPage> {
 }
 
 enum _StatsPeriod { month, year }
+
+const _ledgerChartPalette = [
+  Color(0xFF2A9D8F),
+  Color(0xFFE76F51),
+  Color(0xFF4F46E5),
+  Color(0xFFE9C46A),
+  Color(0xFF38BDF8),
+  Color(0xFF22C55E),
+  Color(0xFFFB7185),
+  Color(0xFF8B5CF6),
+  Color(0xFFF59E0B),
+  Color(0xFF64748B),
+];
+
+const _ledgerChartIncomeColor = Color(0xFF2A9D8F);
+const _ledgerChartExpenseColor = Color(0xFFE76F51);
 
 class _StatsView extends StatelessWidget {
   final List<LedgerEntry> entries;
@@ -3594,6 +3646,7 @@ class _LedgerRow extends StatelessWidget {
         ? AppColors.danger
         : AppColors.success;
     final scheme = Theme.of(context).colorScheme;
+    final inlineTags = entry.tags.take(2).toList();
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -3605,10 +3658,10 @@ class _LedgerRow extends StatelessWidget {
             children: [
               _CategoryIcon(
                 category: cat,
-                size: 50,
+                size: 58,
                 emoji: _resolvedLedgerEmoji(entry),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -3633,31 +3686,14 @@ class _LedgerRow extends StatelessWidget {
                         ],
                       ],
                     ),
-                    if (entry.note.isNotEmpty)
-                      Text(
-                        '备注：${entry.note}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 12,
-                        ).copyWith(color: scheme.appMutedText),
+                    if (entry.note.isNotEmpty || inlineTags.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 3),
+                        child: _LedgerInlineMetaLine(
+                          tags: inlineTags,
+                          note: entry.note,
+                        ),
                       ),
-                    if (entry.tags.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Wrap(
-                        spacing: 4,
-                        runSpacing: 4,
-                        children: entry.tags
-                            .take(3)
-                            .map(
-                              (tag) => TagChip.fromTag(
-                                label: tag.name,
-                                colorKey: tag.colorKey,
-                              ),
-                            )
-                            .toList(),
-                      ),
-                    ],
                   ],
                 ),
               ),
@@ -3677,6 +3713,73 @@ class _LedgerRow extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LedgerInlineMetaLine extends StatelessWidget {
+  final List<Tag> tags;
+  final String note;
+
+  const _LedgerInlineMetaLine({required this.tags, required this.note});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final trimmedNote = note.trim();
+    return Row(
+      children: [
+        for (final tag in tags) ...[
+          _LedgerInlineTag(tag: tag),
+          const SizedBox(width: 4),
+        ],
+        if (trimmedNote.isNotEmpty)
+          Flexible(
+            child: Text(
+              '备注：$trimmedNote',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.2,
+                fontWeight: FontWeight.w600,
+                color: scheme.appMutedText,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _LedgerInlineTag extends StatelessWidget {
+  final Tag tag;
+
+  const _LedgerInlineTag({required this.tag});
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = TagPalette.textColor(tag.colorKey);
+    final bg = TagPalette.bgColor(tag.colorKey);
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 62),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: bg.withValues(alpha: 0.68),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: fg.withValues(alpha: 0.16)),
+      ),
+      child: Text(
+        tag.name,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          fontSize: 10,
+          height: 1.1,
+          fontWeight: FontWeight.w700,
+          color: fg,
         ),
       ),
     );
@@ -3714,7 +3817,7 @@ class _CategoryIcon extends StatelessWidget {
       child: Center(
         child: _LedgerIconImage(
           category: category,
-          size: size * 0.72,
+          size: size * 0.82,
           emoji: emoji,
         ),
       ),
@@ -3865,6 +3968,7 @@ class _AddLedgerPageState extends State<_AddLedgerPage>
   var _showAllCategories = false;
   var _speechReady = false;
   var _listening = false;
+  var _voiceVisible = true;
 
   @override
   void initState() {
@@ -3895,7 +3999,7 @@ class _AddLedgerPageState extends State<_AddLedgerPage>
     Future.microtask(() async {
       await _loadCustomCategories();
       if (initialVoiceText.isNotEmpty && mounted && initial == null) {
-        await _parseLedgerText(initialVoiceText);
+        await _parseLedgerText(initialVoiceText, preserveNote: true);
       }
     });
   }
@@ -3924,10 +4028,7 @@ class _AddLedgerPageState extends State<_AddLedgerPage>
 
   Future<void> _toggleVoiceInput() async {
     if (_listening) {
-      await _speech.stop();
-      if (mounted) setState(() => _listening = false);
-      final text = _noteController.text.trim();
-      if (text.isNotEmpty) await _parseLedgerText(text);
+      await _finishVoiceInput();
       return;
     }
     if (!_speechReady) {
@@ -3941,7 +4042,10 @@ class _AddLedgerPageState extends State<_AddLedgerPage>
       }
       return;
     }
-    setState(() => _listening = true);
+    setState(() {
+      _voiceVisible = true;
+      _listening = true;
+    });
     await _speech.listen(
       onResult: _handleSpeechResult,
       listenOptions: stt.SpeechListenOptions(
@@ -3961,11 +4065,35 @@ class _AddLedgerPageState extends State<_AddLedgerPage>
         offset: _noteController.text.length,
       );
       _aiGenerated = true;
-      if (result.finalResult) _listening = false;
+      if (result.finalResult) {
+        _listening = false;
+        _voiceVisible = false;
+      }
     });
     if (result.finalResult) {
-      await _parseLedgerText(text);
+      await _parseLedgerText(text, preserveNote: true);
     }
+  }
+
+  Future<void> _finishVoiceInput() async {
+    await _speech.stop();
+    final text = _noteController.text.trim();
+    if (mounted) {
+      setState(() {
+        _listening = false;
+        _voiceVisible = false;
+      });
+    }
+    if (text.isNotEmpty) await _parseLedgerText(text, preserveNote: true);
+  }
+
+  Future<void> _dismissVoiceButton() async {
+    if (!_voiceVisible) return;
+    if (_listening) {
+      await _finishVoiceInput();
+      return;
+    }
+    if (mounted) setState(() => _voiceVisible = false);
   }
 
   Future<void> _loadCustomCategories() async {
@@ -3988,7 +4116,10 @@ class _AddLedgerPageState extends State<_AddLedgerPage>
     });
   }
 
-  Future<void> _parseLedgerText(String text) async {
+  Future<void> _parseLedgerText(
+    String text, {
+    bool preserveNote = false,
+  }) async {
     final parsed = await _aiParse(text) ?? _localParse(text);
     if (!mounted) return;
     final cats = _categoriesFor(parsed.kind);
@@ -4009,7 +4140,7 @@ class _AddLedgerPageState extends State<_AddLedgerPage>
         parsed.amount.truncateToDouble() == parsed.amount ? 0 : 2,
       );
       _currency = parsed.currency;
-      _noteController.text = parsed.note;
+      _noteController.text = preserveNote ? text : parsed.note;
       _aiGenerated = true;
     });
   }
@@ -4560,178 +4691,144 @@ class _AddLedgerPageState extends State<_AddLedgerPage>
             Expanded(
               child: Stack(
                 children: [
-                  ListView(
-                    padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
-                    children: [
-                      _buildCategoryPicker(),
-                      const SizedBox(height: 14),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _noteController,
-                              decoration: InputDecoration(
-                                hintText: '备注，例如：地铁 6 元、午餐 28 元',
-                                filled: true,
-                                fillColor: scheme.appSurface,
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(18),
-                                  borderSide: BorderSide(
-                                    color: scheme.appBorder,
-                                  ),
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(18),
-                                  borderSide: BorderSide(
-                                    color: scheme.appBorder,
-                                  ),
-                                ),
-                              ),
+                  Listener(
+                    behavior: HitTestBehavior.translucent,
+                    onPointerDown: (_) => unawaited(_dismissVoiceButton()),
+                    child: ListView(
+                      padding: const EdgeInsets.fromLTRB(20, 4, 20, 156),
+                      children: [
+                        _buildCategoryPicker(),
+                        const SizedBox(height: 14),
+                        TextField(
+                          controller: _noteController,
+                          decoration: InputDecoration(
+                            hintText: '备注，例如：地铁 6 元、午餐 28 元',
+                            filled: true,
+                            fillColor: scheme.appSurface,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(18),
+                              borderSide: BorderSide(color: scheme.appBorder),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(18),
+                              borderSide: BorderSide(color: scheme.appBorder),
                             ),
                           ),
-                          const SizedBox(width: 10),
-                          AppRoundIconButton(
-                            tooltip: _listening ? '停止语音输入' : '语音输入',
-                            onPressed: () => unawaited(_toggleVoiceInput()),
-                            icon: _listening
-                                ? Icons.stop_rounded
-                                : Icons.mic_rounded,
-                            foregroundColor: _listening
-                                ? AppColors.danger
-                                : AppColors.primary,
-                          ),
-                        ],
-                      ),
-                      AnimatedSwitcher(
-                        duration: AppPerformance.lowLatencyMode
-                            ? Duration.zero
-                            : const Duration(milliseconds: 180),
-                        child: _listening
-                            ? Padding(
-                                key: const ValueKey('ledger-listening'),
-                                padding: const EdgeInsets.only(top: 8),
-                                child: Text(
-                                  _noteController.text.trim().isEmpty
-                                      ? '正在听...'
-                                      : '正在听：${_noteController.text.trim()}',
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w700,
-                                    color: scheme.appMutedText,
+                        ),
+                        AnimatedSwitcher(
+                          duration: AppPerformance.lowLatencyMode
+                              ? Duration.zero
+                              : const Duration(milliseconds: 180),
+                          child: _listening
+                              ? Padding(
+                                  key: const ValueKey('ledger-listening'),
+                                  padding: const EdgeInsets.only(top: 8),
+                                  child: Text(
+                                    _noteController.text.trim().isEmpty
+                                        ? '正在听...'
+                                        : '正在听：${_noteController.text.trim()}',
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      color: scheme.appMutedText,
+                                    ),
                                   ),
+                                )
+                              : const SizedBox.shrink(
+                                  key: ValueKey('ledger-listening-hidden'),
                                 ),
-                              )
-                            : const SizedBox.shrink(
-                                key: ValueKey('ledger-listening-hidden'),
-                              ),
-                      ),
-                      const SizedBox(height: 14),
-                      TagSelector(
-                        selectedTags: _tags,
-                        onChanged: (tags) => setState(() => _tags = tags),
-                      ),
-                      const SizedBox(height: 14),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 18,
-                          vertical: 14,
                         ),
-                        decoration: BoxDecoration(
-                          color: scheme.appSurface,
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(
-                            color: scheme.appBorder.withValues(alpha: 0.58),
+                        const SizedBox(height: 14),
+                        TagSelector(
+                          selectedTags: _tags,
+                          onChanged: (tags) => setState(() => _tags = tags),
+                        ),
+                        const SizedBox(height: 14),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 18,
+                            vertical: 14,
+                          ),
+                          decoration: BoxDecoration(
+                            color: scheme.appSurface,
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(
+                              color: scheme.appBorder.withValues(alpha: 0.58),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Text(
+                                '金额',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  color: scheme.appText,
+                                ),
+                              ),
+                              const Spacer(),
+                              Text(
+                                '${_currency == "CNY" ? "¥" : _currency} ${_amountText.isEmpty ? "0.00" : _amountText}',
+                                style: TextStyle(
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.w800,
+                                  color: scheme.appText,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        child: Row(
-                          children: [
-                            Text(
-                              '金额',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w700,
-                                color: scheme.appText,
-                              ),
-                            ),
-                            const Spacer(),
-                            Text(
-                              '${_currency == "CNY" ? "¥" : _currency} ${_amountText.isEmpty ? "0.00" : _amountText}',
-                              style: TextStyle(
-                                fontSize: 28,
-                                fontWeight: FontWeight.w800,
-                                color: scheme.appText,
-                              ),
-                            ),
-                          ],
+                        const SizedBox(height: 12),
+                        _NumberPad(
+                          currency: _currency,
+                          onCurrencyTap: _showCurrencyPicker,
+                          onTap: _tapNumber,
+                        ),
+                        const SizedBox(height: 20),
+                      ],
+                    ),
+                  ),
+                  if (_voiceVisible)
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 78,
+                      child: Center(
+                        child: AppVoiceInputFab(
+                          listening: _listening,
+                          transcript: _noteController.text,
+                          onPressed: () => unawaited(_toggleVoiceInput()),
+                          onLongPressStart: () {},
+                          onLongPressEnd: () {},
+                          gradientColors: _listening
+                              ? const [Color(0xFFFF6B5E), Color(0xFFE11D48)]
+                              : const [Color(0xFF14B8A6), Color(0xFF2563EB)],
                         ),
                       ),
-                      const SizedBox(height: 12),
-                      _LedgerSaveButton(
-                        label: _saving
-                            ? '保存中'
-                            : widget.initialEntry == null
-                            ? '完成记账'
-                            : '保存修改',
-                        icon: _saving
-                            ? Icons.hourglass_top_rounded
-                            : Icons.check_rounded,
-                        onPressed: _save,
-                      ),
-                      const SizedBox(height: 12),
-                      _NumberPad(
-                        currency: _currency,
-                        onCurrencyTap: _showCurrencyPicker,
-                        onTap: _tapNumber,
-                      ),
-                      const SizedBox(height: 20),
-                    ],
+                    ),
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: AppFloatingActionBar(
+                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+                      actions: [
+                        AppBottomAction(
+                          label: _saving
+                              ? '保存中'
+                              : widget.initialEntry == null
+                              ? '完成记账'
+                              : '保存修改',
+                          icon: _saving
+                              ? Icons.hourglass_top_rounded
+                              : Icons.check_rounded,
+                          onPressed: _saving ? () {} : _save,
+                        ),
+                      ],
+                    ),
                   ),
                 ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _LedgerSaveButton extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final VoidCallback onPressed;
-
-  const _LedgerSaveButton({
-    required this.label,
-    required this.icon,
-    required this.onPressed,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Listener(
-      behavior: HitTestBehavior.opaque,
-      onPointerDown: (_) => onPressed(),
-      child: Container(
-        height: 58,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: AppColors.primary,
-          borderRadius: BorderRadius.circular(22),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 22, color: Colors.white),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w900,
-                color: Colors.white,
               ),
             ),
           ],
@@ -4782,7 +4879,7 @@ class _CategoryPickTile extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 160),
         width: width,
-        padding: EdgeInsets.symmetric(vertical: width < 64 ? 7 : 8),
+        padding: EdgeInsets.symmetric(vertical: width < 64 ? 4 : 5),
         decoration: BoxDecoration(
           color: selected
               ? Color.alphaBlend(
@@ -4802,17 +4899,18 @@ class _CategoryPickTile extends StatelessWidget {
           children: [
             _LedgerIconImage(
               category: category,
-              size: (width * 0.44).clamp(24.0, 32.0),
+              size: (width * 0.62).clamp(31.0, 40.0),
               dimmed: dimmed,
             ),
-            const SizedBox(height: 3),
+            const SizedBox(height: 2),
             Text(
               label ?? category.name,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontFamily: 'PingFang SC',
-                fontSize: 12,
+                fontSize: width < 58 ? 9.5 : 10.5,
+                height: 1.05,
                 fontWeight: FontWeight.w700,
                 color: dimmed ? scheme.appMutedText : scheme.appText,
               ),
@@ -5212,7 +5310,7 @@ class _PeriodBarPainter extends CustomPainter {
       return;
     }
     final grid = Paint()
-      ..color = AppColors.border
+      ..color = const Color(0xFFE5E7EB).withValues(alpha: 0.72)
       ..strokeWidth = 1;
     for (var i = 1; i <= 4; i++) {
       final y = size.height * i / 5;
@@ -5230,9 +5328,9 @@ class _PeriodBarPainter extends CustomPainter {
       final incomeHeight = income[i] / maxValue * (size.height - 44) * boost;
       final base = size.height - 32;
       final red = Paint()
-        ..color = AppColors.danger.withValues(alpha: dimmed ? 0.22 : 1);
+        ..color = _ledgerChartExpenseColor.withValues(alpha: dimmed ? 0.22 : 1);
       final green = Paint()
-        ..color = AppColors.success.withValues(alpha: dimmed ? 0.22 : 1);
+        ..color = _ledgerChartIncomeColor.withValues(alpha: dimmed ? 0.22 : 1);
       canvas.drawRRect(
         RRect.fromRectAndRadius(
           Rect.fromLTWH(
@@ -5338,13 +5436,6 @@ class _DonutChartPainter extends CustomPainter {
       center: center,
       radius: math.min(size.width, size.height) * 0.26,
     );
-    final colors = [
-      AppColors.purple,
-      AppColors.primary,
-      AppColors.success,
-      AppColors.warning,
-      AppColors.danger,
-    ];
     var start = -math.pi / 2;
     var i = 0;
     final rows = data.entries.toList()
@@ -5358,9 +5449,8 @@ class _DonutChartPainter extends CustomPainter {
           ? Offset(math.cos(mid), math.sin(mid)) * (10 * progress)
           : Offset.zero;
       final arcRect = rect.shift(offset);
-      final color = colors[i % colors.length].withValues(
-        alpha: dimmed ? 0.22 : 1,
-      );
+      final color = _ledgerChartPalette[i % _ledgerChartPalette.length]
+          .withValues(alpha: dimmed ? 0.22 : 1);
       final paint = Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = selected ? 34 + 8 * progress : 34

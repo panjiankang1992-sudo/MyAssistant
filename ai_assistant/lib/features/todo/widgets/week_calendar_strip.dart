@@ -254,9 +254,7 @@ class _WeekCalendarStripState extends State<WeekCalendarStrip> {
                                           fontSize: 8,
                                           height: 1.0,
                                           fontWeight: FontWeight.w800,
-                                          color: isSelected && isToday
-                                              ? scheme.primary
-                                              : badgeColor,
+                                          color: badgeColor,
                                         ),
                                       ),
                                     ),
