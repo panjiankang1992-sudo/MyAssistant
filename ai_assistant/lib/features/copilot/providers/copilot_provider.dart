@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/database/database.dart' hide CopilotSession;
 import '../../../core/providers/core_providers.dart';
+import '../../../data/datasources/local_datasource.dart';
 import '../../ai_settings/ai_model_provider.dart';
 import '../copilot_settings.dart';
 import '../copilot_memory.dart';
@@ -157,6 +158,8 @@ class CopilotState {
 }
 
 class CopilotNotifier extends Notifier<CopilotState> {
+  static const _sessionsStoreName = 'copilot_sessions_json';
+
   @override
   CopilotState build() {
     Future.microtask(loadSessions);
@@ -298,6 +301,19 @@ class CopilotNotifier extends Notifier<CopilotState> {
   }
 
   Future<List<CopilotSession>> _readSessions() async {
+    if (LocalDatasource.usesFileFallback) {
+      final raw = await ref
+          .read(datasourceProvider)
+          .readLocalStoreText(_sessionsStoreName);
+      if (raw == null || raw.trim().isEmpty) return const [];
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return const [];
+      return decoded
+          .whereType<Map>()
+          .map((item) => CopilotSession.fromJson(item.cast<String, dynamic>()))
+          .where((item) => item.messages.isNotEmpty)
+          .toList();
+    }
     final db = ref.read(databaseProvider);
     final rows = await (db.select(
       db.copilotSessions,
@@ -317,6 +333,15 @@ class CopilotNotifier extends Notifier<CopilotState> {
   }
 
   Future<void> _writeSessions(List<CopilotSession> sessions) async {
+    if (LocalDatasource.usesFileFallback) {
+      await ref
+          .read(datasourceProvider)
+          .writeLocalStoreText(
+            _sessionsStoreName,
+            jsonEncode(sessions.take(50).map((item) => item.toJson()).toList()),
+          );
+      return;
+    }
     final db = ref.read(databaseProvider);
     final current = await db.select(db.copilotSessions).get();
     final ids = sessions.map((item) => item.id).toSet();

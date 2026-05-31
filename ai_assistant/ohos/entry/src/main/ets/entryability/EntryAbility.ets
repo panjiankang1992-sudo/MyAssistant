@@ -656,6 +656,14 @@ class AssistantLocalStoreHandler {
           this.writeText(call);
           result.success(true);
           break;
+        case 'delete':
+          this.delete(call);
+          result.success(true);
+          break;
+        case 'clear':
+          this.clear();
+          result.success(true);
+          break;
         default:
           result.notImplemented();
       }
@@ -697,6 +705,18 @@ class AssistantLocalStoreHandler {
     const prefs = this.getPreferences();
     const content = (call.argument('content') as string | null) ?? '';
     prefs.putSync(this.storeKey(call), content);
+    prefs.flushSync();
+  }
+
+  private delete(call: MethodCall): void {
+    const prefs = this.getPreferences();
+    prefs.deleteSync(this.storeKey(call));
+    prefs.flushSync();
+  }
+
+  private clear(): void {
+    const prefs = this.getPreferences();
+    prefs.clearSync();
     prefs.flushSync();
   }
 }

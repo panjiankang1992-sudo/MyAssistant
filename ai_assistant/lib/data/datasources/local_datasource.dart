@@ -2,8 +2,8 @@ import 'dart:convert';
 
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
 import '../../core/database/database.dart';
+import '../../core/storage/key_value_storage.dart';
 import '../../domain/models/todo.dart' as model;
 import '../../domain/models/routine.dart' as model;
 import '../../domain/models/tag.dart' as model_tag;
@@ -34,9 +34,8 @@ class LocalDatasource {
 
   static bool get usesFileFallback => _useFileFallback;
 
-  static const MethodChannel _localStoreChannel = MethodChannel(
-    'my_assistant/local_store',
-  );
+  static const _settingsStoreName = 'app_settings_json';
+  static const _metadataOptionsStoreName = 'metadata_options_json';
   static List<model.Todo>? _fallbackTodoCache;
   static List<model_attachment.AppAttachment>? _fallbackAttachmentCache;
 
@@ -48,8 +47,8 @@ class LocalDatasource {
 
   Future<String?> _readFallbackStore(String name) async {
     try {
-      return await _localStoreChannel
-          .invokeMethod<String>('readText', {'name': name})
+      return await AppKeyValueStorage.instance
+          .readString(name)
           .timeout(const Duration(seconds: 2), onTimeout: () => null);
     } catch (_) {
       return null;
@@ -57,9 +56,26 @@ class LocalDatasource {
   }
 
   Future<void> _writeFallbackStore(String name, String content) async {
-    await _localStoreChannel
-        .invokeMethod<bool>('writeText', {'name': name, 'content': content})
+    await AppKeyValueStorage.instance
+        .writeString(name, content)
         .timeout(const Duration(seconds: 2));
+  }
+
+  Future<Map<String, dynamic>> _readFallbackJsonMap(String name) async {
+    final raw = await _readFallbackStore(name);
+    if (raw == null || raw.trim().isEmpty) return <String, dynamic>{};
+    final decoded = jsonDecode(raw);
+    if (decoded is Map) return decoded.cast<String, dynamic>();
+    return <String, dynamic>{};
+  }
+
+  Future<void> _writeFallbackJsonMap(String name, Map<String, dynamic> value) {
+    return _writeFallbackStore(name, jsonEncode(value));
+  }
+
+  static String _fallbackSettingKey(String dataType, String id) {
+    final raw = '${dataType}__$id';
+    return raw.replaceAll(RegExp(r'[^A-Za-z0-9_.-]'), '_');
   }
 
   Future<List<model.Todo>> _readFallbackTodos() async {
@@ -815,6 +831,14 @@ class LocalDatasource {
   Future<List<model_meta.MetadataOption>> getMetadataOptions({
     String? kind,
   }) async {
+    if (_useFileFallback) {
+      final options = await _readFallbackMetadataOptions();
+      final filtered = kind == null
+          ? options
+          : options.where((option) => option.kind == kind).toList();
+      filtered.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+      return filtered;
+    }
     final query = _db.select(_db.metadataOptions)
       ..orderBy([(t) => OrderingTerm.asc(t.sortOrder)]);
     if (kind != null) {
@@ -839,6 +863,20 @@ class LocalDatasource {
   }
 
   Future<void> upsertMetadataOption(model_meta.MetadataOption option) async {
+    if (_useFileFallback) {
+      final options = await _readFallbackMetadataOptions();
+      final index = options.indexWhere((item) => item.id == option.id);
+      if (index >= 0) {
+        options[index] = option;
+      } else {
+        options.add(option);
+      }
+      await _writeFallbackStore(
+        _metadataOptionsStoreName,
+        jsonEncode(options.map((item) => item.toJson()).toList()),
+      );
+      return;
+    }
     await _db
         .into(_db.metadataOptions)
         .insertOnConflictUpdate(
@@ -854,6 +892,135 @@ class LocalDatasource {
             updatedAt: Value(option.updatedAt),
           ),
         );
+  }
+
+  Future<List<model_meta.MetadataOption>> _readFallbackMetadataOptions() async {
+    final raw = await _readFallbackStore(_metadataOptionsStoreName);
+    if (raw == null || raw.trim().isEmpty) {
+      return _presetFallbackMetadataOptions();
+    }
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is List) {
+        return decoded
+            .whereType<Map>()
+            .map(
+              (item) => model_meta.MetadataOption.fromJson(
+                item.cast<String, dynamic>(),
+              ),
+            )
+            .toList();
+      }
+    } catch (_) {
+      // Fall back to presets when old development data is malformed.
+    }
+    return _presetFallbackMetadataOptions();
+  }
+
+  static List<model_meta.MetadataOption> _presetFallbackMetadataOptions() {
+    final now = DateTime.fromMillisecondsSinceEpoch(0);
+    return [
+      model_meta.MetadataOption(
+        id: 'source-ai',
+        kind: 'source',
+        value: 'ai',
+        label: 'AI',
+        iconKey: 'auto_awesome',
+        colorKey: 'blue',
+        sortOrder: 0,
+        updatedAt: now,
+      ),
+      model_meta.MetadataOption(
+        id: 'source-routine',
+        kind: 'source',
+        value: 'routine',
+        label: '例行',
+        iconKey: 'repeat',
+        colorKey: 'orange',
+        sortOrder: 1,
+        updatedAt: now,
+      ),
+      model_meta.MetadataOption(
+        id: 'source-calendar',
+        kind: 'source',
+        value: 'calendar',
+        label: '日历',
+        iconKey: 'event',
+        colorKey: 'purple',
+        sortOrder: 2,
+        updatedAt: now,
+      ),
+      model_meta.MetadataOption(
+        id: 'source-message',
+        kind: 'source',
+        value: 'message',
+        label: '消息',
+        iconKey: 'message',
+        colorKey: 'green',
+        sortOrder: 3,
+        updatedAt: now,
+      ),
+      model_meta.MetadataOption(
+        id: 'source-sms',
+        kind: 'source',
+        value: 'sms',
+        label: '短信',
+        iconKey: 'sms',
+        colorKey: 'teal',
+        sortOrder: 4,
+        updatedAt: now,
+      ),
+      model_meta.MetadataOption(
+        id: 'action-none',
+        kind: 'action',
+        value: 'none',
+        label: '无动作',
+        iconKey: 'block',
+        colorKey: 'gray',
+        sortOrder: 0,
+        updatedAt: now,
+      ),
+      model_meta.MetadataOption(
+        id: 'action-bookkeeping',
+        kind: 'action',
+        value: 'bookkeeping',
+        label: '记账',
+        iconKey: 'receipt',
+        colorKey: 'orange',
+        sortOrder: 1,
+        updatedAt: now,
+      ),
+      model_meta.MetadataOption(
+        id: 'action-open-app',
+        kind: 'action',
+        value: 'open_app',
+        label: '打开应用',
+        iconKey: 'open',
+        colorKey: 'blue',
+        sortOrder: 2,
+        updatedAt: now,
+      ),
+      model_meta.MetadataOption(
+        id: 'action-call',
+        kind: 'action',
+        value: 'call',
+        label: '拨打电话',
+        iconKey: 'call',
+        colorKey: 'green',
+        sortOrder: 3,
+        updatedAt: now,
+      ),
+      model_meta.MetadataOption(
+        id: 'action-message',
+        kind: 'action',
+        value: 'message',
+        label: '发消息',
+        iconKey: 'message',
+        colorKey: 'purple',
+        sortOrder: 4,
+        updatedAt: now,
+      ),
+    ];
   }
 
   Future<List<model_attachment.AppAttachment>> getAllAttachments() async {
@@ -1228,6 +1395,16 @@ class LocalDatasource {
     String dataType,
     String id,
   ) async {
+    if (_useFileFallback) {
+      final settings = await _readFallbackJsonMap(_settingsStoreName);
+      final record = settings[_fallbackSettingKey(dataType, id)];
+      if (record is! Map) return null;
+      final typed = record.cast<String, dynamic>();
+      if (typed['isDeleted'] as bool? ?? false) return null;
+      final payload = typed['payload'];
+      if (payload is Map) return payload.cast<String, dynamic>();
+      return null;
+    }
     final row =
         await (_db.select(_db.appSettingsRecords)
               ..where((t) => t.dataType.equals(dataType) & t.id.equals(id)))
@@ -1246,6 +1423,25 @@ class LocalDatasource {
     DateTime? updatedAt,
   }) async {
     final now = updatedAt ?? DateTime.now();
+    if (_useFileFallback) {
+      final settings = await _readFallbackJsonMap(_settingsStoreName);
+      final key = _fallbackSettingKey(dataType, id);
+      final existing = settings[key];
+      final existingVersion = existing is Map
+          ? (existing['version'] as num?)?.toInt() ?? 0
+          : 0;
+      settings[key] = {
+        'id': id,
+        'module': module,
+        'dataType': dataType,
+        'payload': payload,
+        'updatedAt': now.toIso8601String(),
+        'version': version ?? existingVersion + 1,
+        'isDeleted': isDeleted,
+      };
+      await _writeFallbackJsonMap(_settingsStoreName, settings);
+      return;
+    }
     final existing =
         await (_db.select(_db.appSettingsRecords)
               ..where((t) => t.dataType.equals(dataType) & t.id.equals(id)))
