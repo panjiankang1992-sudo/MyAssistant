@@ -10,6 +10,18 @@ import '../../domain/models/tag.dart' as model_tag;
 import '../../domain/models/metadata_option.dart' as model_meta;
 import '../../domain/models/app_attachment.dart' as model_attachment;
 
+class SyncEntityRef {
+  final String id;
+  final String dataType;
+  final String localTable;
+
+  const SyncEntityRef({
+    required this.id,
+    required this.dataType,
+    required this.localTable,
+  });
+}
+
 class LocalDatasource {
   final AppDatabase _db;
 
@@ -848,6 +860,55 @@ class LocalDatasource {
     if (_useFileFallback) return _readFallbackAttachments();
     final rows = await _db.select(_db.attachments).get();
     return rows.map(_mapAttachment).toList();
+  }
+
+  Future<List<SyncEntityRef>> getAllSyncEntityRefs() async {
+    final rows = await _db
+        .customSelect(
+          '''
+          SELECT id, 'bill' AS data_type, 'bills' AS local_table FROM bills
+          UNION ALL
+          SELECT id, 'category' AS data_type, 'bill_categories' AS local_table
+          FROM bill_categories
+          UNION ALL
+          SELECT
+            id,
+            CASE
+              WHEN archived = 1 THEN 'archive'
+              WHEN note_type = 'diary' THEN 'diary'
+              ELSE 'note'
+            END AS data_type,
+            'quick_notes' AS local_table
+          FROM quick_notes
+          UNION ALL
+          SELECT
+            id,
+            CASE WHEN archived = 1 THEN 'archive_chat' ELSE 'chat' END
+              AS data_type,
+            'copilot_sessions' AS local_table
+          FROM copilot_sessions
+          UNION ALL
+          SELECT id, data_type, 'app_settings' AS local_table
+          FROM app_settings
+          ''',
+          readsFrom: {
+            _db.bills,
+            _db.billCategories,
+            _db.quickNotes,
+            _db.copilotSessions,
+            _db.appSettingsRecords,
+          },
+        )
+        .get();
+    return rows
+        .map(
+          (row) => SyncEntityRef(
+            id: row.read<String>('id'),
+            dataType: row.read<String>('data_type'),
+            localTable: row.read<String>('local_table'),
+          ),
+        )
+        .toList();
   }
 
   Future<model_attachment.AppAttachment?> getAttachmentById(String id) async {

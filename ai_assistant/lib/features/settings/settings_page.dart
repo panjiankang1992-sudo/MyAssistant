@@ -4,6 +4,8 @@ import '../../core/theme/app_theme.dart';
 import '../../core/security/keychain_service.dart';
 import '../../data/datasources/webdav_datasource.dart';
 import '../../shared/widgets/app_controls.dart';
+import '../../shared/widgets/edge_swipe_pop.dart';
+import '../sync/data_sync_service.dart';
 import '../sync/providers/sync_provider.dart';
 import '../../core/providers/core_providers.dart';
 
@@ -53,9 +55,35 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     }
   }
 
+  Future<bool> _ensureWebdavLoaded() async {
+    if (_webdavLoaded) return true;
+    await _loadWebdavInfo();
+    return _webdavLoaded;
+  }
+
+  bool _isSyncErrorMessage(String message) {
+    return message.contains('失败') ||
+        message.contains('异常') ||
+        message.contains('丢失') ||
+        message.contains('未配置');
+  }
+
+  Future<String> _nullSyncResultMessage(DataSyncService service) async {
+    if (service.isSyncing) return '已有同步任务正在执行，请稍后再试';
+    if (!await service.isConfigured) return '未配置 WebDAV，已跳过同步';
+    return '同步未开始，请稍后重试';
+  }
+
+  String _syncResultErrorMessage(SyncResult result) {
+    final error = result.error?.trim();
+    if (error != null && error.isNotEmpty) return error;
+    return '同步失败：请稍后重试';
+  }
+
   /// 找最近 N 天的待办目录并拉取
   Future<void> _syncWebdav() async {
-    if (!_webdavLoaded) {
+    if (!await _ensureWebdavLoaded()) {
+      if (!mounted) return;
       setState(() => _syncMessage = '未配置 WebDAV，当前仅使用本地存储');
       return;
     }
@@ -64,11 +92,16 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       _syncMessage = '';
     });
     try {
-      final result = await ref
-          .read(dataSyncServiceProvider)
-          .manualSync(full: false);
+      final service = ref.read(dataSyncServiceProvider);
+      final result = await service.manualSync(full: false);
+      if (!mounted) return;
       if (result == null) {
-        setState(() => _syncMessage = '未配置 WebDAV，已跳过同步');
+        final message = await _nullSyncResultMessage(service);
+        if (mounted) setState(() => _syncMessage = message);
+        return;
+      }
+      if (result.hasErrors) {
+        setState(() => _syncMessage = _syncResultErrorMessage(result));
         return;
       }
 
@@ -77,14 +110,15 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             '同步完成：拉取 ${result.pullCount} 条，推送 ${result.pushCount} 条',
       );
     } catch (e) {
-      setState(() => _syncMessage = '同步异常: $e');
+      if (mounted) setState(() => _syncMessage = '同步异常: $e');
     } finally {
-      setState(() => _syncing = false);
+      if (mounted) setState(() => _syncing = false);
     }
   }
 
   Future<void> _fullSync() async {
-    if (!_webdavLoaded) {
+    if (!await _ensureWebdavLoaded()) {
+      if (!mounted) return;
       setState(() => _syncMessage = '未配置 WebDAV，当前仅使用本地存储');
       return;
     }
@@ -93,11 +127,16 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       _syncMessage = '';
     });
     try {
-      final result = await ref
-          .read(dataSyncServiceProvider)
-          .manualSync(full: true);
+      final service = ref.read(dataSyncServiceProvider);
+      final result = await service.manualSync(full: true);
+      if (!mounted) return;
       if (result == null) {
-        setState(() => _syncMessage = '未配置 WebDAV，已跳过同步');
+        final message = await _nullSyncResultMessage(service);
+        if (mounted) setState(() => _syncMessage = message);
+        return;
+      }
+      if (result.hasErrors) {
+        setState(() => _syncMessage = _syncResultErrorMessage(result));
         return;
       }
       final msg = StringBuffer();
@@ -108,9 +147,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       );
       setState(() => _syncMessage = msg.toString());
     } catch (e) {
-      setState(() => _syncMessage = '同步异常: $e');
+      if (mounted) setState(() => _syncMessage = '同步异常: $e');
     } finally {
-      setState(() => _syncing = false);
+      if (mounted) setState(() => _syncing = false);
     }
   }
 
@@ -449,10 +488,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color:
-                      _syncMessage.contains('失败') ||
-                          _syncMessage.contains('异常') ||
-                          _syncMessage.contains('丢失')
+                  color: _isSyncErrorMessage(_syncMessage)
                       ? const Color(0xFFFFEBEE)
                       : const Color(0xFFE8F5E9),
                   borderRadius: BorderRadius.circular(8),
@@ -461,10 +497,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   _syncMessage,
                   style: TextStyle(
                     fontSize: 14,
-                    color:
-                        _syncMessage.contains('失败') ||
-                            _syncMessage.contains('异常') ||
-                            _syncMessage.contains('丢失')
+                    color: _isSyncErrorMessage(_syncMessage)
                         ? const Color(0xFFC62828)
                         : const Color(0xFF2E7D32),
                   ),
@@ -499,7 +532,8 @@ class _RightSlidePageRoute<T> extends PageRouteBuilder<T> {
     : super(
         transitionDuration: const Duration(milliseconds: 260),
         reverseTransitionDuration: const Duration(milliseconds: 220),
-        pageBuilder: (context, animation, secondaryAnimation) => child,
+        pageBuilder: (context, animation, secondaryAnimation) =>
+            EdgeSwipePop(child: child),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           final curved = CurvedAnimation(
             parent: animation,

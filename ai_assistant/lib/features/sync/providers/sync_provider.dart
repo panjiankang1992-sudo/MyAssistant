@@ -78,7 +78,11 @@ class SyncNotifier extends Notifier<SyncState> {
     return const SyncState();
   }
 
-  void setSyncing(bool v) => state = state.copyWith(syncing: v);
+  void setSyncing(bool v) {
+    state = v
+        ? state.clearError().copyWith(syncing: true)
+        : state.copyWith(syncing: false, error: state.error);
+  }
 
   void onSyncComplete(SyncResult result) {
     lastResult = result;

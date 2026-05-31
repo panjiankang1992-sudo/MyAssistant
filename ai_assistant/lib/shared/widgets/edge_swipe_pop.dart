@@ -31,7 +31,12 @@ class _EdgeSwipePopState extends State<EdgeSwipePop> {
         final velocity = details.primaryVelocity ?? 0;
         if (_drag > 80 || velocity > 420) {
           final navigator = Navigator.of(context);
-          if (navigator.canPop()) navigator.pop();
+          if (navigator.canPop()) {
+            navigator.pop();
+          } else {
+            final rootNavigator = Navigator.of(context, rootNavigator: true);
+            if (rootNavigator.canPop()) rootNavigator.pop();
+          }
         }
         _tracking = false;
         _drag = 0;

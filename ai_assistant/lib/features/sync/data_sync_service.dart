@@ -42,6 +42,10 @@ class DataSyncService {
        _localSync = localSync,
        _notifier = notifier;
 
+  bool get isSyncing => _syncing;
+
+  Future<bool> get isConfigured => _syncConfigured();
+
   void start() {
     _timer ??= Timer.periodic(
       const Duration(minutes: 10),
@@ -117,6 +121,7 @@ class DataSyncService {
       );
     } finally {
       _syncing = false;
+      _notifier.setSyncing(false);
     }
   }
 }

@@ -9,6 +9,7 @@ class CopilotHero extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profile = ref.watch(profileProvider);
+    final scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 20),
       child: Column(
@@ -34,23 +35,31 @@ class CopilotHero extends ConsumerWidget {
           const SizedBox(height: 12),
           Text(
             '你好，${profile.name}',
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: 'PingFang SC',
-              fontFamilyFallback: ['.SF Pro Text', 'system-ui', 'sans-serif'],
+              fontFamilyFallback: const [
+                '.SF Pro Text',
+                'system-ui',
+                'sans-serif',
+              ],
               fontSize: 22,
               fontWeight: FontWeight.w700,
-              color: AppColors.text,
+              color: scheme.appText,
             ),
           ),
           const SizedBox(height: 4),
-          const Text(
+          Text(
             '我能帮你做些什么？',
             style: TextStyle(
               fontFamily: 'PingFang SC',
-              fontFamilyFallback: ['.SF Pro Text', 'system-ui', 'sans-serif'],
+              fontFamilyFallback: const [
+                '.SF Pro Text',
+                'system-ui',
+                'sans-serif',
+              ],
               fontSize: 16,
               fontWeight: FontWeight.w400,
-              color: AppColors.textTertiary,
+              color: scheme.appSubtleText,
             ),
           ),
         ],

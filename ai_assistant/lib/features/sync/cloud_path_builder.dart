@@ -96,11 +96,11 @@ class CloudPathBuilder {
   }
 
   String buildTagsIndexPath() {
-    return buildIndexPath('profile', 'tags');
+    return '$appRoot/profile/tags_setting.json';
   }
 
   String buildMetadataIndexPath() {
-    return buildIndexPath('profile', 'data');
+    return '$appRoot/profile/data_setting.json';
   }
 
   List<String> get requiredDirectories {

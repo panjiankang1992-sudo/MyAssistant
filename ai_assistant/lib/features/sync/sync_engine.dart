@@ -69,7 +69,9 @@ class SyncEngine {
     await _recordIndexFileIfNeeded(path);
   }
 
-  Future<SyncResult> sync(String module) async {
+  Future<SyncResult> sync(String module) => _sync(module);
+
+  Future<SyncResult> _sync(String module, {bool forcePush = false}) async {
     await _ensureCloudDirectories();
 
     // Pull tags first so we have latest tag definitions
@@ -90,7 +92,7 @@ class SyncEngine {
 
     await _pullViaIndex(module);
     final pullCount = await _processPendingDownloads();
-    final pushCount = await _pushAll(module);
+    final pushCount = await _pushAll(module, force: forcePush);
 
     return SyncResult(
       module: module,
@@ -545,10 +547,16 @@ class SyncEngine {
 
   String _dateStr(DateTime dt) => dt.toIso8601String().split('T').first;
 
-  Future<int> _pushAll(String module) async {
+  Future<int> _pushAll(String module, {bool force = false}) async {
     await _ensureCloudDirectories();
     await _dedupeLocalGeneratedTodos();
     int pushed = await _pushPendingUploads(module);
+
+    if (force) {
+      await pushTags(await _localDs.getAllTags());
+      await pushMetadataOptions(await _localDs.getMetadataOptions());
+      pushed += 2;
+    }
 
     final todos = await _localDs.getAllTodos();
     final todoIndex = await _localSyncDs.getSyncIndexForType('todo');
@@ -556,13 +564,15 @@ class SyncEngine {
     for (final todo in todos) {
       final li = todoIndex.where((e) => e.dataId == todo.id).firstOrNull;
       if (todo.deleted) {
-        if (li != null && li.localVersion <= li.cloudVersion) continue;
+        if (!force && li != null && li.localVersion <= li.cloudVersion) {
+          continue;
+        }
         await _uploadTodoFile(todo, deleted: true);
         todoChanged = true;
         pushed++;
         continue;
       }
-      if (li != null && li.localVersion <= li.cloudVersion) continue;
+      if (!force && li != null && li.localVersion <= li.cloudVersion) continue;
       await _uploadTodoFile(todo, deleted: false);
       todoChanged = true;
       pushed++;
@@ -579,13 +589,100 @@ class SyncEngine {
       final li = routineIndex
           .where((e) => e.dataId == routine.uuid)
           .firstOrNull;
-      if (li != null && li.localVersion <= li.cloudVersion) continue;
+      if (!force && li != null && li.localVersion <= li.cloudVersion) continue;
       await _uploadRoutineFile(routine);
       routineChanged = true;
       pushed++;
     }
     if (routineChanged) await _updateCloudIndex('todos', 'routine');
+    pushed += await _pushAllGenericEntities(force: force);
+    pushed += await _pushAllAttachments(force: force);
     await _flushSyncManifestIfNeeded();
+    return pushed;
+  }
+
+  Future<bool> _shouldUploadEntity({
+    required String dataType,
+    required String dataId,
+    required int version,
+    required bool force,
+  }) async {
+    if (force) return true;
+    final index = await _localSyncDs.getSyncIndex(dataId, dataType);
+    if (index == null) return true;
+    if ((index.cloudPath ?? '').isEmpty) return true;
+    if (index.syncStatus != 'synced') return true;
+    return index.localVersion > index.cloudVersion ||
+        version > index.cloudVersion;
+  }
+
+  Future<int> _pushAllGenericEntities({required bool force}) async {
+    final refs = await _localDs.getAllSyncEntityRefs();
+    final changedTypes = <String>{};
+    var pushed = 0;
+    for (final ref in refs) {
+      final module = _moduleForDataType(ref.dataType);
+      if (module == null) continue;
+      final entity = await _localDs.getSyncEntityJson(
+        ref.localTable,
+        ref.id,
+        dataType: ref.dataType,
+      );
+      if (entity == null) continue;
+      final version = entity['version'] as int? ?? 1;
+      final shouldUpload = await _shouldUploadEntity(
+        dataType: ref.dataType,
+        dataId: ref.id,
+        version: version,
+        force: force,
+      );
+      if (!shouldUpload) continue;
+      final path = _pathBuilder.buildDataFilePath(
+        module,
+        ref.dataType,
+        ref.id,
+        dateStr: entity['date'] as String? ?? entity['updatedAt'] as String?,
+      );
+      await _uploadGenericEntityFile(
+        dataType: ref.dataType,
+        dataId: ref.id,
+        data: entity,
+        path: path,
+      );
+      changedTypes.add(ref.dataType);
+      pushed++;
+    }
+    for (final dataType in changedTypes) {
+      final module = _moduleForDataType(dataType);
+      if (module != null) await _updateCloudIndex(module, dataType);
+    }
+    return pushed;
+  }
+
+  Future<int> _pushAllAttachments({required bool force}) async {
+    final attachments = await _localDs.getAllAttachments();
+    var pushed = 0;
+    var changed = false;
+    for (final attachment in attachments) {
+      if (attachment.exceedsMaxSize) continue;
+      final shouldUpload = await _shouldUploadEntity(
+        dataType: 'attachment',
+        dataId: attachment.id,
+        version: 1,
+        force: force,
+      );
+      if (!shouldUpload) continue;
+      final path = _pathBuilder.buildDataFilePath(
+        'attachments',
+        'attachment',
+        attachment.id,
+        dateStr: attachment.updatedAt.toIso8601String(),
+      );
+      await _uploadAttachmentFile(attachment, path);
+      changed = true;
+      pushed++;
+    }
+    if (changed) await _updateCloudIndex('attachments', 'attachment');
     return pushed;
   }
 
@@ -1180,7 +1277,7 @@ class SyncEngine {
   }
 
   Future<SyncResult> fullSync(String module) async {
-    return sync(module);
+    return _sync(module, forcePush: true);
   }
 
   // ── 公开的单条上传 (给 repository 的 auto-sync 用) ──

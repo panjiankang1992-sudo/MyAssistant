@@ -31,20 +31,30 @@ class _CopilotAvatarPickerDialogState extends State<CopilotAvatarPickerDialog> {
   }
 
   Future<void> _pickCustom() async {
-    final files = await AppFilePicker.pickImages(
-      allowMultiple: false,
-      maxSelectNumber: 1,
-    );
-    if (files.isEmpty || files.first.path.trim().isEmpty) return;
-    if (!mounted) return;
-    final croppedPath = await Navigator.of(context).push<String>(
-      MaterialPageRoute(
-        builder: (_) => AvatarImageCropPage(imagePath: files.first.path),
-        fullscreenDialog: true,
-      ),
-    );
-    if (!mounted || croppedPath == null || croppedPath.trim().isEmpty) return;
-    setState(() => _selected = CopilotAvatarCatalog.fileValue(croppedPath));
+    try {
+      final files = await AppFilePicker.pickImages(
+        allowMultiple: false,
+        maxSelectNumber: 1,
+      );
+      if (files.isEmpty || files.first.path.trim().isEmpty) return;
+      if (!mounted) return;
+      final croppedPath = await Navigator.of(context, rootNavigator: true)
+          .push<String>(
+            MaterialPageRoute(
+              builder: (_) => AvatarImageCropPage(imagePath: files.first.path),
+              fullscreenDialog: true,
+            ),
+          );
+      if (!mounted || croppedPath == null || croppedPath.trim().isEmpty) return;
+      final value = CopilotAvatarCatalog.fileValue(croppedPath);
+      setState(() => _selected = value);
+      Navigator.of(context).pop(value);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('头像图片处理失败：$e')));
+    }
   }
 
   @override

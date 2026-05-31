@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/widgets/app_controls.dart';
+import '../../shared/widgets/edge_swipe_pop.dart';
 import '../copilot/copilot_avatar.dart';
 import '../copilot/copilot_avatar_picker.dart';
 import 'profile_provider.dart';
@@ -13,7 +14,8 @@ void showEditProfileModal(BuildContext context) {
 
 PageRoute<T> profileSidePageRoute<T>(Widget page) {
   return PageRouteBuilder<T>(
-    pageBuilder: (context, animation, secondaryAnimation) => page,
+    pageBuilder: (context, animation, secondaryAnimation) =>
+        EdgeSwipePop(child: page),
     transitionsBuilder: (context, animation, secondaryAnimation, child) {
       final offset = Tween<Offset>(
         begin: const Offset(1, 0),

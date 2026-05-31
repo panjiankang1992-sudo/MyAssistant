@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 import '../../core/theme/app_theme.dart';
 import '../../domain/models/ai_model_config.dart';
 import '../../shared/widgets/app_controls.dart';
+import '../../shared/widgets/edge_swipe_pop.dart';
 import 'ai_model_catalog_service.dart';
 import 'ai_model_provider.dart';
 
@@ -203,214 +205,474 @@ class _CapabilityCard extends StatelessWidget {
 
 Future<void> showAiModelDialog(
   BuildContext context,
-  WidgetRef ref, {
+  WidgetRef _, {
   AiModelConfig? config,
-}) async {
-  final now = DateTime.now();
-  var provider = config?.provider ?? 'deepseek';
-  final nameCtrl = TextEditingController(text: config?.name ?? 'DeepSeek');
-  final baseCtrl = TextEditingController(
-    text: config?.baseUrl ?? AiProviderPresets.byProvider(provider).baseUrl,
-  );
-  final modelCtrl = TextEditingController(
-    text: config?.model ?? AiProviderPresets.byProvider(provider).model,
-  );
-  final keyCtrl = TextEditingController(text: config?.apiKey ?? '');
-  final catalog = AiModelCatalogService();
-  var models = catalog.fallbackModels(provider);
-  var fetchingModels = false;
-  String? modelFetchError;
-
-  await showDialog<void>(
-    context: context,
-    builder: (ctx) => StatefulBuilder(
-      builder: (ctx, setState) {
-        void applyPreset(String value) {
-          final preset = AiProviderPresets.byProvider(value);
-          setState(() {
-            provider = value;
-            models = catalog.fallbackModels(provider);
-            modelFetchError = null;
-            if (config == null || nameCtrl.text.trim().isEmpty) {
-              nameCtrl.text = preset.label;
-            }
-            if (value != 'custom') {
-              baseCtrl.text = preset.baseUrl;
-              modelCtrl.text = preset.model;
-            }
-          });
-        }
-
-        Future<void> fetchModels() async {
-          setState(() {
-            fetchingModels = true;
-            modelFetchError = null;
-          });
-          try {
-            final fetched = await catalog.fetchModels(
-              provider: provider,
-              baseUrl: baseCtrl.text.trim(),
-              apiKey: keyCtrl.text.trim(),
-            );
-            setState(() {
-              models = fetched.isEmpty
-                  ? catalog.fallbackModels(provider)
-                  : fetched;
-              if (models.isNotEmpty &&
-                  !models.contains(modelCtrl.text.trim())) {
-                modelCtrl.text = models.first;
-              }
-            });
-          } catch (e) {
-            setState(() {
-              modelFetchError = e.toString().replaceFirst('Exception: ', '');
-            });
-          } finally {
-            setState(() {
-              fetchingModels = false;
-            });
-          }
-        }
-
-        Future<void> saveConfig() async {
-          await ref
-              .read(aiModelProvider.notifier)
-              .upsert(
-                AiModelConfig(
-                  id: config?.id ?? '',
-                  name: nameCtrl.text.trim(),
-                  provider: provider,
-                  baseUrl: baseCtrl.text.trim(),
-                  model: modelCtrl.text.trim(),
-                  apiKey: keyCtrl.text.trim(),
-                  createdAt: config?.createdAt ?? now,
-                  updatedAt: now,
-                ),
-              );
-          if (ctx.mounted) Navigator.of(ctx).pop();
-        }
-
-        return AlertDialog(
-          title: Text(config == null ? '添加模型' : '编辑模型'),
-          content: SizedBox(
-            width: 440,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  AppDropdownField<String>(
-                    label: '厂商',
-                    value: provider,
-                    options: AiProviderPresets.options
-                        .map(
-                          (item) => AppDropdownOption(
-                            value: item.provider,
-                            label: item.label,
-                          ),
-                        )
-                        .toList(),
-                    onChanged: applyPreset,
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: nameCtrl,
-                    decoration: appInputDecoration(label: '显示名称'),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: baseCtrl,
-                    decoration: appInputDecoration(
-                      label: 'Base URL',
-                      hintText: 'https://api.example.com/v1',
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: models.isEmpty
-                            ? TextField(
-                                controller: modelCtrl,
-                                decoration: appInputDecoration(label: '模型名'),
-                              )
-                            : AppDropdownField<String>(
-                                label: '模型名',
-                                value: models.contains(modelCtrl.text.trim())
-                                    ? modelCtrl.text.trim()
-                                    : models.first,
-                                options: models
-                                    .map(
-                                      (model) => AppDropdownOption(
-                                        value: model,
-                                        label: model,
-                                      ),
-                                    )
-                                    .toList(),
-                                onChanged: (value) =>
-                                    setState(() => modelCtrl.text = value),
-                              ),
-                      ),
-                      const SizedBox(width: 10),
-                      SizedBox(
-                        height: appControlHeight,
-                        child: OutlinedButton.icon(
-                          onPressed: fetchingModels ? null : fetchModels,
-                          style: OutlinedButton.styleFrom(
-                            minimumSize: const Size(92, appControlHeight),
-                            fixedSize: const Size.fromHeight(appControlHeight),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(18),
-                            ),
-                            side: BorderSide(
-                              color: AppColors.primary.withValues(alpha: 0.28),
-                            ),
-                          ),
-                          icon: fetchingModels
-                              ? const SizedBox(
-                                  width: 14,
-                                  height: 14,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Icon(Icons.cloud_sync_rounded, size: 16),
-                          label: const Text('拉取'),
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (modelFetchError != null) ...[
-                    const SizedBox(height: 8),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        modelFetchError!,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.danger,
-                        ),
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: keyCtrl,
-                    obscureText: true,
-                    decoration: appInputDecoration(label: 'API Key'),
-                  ),
-                  const SizedBox(height: 18),
-                  AppDialogActionRow(
-                    onCancel: () => Navigator.of(ctx).pop(),
-                    onConfirm: saveConfig,
-                    confirmLabel: '保存',
-                  ),
-                ],
-              ),
-            ),
-          ),
+}) {
+  return Navigator.of(context).push<void>(
+    PageRouteBuilder<void>(
+      transitionDuration: const Duration(milliseconds: 260),
+      reverseTransitionDuration: const Duration(milliseconds: 220),
+      pageBuilder: (context, animation, secondaryAnimation) =>
+          EdgeSwipePop(child: _AiModelEditorPage(config: config)),
+      transitionsBuilder: (context, animation, secondaryAnimation, child) {
+        final curved = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutCubic,
+          reverseCurve: Curves.easeInCubic,
+        );
+        return SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(1, 0),
+            end: Offset.zero,
+          ).animate(curved),
+          child: child,
         );
       },
     ),
   );
+}
+
+class _AiModelEditorPage extends ConsumerStatefulWidget {
+  final AiModelConfig? config;
+
+  const _AiModelEditorPage({this.config});
+
+  @override
+  ConsumerState<_AiModelEditorPage> createState() => _AiModelEditorPageState();
+}
+
+class _AiModelEditorPageState extends ConsumerState<_AiModelEditorPage> {
+  late String _provider;
+  late final TextEditingController _nameCtrl;
+  late final TextEditingController _baseCtrl;
+  late final TextEditingController _modelCtrl;
+  late final TextEditingController _keyCtrl;
+  final _catalog = AiModelCatalogService();
+  late List<String> _models;
+  bool _fetchingModels = false;
+  bool _saving = false;
+  bool _obscureKey = true;
+  String? _modelFetchError;
+  String? _formError;
+
+  @override
+  void initState() {
+    super.initState();
+    final config = widget.config;
+    _provider = config?.provider ?? 'deepseek';
+    final preset = AiProviderPresets.byProvider(_provider);
+    _nameCtrl = TextEditingController(text: config?.name ?? preset.label);
+    _baseCtrl = TextEditingController(text: config?.baseUrl ?? preset.baseUrl);
+    _modelCtrl = TextEditingController(text: config?.model ?? preset.model);
+    _keyCtrl = TextEditingController(text: config?.apiKey ?? '');
+    _models = _catalog.fallbackModels(_provider);
+  }
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _baseCtrl.dispose();
+    _modelCtrl.dispose();
+    _keyCtrl.dispose();
+    super.dispose();
+  }
+
+  bool get _busy => _saving || _fetchingModels;
+
+  void _applyPreset(String value) {
+    final preset = AiProviderPresets.byProvider(value);
+    setState(() {
+      _provider = value;
+      _models = _catalog.fallbackModels(_provider);
+      _modelFetchError = null;
+      _formError = null;
+      if (widget.config == null || _nameCtrl.text.trim().isEmpty) {
+        _nameCtrl.text = preset.label;
+      }
+      if (value != 'custom') {
+        _baseCtrl.text = preset.baseUrl;
+        _modelCtrl.text = preset.model;
+      }
+    });
+  }
+
+  Future<void> _pasteInto(TextEditingController controller) async {
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    final text = data?.text ?? '';
+    if (text.isEmpty) return;
+    controller.value = TextEditingValue(
+      text: text.trim(),
+      selection: TextSelection.collapsed(offset: text.trim().length),
+    );
+  }
+
+  Future<void> _fetchModels() async {
+    setState(() {
+      _fetchingModels = true;
+      _modelFetchError = null;
+      _formError = null;
+    });
+    try {
+      final fetched = await _catalog.fetchModels(
+        provider: _provider,
+        baseUrl: _baseCtrl.text.trim(),
+        apiKey: _keyCtrl.text.trim(),
+      );
+      if (!mounted) return;
+      setState(() {
+        _models = fetched.isEmpty
+            ? _catalog.fallbackModels(_provider)
+            : fetched;
+        if (_models.isNotEmpty && !_models.contains(_modelCtrl.text.trim())) {
+          _modelCtrl.text = _models.first;
+        }
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _modelFetchError = e.toString().replaceFirst('Exception: ', '');
+      });
+    } finally {
+      if (mounted) setState(() => _fetchingModels = false);
+    }
+  }
+
+  String? _validate() {
+    if (_nameCtrl.text.trim().isEmpty) return '请填写显示名称';
+    if (_baseCtrl.text.trim().isEmpty) return '请填写 Base URL';
+    if (_modelCtrl.text.trim().isEmpty) return '请填写模型名';
+    if (_keyCtrl.text.trim().isEmpty) return '请填写 API Key';
+    return null;
+  }
+
+  Future<void> _save() async {
+    if (_busy) return;
+    final error = _validate();
+    if (error != null) {
+      setState(() => _formError = error);
+      return;
+    }
+    setState(() {
+      _saving = true;
+      _formError = null;
+    });
+    final now = DateTime.now();
+    try {
+      await ref
+          .read(aiModelProvider.notifier)
+          .upsert(
+            AiModelConfig(
+              id: widget.config?.id ?? '',
+              name: _nameCtrl.text.trim(),
+              provider: _provider,
+              baseUrl: _baseCtrl.text.trim(),
+              model: _modelCtrl.text.trim(),
+              apiKey: _keyCtrl.text.trim(),
+              createdAt: widget.config?.createdAt ?? now,
+              updatedAt: now,
+            ),
+          );
+      if (mounted) Navigator.of(context).pop();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _formError = '保存失败：$e');
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+    final title = widget.config == null ? '添加模型' : '编辑模型';
+    return Scaffold(
+      resizeToAvoidBottomInset: false,
+      backgroundColor: theme.scaffoldBackgroundColor,
+      body: SafeArea(
+        child: Stack(
+          children: [
+            ListView(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              padding: EdgeInsets.fromLTRB(22, 16, 22, 126 + keyboardInset),
+              children: [
+                Row(
+                  children: [
+                    IconButton.filledTonal(
+                      onPressed: _busy
+                          ? null
+                          : () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w900,
+                          color: scheme.appText,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  '配置 Copilot 调用的大模型。粘贴按钮可直接从剪贴板写入 Base URL 或 API Key。',
+                  style: TextStyle(
+                    fontSize: 13,
+                    height: 1.45,
+                    color: scheme.appMutedText,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                AppDropdownField<String>(
+                  label: '厂商',
+                  value: _provider,
+                  options: AiProviderPresets.options
+                      .map(
+                        (item) => AppDropdownOption(
+                          value: item.provider,
+                          label: item.label,
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) {
+                    if (!_busy) _applyPreset(value);
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _nameCtrl,
+                  enabled: !_busy,
+                  textInputAction: TextInputAction.next,
+                  decoration: appInputDecoration(
+                    context: context,
+                    label: '显示名称',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _baseCtrl,
+                  enabled: !_busy,
+                  keyboardType: TextInputType.url,
+                  textInputAction: TextInputAction.next,
+                  decoration: appInputDecoration(
+                    context: context,
+                    label: 'Base URL',
+                    hintText: 'https://api.example.com/v1',
+                    suffixIcon: AppIconTapButton(
+                      tooltip: '粘贴',
+                      onPressed: _busy ? null : () => _pasteInto(_baseCtrl),
+                      icon: Icons.content_paste_rounded,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: _models.isEmpty
+                          ? TextField(
+                              controller: _modelCtrl,
+                              enabled: !_busy,
+                              textInputAction: TextInputAction.next,
+                              decoration: appInputDecoration(
+                                context: context,
+                                label: '模型名',
+                              ),
+                            )
+                          : AppDropdownField<String>(
+                              label: '模型名',
+                              value: _models.contains(_modelCtrl.text.trim())
+                                  ? _modelCtrl.text.trim()
+                                  : _models.first,
+                              options: _models
+                                  .map(
+                                    (model) => AppDropdownOption(
+                                      value: model,
+                                      label: model,
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (value) {
+                                if (!_busy) {
+                                  setState(() => _modelCtrl.text = value);
+                                }
+                              },
+                            ),
+                    ),
+                    const SizedBox(width: 10),
+                    SizedBox(
+                      height: appControlHeight,
+                      child: OutlinedButton.icon(
+                        onPressed: _busy ? null : _fetchModels,
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(92, appControlHeight),
+                          fixedSize: const Size.fromHeight(appControlHeight),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                          side: BorderSide(
+                            color: scheme.primary.withValues(alpha: 0.28),
+                          ),
+                        ),
+                        icon: _fetchingModels
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.cloud_sync_rounded, size: 16),
+                        label: const Text('拉取'),
+                      ),
+                    ),
+                  ],
+                ),
+                if (_modelFetchError != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    _modelFetchError!,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.danger,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _keyCtrl,
+                  enabled: !_busy,
+                  obscureText: _obscureKey,
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => _save(),
+                  decoration: appInputDecoration(
+                    context: context,
+                    label: 'API Key',
+                    suffixIcon: SizedBox(
+                      width: 92,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          AppIconTapButton(
+                            tooltip: '粘贴',
+                            onPressed: _busy
+                                ? null
+                                : () => _pasteInto(_keyCtrl),
+                            icon: Icons.content_paste_rounded,
+                          ),
+                          AppIconTapButton(
+                            tooltip: _obscureKey ? '显示' : '隐藏',
+                            onPressed: _busy
+                                ? null
+                                : () => setState(
+                                    () => _obscureKey = !_obscureKey,
+                                  ),
+                            icon: _obscureKey
+                                ? Icons.visibility_outlined
+                                : Icons.visibility_off_outlined,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                if (_formError != null) ...[
+                  const SizedBox(height: 14),
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: scheme.errorContainer,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Text(
+                      _formError!,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: scheme.onErrorContainer,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: keyboardInset,
+              child: _AiModelEditorActions(
+                saving: _saving,
+                busy: _busy,
+                onCancel: () => Navigator.of(context).pop(),
+                onSave: _save,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AiModelEditorActions extends StatelessWidget {
+  final bool saving;
+  final bool busy;
+  final VoidCallback onCancel;
+  final VoidCallback onSave;
+
+  const _AiModelEditorActions({
+    required this.saving,
+    required this.busy,
+    required this.onCancel,
+    required this.onSave,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Color.alphaBlend(
+          scheme.surface.withValues(alpha: 0.88),
+          Theme.of(context).scaffoldBackgroundColor,
+        ),
+        border: Border(
+          top: BorderSide(color: scheme.outline.withValues(alpha: 0.12)),
+        ),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(22, 14, 22, 18),
+          child: Row(
+            children: [
+              Expanded(
+                child: AppDialogActionButton(
+                  label: '取消',
+                  onPressed: busy ? null : onCancel,
+                  tone: AppActionButtonTone.neutral,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 2,
+                child: AppDialogActionButton(
+                  label: saving ? '保存中' : '保存',
+                  onPressed: busy ? null : onSave,
+                  icon: Icons.check_rounded,
+                  filled: true,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

@@ -54,8 +54,7 @@ final dataSyncServiceProvider = Provider<DataSyncService>((ref) {
       final lastUrl = await keychain.getLastServerUrl();
       if (lastUrl == null || lastUrl.trim().isEmpty) return false;
       final creds = await keychain.getCredentials(lastUrl);
-      final root = await keychain.getSyncRootDirectory();
-      return creds != null && root.trim().isNotEmpty;
+      return creds != null;
     },
     localSync: ref.watch(localSyncDsProvider),
     notifier: ref.read(syncNotifierProvider.notifier),

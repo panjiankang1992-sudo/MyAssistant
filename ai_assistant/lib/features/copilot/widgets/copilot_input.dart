@@ -387,14 +387,15 @@ class _ModelDropdownMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       width: 260,
       constraints: BoxConstraints(maxHeight: maxHeight),
       padding: const EdgeInsets.symmetric(vertical: 8),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: scheme.appElevatedSurface,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.border.withValues(alpha: 0.76)),
+        border: Border.all(color: scheme.appBorder.withValues(alpha: 0.76)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.08),
@@ -424,16 +425,14 @@ class _ModelDropdownMenu extends StatelessWidget {
                     height: 30,
                     decoration: BoxDecoration(
                       color: selected
-                          ? AppColors.primary.withValues(alpha: 0.12)
-                          : AppColors.inputBg,
+                          ? scheme.primary.withValues(alpha: 0.14)
+                          : scheme.appInput,
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Icon(
                       selected ? Icons.check_rounded : Icons.memory_rounded,
                       size: 16,
-                      color: selected
-                          ? AppColors.primary
-                          : AppColors.textTertiary,
+                      color: selected ? scheme.primary : scheme.appSubtleText,
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -451,9 +450,7 @@ class _ModelDropdownMenu extends StatelessWidget {
                             fontWeight: selected
                                 ? FontWeight.w900
                                 : FontWeight.w800,
-                            color: selected
-                                ? AppColors.primary
-                                : AppColors.text,
+                            color: selected ? scheme.primary : scheme.appText,
                           ),
                         ),
                         const SizedBox(height: 2),
@@ -461,9 +458,9 @@ class _ModelDropdownMenu extends StatelessWidget {
                           choice.subtitle,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
-                            color: AppColors.textSecondary,
+                            color: scheme.appMutedText,
                           ),
                         ),
                       ],

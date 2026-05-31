@@ -11,6 +11,7 @@ class PromptCards extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     const prompts = [
       _PromptData(Icons.analytics_rounded, '分析本月消费趋势', AppColors.workBg),
       _PromptData(Icons.article_rounded, '总结本周工作内容', Color(0xFFE8FAF3)),
@@ -47,9 +48,9 @@ class PromptCards extends StatelessWidget {
                             vertical: 13,
                           ),
                           decoration: BoxDecoration(
-                            color: AppColors.surface,
+                            color: scheme.appSurface,
                             borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: AppColors.border),
+                            border: Border.all(color: scheme.appBorder),
                           ),
                           child: Row(
                             children: [
@@ -57,13 +58,15 @@ class PromptCards extends StatelessWidget {
                                 width: 30,
                                 height: 30,
                                 decoration: BoxDecoration(
-                                  color: p.bgColor,
+                                  color: _toneBackground(scheme, p.bgColor),
                                   shape: BoxShape.circle,
                                 ),
                                 child: Icon(
                                   p.icon,
                                   size: 15,
-                                  color: AppColors.textSecondary,
+                                  color: scheme.isDarkTheme
+                                      ? scheme.appMutedText
+                                      : AppColors.textSecondary,
                                 ),
                               ),
                               const SizedBox(width: 10),
@@ -72,23 +75,23 @@ class PromptCards extends StatelessWidget {
                                   p.text,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontFamily: 'PingFang SC',
-                                    fontFamilyFallback: [
+                                    fontFamilyFallback: const [
                                       '.SF Pro Text',
                                       'system-ui',
                                       'sans-serif',
                                     ],
                                     fontSize: 14,
                                     fontWeight: FontWeight.w500,
-                                    color: AppColors.text,
+                                    color: scheme.appText,
                                   ),
                                 ),
                               ),
-                              const Icon(
+                              Icon(
                                 Icons.north_east_rounded,
                                 size: 14,
-                                color: AppColors.textTertiary,
+                                color: scheme.appSubtleText,
                               ),
                             ],
                           ),
@@ -122,6 +125,7 @@ class BuiltinSkillCards extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const skills = BuiltinSkillRegistry.all;
+    final scheme = Theme.of(context).colorScheme;
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 720),
@@ -130,20 +134,20 @@ class BuiltinSkillCards extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Row(
+              Row(
                 children: [
                   Icon(
                     Icons.extension_rounded,
                     size: 17,
-                    color: AppColors.textSecondary,
+                    color: scheme.appMutedText,
                   ),
-                  SizedBox(width: 7),
+                  const SizedBox(width: 7),
                   Text(
                     '内置技能',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w900,
-                      color: AppColors.text,
+                      color: scheme.appText,
                     ),
                   ),
                 ],
@@ -186,6 +190,7 @@ class _BuiltinSkillCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -194,9 +199,9 @@ class _BuiltinSkillCard extends StatelessWidget {
         child: Ink(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: AppColors.surface,
+            color: scheme.appSurface,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.border),
+            border: Border.all(color: scheme.appBorder),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -207,7 +212,9 @@ class _BuiltinSkillCard extends StatelessWidget {
                     width: 30,
                     height: 30,
                     decoration: BoxDecoration(
-                      color: skill.color.withValues(alpha: 0.1),
+                      color: skill.color.withValues(
+                        alpha: scheme.isDarkTheme ? 0.22 : 0.1,
+                      ),
                       borderRadius: BorderRadius.circular(11),
                     ),
                     child: Icon(skill.icon, size: 16, color: skill.color),
@@ -217,9 +224,9 @@ class _BuiltinSkillCard extends StatelessWidget {
                     skill.id,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 10,
-                      color: AppColors.textTertiary,
+                      color: scheme.appSubtleText,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -230,10 +237,10 @@ class _BuiltinSkillCard extends StatelessWidget {
                 skill.name,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w900,
-                  color: AppColors.text,
+                  color: scheme.appText,
                 ),
               ),
               const SizedBox(height: 5),
@@ -241,10 +248,10 @@ class _BuiltinSkillCard extends StatelessWidget {
                 skill.summary,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12,
                   height: 1.35,
-                  color: AppColors.textSecondary,
+                  color: scheme.appMutedText,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -254,4 +261,12 @@ class _BuiltinSkillCard extends StatelessWidget {
       ),
     );
   }
+}
+
+Color _toneBackground(ColorScheme scheme, Color color) {
+  if (!scheme.isDarkTheme) return color;
+  return Color.alphaBlend(
+    color.withValues(alpha: 0.18),
+    scheme.appElevatedSurface,
+  );
 }
