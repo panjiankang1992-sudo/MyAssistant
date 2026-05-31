@@ -27,12 +27,14 @@ class NoteAttachmentDraft {
   final String fileName;
   final String attachmentType;
   final String? mimeType;
+  final String? existingId;
 
   const NoteAttachmentDraft({
     required this.path,
     required this.fileName,
     required this.attachmentType,
     this.mimeType,
+    this.existingId,
   });
 }
 
@@ -89,8 +91,13 @@ class NotesNotifier extends Notifier<List<QuickNote>> {
         (looksLikeDiaryTitle(title)
             ? QuickNoteType.diary
             : QuickNoteType.document);
-    final attachmentIds = [...?initial?.attachmentIds];
+    final attachmentIds = <String>[];
     for (final draft in attachments) {
+      final existingId = draft.existingId?.trim();
+      if (existingId != null && existingId.isNotEmpty) {
+        attachmentIds.add(existingId);
+        continue;
+      }
       final file = File(draft.path);
       if (!await file.exists()) continue;
       final sizeBytes = await file.length();
